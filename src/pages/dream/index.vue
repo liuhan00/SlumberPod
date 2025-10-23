@@ -38,14 +38,16 @@
         <input 
           v-model="inputText" 
           class="input" 
-          placeholder="描述你的梦境..." 
+          placeholder="请输入你的梦境描述..." 
           :disabled="isLoading"
           @confirm="sendMessage"
+          style="border: 2px solid #007aff; background: white; color: #333;"
         />
         <button class="send-btn" :disabled="!inputText.trim() || isLoading" @click="sendMessage">
-          <text class="send-icon">📤</text>
+          <text class="send-icon">发送</text>
         </button>
       </view>
+      <text class="input-hint">输入梦境描述后点击发送按钮或按回车键</text>
     </view>
   </view>
 </template>
@@ -250,46 +252,71 @@ function generateDreamAnalysis(dreamDescription) {
 /* 输入区域 */
 .input-container {
   position: fixed;
-  bottom: 0;
+  bottom: 50px; /* 为底部导航栏留出空间 */
   left: 0;
   right: 0;
-  background: var(--bg);
-  padding: 12px 16px;
-  border-top: 1px solid var(--border);
+  background: #f8f9fa;
+  padding: 16px;
+  border-top: 2px solid #e9ecef;
+  z-index: 1000;
 }
 
 .input-wrapper {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
+  margin-bottom: 8px;
 }
 
 .input {
   flex: 1;
-  background: var(--input-bg);
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  padding: 12px 16px;
-  font-size: 14px;
+  background: white;
+  border: 2px solid #007aff;
+  border-radius: 25px;
+  padding: 14px 20px;
+  font-size: 16px;
+  color: #333;
+  box-shadow: 0 2px 8px rgba(0, 122, 255, 0.2);
+}
+
+.input:focus {
+  outline: none;
+  border-color: #0056b3;
+  box-shadow: 0 2px 12px rgba(0, 122, 255, 0.3);
 }
 
 .send-btn {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: var(--uni-color-primary);
+  min-width: 60px;
+  height: 48px;
+  border-radius: 24px;
+  background: #007aff;
   border: none;
   display: flex;
   align-items: center;
   justify-content: center;
+  color: white;
+  font-weight: 600;
+  font-size: 14px;
 }
 
 .send-btn:disabled {
-  opacity: 0.5;
+  background: #ccc;
+  opacity: 0.6;
+}
+
+.send-btn:not(:disabled):hover {
+  background: #0056b3;
 }
 
 .send-icon {
-  font-size: 18px;
+  font-size: 14px;
+}
+
+.input-hint {
+  font-size: 12px;
+  color: #666;
+  text-align: center;
+  display: block;
 }
 
 /* 打字指示器 */

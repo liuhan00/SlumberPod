@@ -4,6 +4,13 @@
     <view class="header">
       <SearchBar />
       <view class="header-right">
+        <!-- 消息图标 -->
+        <view class="message-icon" @click="goToMessages">
+          <text class="message-badge" v-if="unreadCount > 0">{{ unreadCount > 99 ? '99+' : unreadCount }}</text>
+          <text class="message-symbol">💬</text>
+        </view>
+        
+        <!-- 播放器图标 -->
         <view v-if="currentTrack" class="playing-icon" @click="goToPlayer">
           <image class="cover" :src="currentTrack.cover" mode="aspectFill" />
           <view v-if="isPlaying" class="playing-indicator"></view>
@@ -15,6 +22,47 @@
     </view>
     
     <BannerCarousel />
+    
+    <!-- 随机白噪音色子 -->
+    <view class="dice-section">
+      <view class="dice-header">
+        <text class="dice-title">随机白噪音</text>
+        <view class="dice-btn" @click="randomizeNoises">
+          <text class="dice-icon">🎲</text>
+          <text class="dice-text">随机</text>
+        </view>
+      </view>
+      <view class="dice-grid">
+        <view 
+          v-for="(noise, index) in randomNoises" 
+          :key="index" 
+          class="dice-item"
+          :class="{ active: isPlayingNoise(noise.id) }"
+          @click="toggleNoisePlay(noise)"
+        >
+          <view class="dice-icon-wrapper">
+            <text class="noise-icon">{{ getNoiseIcon(noise.name) }}</text>
+            <view v-if="isPlayingNoise(noise.id)" class="playing-dot"></view>
+          </view>
+          <text class="noise-name">{{ noise.name }}</text>
+        </view>
+      </view>
+    </view>
+    
+    <!-- 创作模块 -->
+    <view class="creation-section">
+      <view class="creation-header">
+        <text class="creation-title">创作你的白噪音</text>
+        <view class="creation-btn" @click="goToCreation">
+          <text class="creation-icon">🎵</text>
+          <text class="creation-text">开始创作</text>
+        </view>
+      </view>
+      <view class="creation-desc">
+        <text class="desc-text">录制、混音、创作属于你的独特白噪音，分享到社区与大家交流</text>
+      </view>
+    </view>
+    
     <view class="section">
       <text class="section-title">推荐白噪音</text>
       <view class="grid">
@@ -30,6 +78,7 @@
   </scroll-view>
 </template>
 <script setup>
+import { ref, onMounted } from 'vue'
 import SearchBar from '@/components/SearchBar.vue'
 import BannerCarousel from '@/components/BannerCarousel.vue'
 import NoiseCard from '@/components/NoiseCard.vue'
@@ -52,6 +101,62 @@ const recent = items
 const playerStore = usePlayerStore()
 const { currentTrack, isPlaying } = storeToRefs(playerStore)
 
+// 随机白噪音功能
+const randomNoises = ref([])
+const playingNoises = ref(new Set())
+
+// 初始化随机白噪音
+const initializeRandomNoises = () => {
+  randomNoises.value = getRandomNoises(3)
+}
+
+// 获取随机白噪音
+const getRandomNoises = (count) => {
+  const shuffled = [...noises].sort(() => 0.5 - Math.random())
+  return shuffled.slice(0, count)
+}
+
+// 随机化白噪音
+const randomizeNoises = () => {
+  // 停止所有正在播放的白噪音
+  playingNoises.value.clear()
+  randomNoises.value = getRandomNoises(3)
+}
+
+// 切换白噪音播放状态
+const toggleNoisePlay = (noise) => {
+  if (playingNoises.value.has(noise.id)) {
+    playingNoises.value.delete(noise.id)
+  } else {
+    playingNoises.value.add(noise.id)
+  }
+}
+
+// 检查白噪音是否正在播放
+const isPlayingNoise = (noiseId) => {
+  return playingNoises.value.has(noiseId)
+}
+
+// 获取白噪音图标
+const getNoiseIcon = (name) => {
+  const iconMap = {
+    '海浪': '🌊',
+    '雨声': '🌧️',
+    '壁炉': '🔥',
+    '树林': '🌲',
+    '地铁': '🚇',
+    '自然声': '🌿',
+    '居家': '🏠',
+    '环境': '🏙️'
+  }
+  return iconMap[name] || '🎵'
+}
+
+// 初始化
+onMounted(() => {
+  initializeRandomNoises()
+})
+
 // 跳转到播放页面
 function goToPlayer() {
   try {
@@ -60,6 +165,27 @@ function goToPlayer() {
     if(typeof location !== 'undefined') location.hash = '#/pages/player/index'
   }
 }
+
+// 跳转到消息页面
+function goToMessages() {
+  try {
+    uni.navigateTo({ url: '/pages/messages/index' })
+  } catch(e) {
+    if(typeof location !== 'undefined') location.hash = '#/pages/messages/index'
+  }
+}
+
+// 跳转到创作页面
+function goToCreation() {
+  try {
+    uni.navigateTo({ url: '/pages/creation/index' })
+  } catch(e) {
+    if(typeof location !== 'undefined') location.hash = '#/pages/creation/index'
+  }
+}
+
+// 未读消息数量（模拟数据）
+const unreadCount = ref(3)
 </script>
 <style scoped>
 .page { min-height:100vh }
@@ -78,6 +204,52 @@ function goToPlayer() {
   right: 16px;
   top: 50%;
   transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* 消息图标 */
+.message-icon {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--card-bg, #ffffff);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s;
+}
+
+.message-icon:active {
+  transform: scale(0.95);
+  opacity: 0.8;
+}
+
+.message-symbol {
+  font-size: 18px;
+}
+
+.message-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  background: #ff3b30;
+  color: white;
+  font-size: 10px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  border: 2px solid white;
+  animation: pulse 1.5s infinite;
 }
 
 /* 默认播放图标 */
@@ -131,6 +303,185 @@ function goToPlayer() {
   0% { transform: scale(1); opacity: 1; }
   50% { transform: scale(1.2); opacity: 0.7; }
   100% { transform: scale(1); opacity: 1; }
+}
+
+/* 创作模块 */
+.creation-section {
+  padding: 20px 16px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  margin: 12px 16px;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(102, 126, 234, 0.3);
+  color: white;
+}
+
+.creation-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.creation-title {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.creation-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 20px;
+  background: rgba(255, 255, 255, 0.2);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 25px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.3s;
+  backdrop-filter: blur(10px);
+}
+
+.creation-btn:active {
+  transform: scale(0.95);
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.creation-icon {
+  font-size: 16px;
+}
+
+.creation-text {
+  font-weight: 500;
+}
+
+.creation-desc {
+  opacity: 0.9;
+}
+
+.desc-text {
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+/* 随机白噪音色子区域 */
+.dice-section {
+  padding: 16px;
+  background: var(--card-bg, #ffffff);
+  margin: 12px 16px;
+  border-radius: 16px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+}
+
+.dice-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.dice-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--fg, #333);
+}
+
+.dice-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: var(--uni-color-primary, #007aff);
+  color: white;
+  border-radius: 20px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.dice-btn:active {
+  transform: scale(0.95);
+  opacity: 0.8;
+}
+
+.dice-icon {
+  font-size: 16px;
+}
+
+.dice-text {
+  font-weight: 500;
+}
+
+.dice-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.dice-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 8px;
+  background: var(--input-bg, #f8f9fa);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 2px solid transparent;
+}
+
+.dice-item.active {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-color: #5a67d8;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.dice-item:active {
+  transform: scale(0.95);
+}
+
+.dice-icon-wrapper {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  margin-bottom: 8px;
+}
+
+.dice-item.active .dice-icon-wrapper {
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(4px);
+}
+
+.noise-icon {
+  font-size: 24px;
+}
+
+.playing-dot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ff3b30;
+  border: 2px solid white;
+  animation: pulse 1.5s infinite;
+}
+
+.noise-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted, #666);
+  text-align: center;
+}
+
+.dice-item.active .noise-name {
+  color: white;
 }
 
 .section { padding: 12px 16px }

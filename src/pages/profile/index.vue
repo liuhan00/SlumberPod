@@ -36,6 +36,7 @@ const settings = [
   { key:'favorites', label:'我喜欢的' },
   { key:'history', label:'播放历史' },
   { key:'comments', label:'我的评论' },
+  { key:'creations', label:'我的创作' },
   { key:'feed', label:'社区动态' },
   { key:'account', label:'账号资料' },
   { key:'help', label:'帮助与客服' },
@@ -58,6 +59,7 @@ function onSetting(key){
   if(key==='favorites') go('pages/favorites/index')
   else if(key==='history') go('pages/history/index')
   else if(key==='comments') go('pages/comments/index')
+  else if(key==='creations') go('pages/creations/index')
   else if(key==='feed') { try { uni.switchTab({ url:'/pages/community/index' }) } catch(e) { go('pages/community/index') } }
   else if(key==='account') go('pages/account/index')
   else if(key==='help') go('pages/help/index')

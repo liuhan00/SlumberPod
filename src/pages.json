@@ -21,7 +21,13 @@
     { "path": "pages/comments/index", "style": { "navigationBarTitleText": "我的评论" } },
     { "path": "pages/account/index", "style": { "navigationBarTitleText": "账号资料" } },
     { "path": "pages/help/index", "style": { "navigationBarTitleText": "帮助与客服" } },
-    { "path": "pages/about/index", "style": { "navigationBarTitleText": "关于 SlumberPod" } }
+    { "path": "pages/about/index", "style": { "navigationBarTitleText": "关于 SlumberPod" } },
+    { "path": "pages/messages/index", "style": { "navigationBarTitleText": "消息" } },
+    { "path": "pages/messages/detail", "style": { "navigationBarTitleText": "消息详情" } },
+    { "path": "pages/search/index", "style": { "navigationBarTitleText": "搜索" } },
+    { "path": "pages/creation/index", "style": { "navigationBarTitleText": "创作白噪音" } },
+    { "path": "pages/creation/share", "style": { "navigationBarTitleText": "分享创作" } },
+    { "path": "pages/creations/index", "style": { "navigationBarTitleText": "我的创作" } }
   ],
   "globalStyle": {
     "navigationBarTextStyle": "black",
