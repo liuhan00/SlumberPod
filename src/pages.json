@@ -12,6 +12,7 @@
     { "path": "pages/sleep/index", "style": { "navigationBarTitleText": "睡觉" } },
     { "path": "pages/sleep/Nap", "style": { "navigationBarTitleText": "小憩" } },
     { "path": "pages/sleep/Alarm", "style": { "navigationBarTitleText": "闹钟与提醒" } },
+    { "path": "pages/dream/index", "style": { "navigationBarTitleText": "AI解梦" } },
     { "path": "pages/profile/index", "style": { "navigationBarTitleText": "我的" } },
     { "path": "pages/player/index", "style": { "navigationBarTitleText": "播放" } },
     { "path": "pages/queue/index", "style": { "navigationBarTitleText": "队列" } },
@@ -51,6 +52,12 @@
         "text": "睡觉",
         "iconPath": "static/tabbar/sleep.svg",
         "selectedIconPath": "static/tabbar/sleep.svg"
+      },
+      {
+        "pagePath": "pages/dream/index",
+        "text": "AI解梦",
+        "iconPath": "static/tabbar/dream.svg",
+        "selectedIconPath": "static/tabbar/dream.svg"
       },
       {
         "pagePath": "pages/profile/index",
