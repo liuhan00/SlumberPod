@@ -12,17 +12,21 @@
     { "path": "pages/sleep/index", "style": { "navigationBarTitleText": "睡觉" } },
     { "path": "pages/sleep/Nap", "style": { "navigationBarTitleText": "小憩" } },
     { "path": "pages/sleep/Alarm", "style": { "navigationBarTitleText": "闹钟与提醒" } },
-    { "path": "pages/training/index", "style": { "navigationBarTitleText": "训练" } },
     { "path": "pages/profile/index", "style": { "navigationBarTitleText": "我的" } },
     { "path": "pages/player/index", "style": { "navigationBarTitleText": "播放" } },
     { "path": "pages/queue/index", "style": { "navigationBarTitleText": "队列" } },
-    { "path": "pages/history/index", "style": { "navigationBarTitleText": "历史" } }
+    { "path": "pages/history/index", "style": { "navigationBarTitleText": "历史" } },
+    { "path": "pages/favorites/index", "style": { "navigationBarTitleText": "我喜欢的" } },
+    { "path": "pages/comments/index", "style": { "navigationBarTitleText": "我的评论" } },
+    { "path": "pages/account/index", "style": { "navigationBarTitleText": "账号资料" } },
+    { "path": "pages/help/index", "style": { "navigationBarTitleText": "帮助与客服" } },
+    { "path": "pages/about/index", "style": { "navigationBarTitleText": "关于 SlumberPod" } }
   ],
   "globalStyle": {
     "navigationBarTextStyle": "black",
     "navigationBarTitleText": "SlumberPod",
-    "navigationBarBackgroundColor": "#F8F8F8",
-    "backgroundColor": "#F8F8F8"
+    "navigationBarBackgroundColor": "#0c0f16",
+    "backgroundColor": "#0c0f16"
   },
   "tabBar": {
     "color": "#666",
@@ -47,12 +51,6 @@
         "text": "睡觉",
         "iconPath": "static/tabbar/sleep.svg",
         "selectedIconPath": "static/tabbar/sleep.svg"
-      },
-      {
-        "pagePath": "pages/training/index",
-        "text": "训练",
-        "iconPath": "static/tabbar/training.svg",
-        "selectedIconPath": "static/tabbar/training.svg"
       },
       {
         "pagePath": "pages/profile/index",

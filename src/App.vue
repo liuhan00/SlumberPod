@@ -1,6 +1,15 @@
+<template>
+  <view>
+    <slot />
+    <MiniPlayer />
+  </view>
+</template>
 <script>
+import MiniPlayer from '@/components/MiniPlayer.vue'
 import { usePlayerStore } from '@/stores/player'
+import { getHour, getThemeByHour, baseColors, textColors } from '@/utils/timeTheme'
 export default {
+  components: { MiniPlayer },
   onLaunch() {
     const store = usePlayerStore()
     const s = uni.getStorageSync('playerState')
@@ -13,6 +22,16 @@ export default {
       store.isMuted = s.isMuted || false
       store.loopMode = s.loopMode || 'all'
     }
+  },
+  onShow() {
+    const h = getHour()
+    const t = getThemeByHour(h)
+    try {
+      uni.setNavigationBarColor({
+        frontColor: textColors[t] === '#0f172a' ? '#000000' : '#ffffff',
+        backgroundColor: baseColors[t]
+      })
+    } catch (e) {}
   },
   onHide() {
     const store = usePlayerStore()
@@ -31,5 +50,7 @@ export default {
 </script>
 
 <style>
-/*每个页面公共css */
+/* 全局背景和文字颜色由 theme 驱动 */
+html, body, #app { height: 100%; }
+.page { min-height: 100vh; padding-bottom: var(--bottom-safe, 0); }
 </style>

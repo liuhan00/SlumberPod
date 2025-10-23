@@ -1,5 +1,5 @@
 <template>
-  <scroll-view class="page" scroll-y>
+  <scroll-view class="page" scroll-y :style="bgStyle">
     <SearchBar />
     <BannerCarousel />
     <view class="section">
@@ -20,6 +20,10 @@
 import SearchBar from '@/components/SearchBar.vue'
 import BannerCarousel from '@/components/BannerCarousel.vue'
 import NoiseCard from '@/components/NoiseCard.vue'
+import { useGlobalTheme } from '@/composables/useGlobalTheme'
+import { useThemeStore } from '@/stores/theme'
+const themeStore = useThemeStore(); themeStore.load()
+const { bgStyle } = useGlobalTheme()
 
 import { allNoises as noises } from '@/data/noises'
 import { useHistoryStore } from '@/stores/history'

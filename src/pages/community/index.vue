@@ -1,5 +1,5 @@
 <template>
-  <scroll-view class="page" scroll-y>
+  <scroll-view class="page" scroll-y :style="bgStyle">
     <view class="section">
       <CommunityComposer @submit="createPost" />
       <view class="tabs">
@@ -13,6 +13,10 @@
 import { ref, computed } from 'vue'
 import CommunityComposer from '@/components/CommunityComposer.vue'
 import PostCard from '@/components/PostCard.vue'
+import { useGlobalTheme } from '@/composables/useGlobalTheme'
+import { useThemeStore } from '@/stores/theme'
+const themeStore = useThemeStore(); themeStore.load()
+const { bgStyle } = useGlobalTheme()
 
 const tabs=['推荐','最新','关注']
 const active = ref('推荐')

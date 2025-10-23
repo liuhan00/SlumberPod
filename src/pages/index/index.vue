@@ -16,10 +16,10 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background-color: #0f172a;
+  background-color: var(--card-bg);
 }
 .title {
-  color: #fff;
+  color: var(--fg);
   font-size: 28px;
   font-weight: 600;
 }

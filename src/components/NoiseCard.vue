@@ -14,7 +14,7 @@ const store = usePlayerStore()
 function onClick() {
   store.setPlaylist([])
   store.play(props.item)
-  uni.navigateTo({ url: `/pages/player/index?id=${props.item.id}` })
+  try{ uni.navigateTo({ url: `/pages/player/index?id=${props.item.id}` }) }catch(e){ if(typeof location!=='undefined') location.hash = `#/pages/player/index?id=${props.item.id}` }
 }
 function onLongPress(){
   store.addToQueue(props.item)
@@ -25,6 +25,6 @@ function onLongPress(){
 .card { width:48%; margin-bottom: 12px; }
 .cover { width:100%; height:120px; border-radius: 10px; }
 .meta { margin-top:6px }
-.name { font-size: 14px; color:#111 }
-.author { font-size: 12px; color:#666 }
+.name { font-size: 14px; color: var(--fg) }
+.author { font-size: 12px; color: var(--muted) }
 </style>

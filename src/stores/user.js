@@ -14,6 +14,7 @@ export const useUserStore = defineStore('user', {
   }),
   actions: {
     toggleVip(){ this.vip = !this.vip },
-    updateNickname(n){ this.nickname = n }
+    updateNickname(n){ this.nickname = n },
+    updateAvatar(url){ this.avatar = url }
   }
 })

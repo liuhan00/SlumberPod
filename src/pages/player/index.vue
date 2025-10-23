@@ -9,6 +9,7 @@
       <text class="count">{{ (store.currentIndex + 1) }} / {{ store.playlist.length }}</text>
     </view>
     <view class="nav">
+      <button class="heart" @click="toggleFav">{{ isFav ? '❤️' : '♡' }}</button>
       <button class="btn" @click="goQueue">查看队列</button>
     </view>
     <PlayerControls
@@ -36,12 +37,16 @@ import { computed, watch } from 'vue'
 import PlayerControls from '@/components/PlayerControls.vue'
 import { usePlayerStore } from '@/stores/player'
 import { useHistoryStore } from '@/stores/history'
+import { useFavoritesStore } from '@/stores/favorites'
 import { allNoises } from '@/data/noises'
 
 const store = usePlayerStore()
 const historyStore = useHistoryStore()
+const favStore = useFavoritesStore(); favStore.load()
 historyStore.load()
 const track = computed(()=> store.currentTrack)
+const isFav = computed(()=> !!track.value && favStore.items.some(x=>x.id===track.value.id))
+function toggleFav(){ if(!track.value) return; favStore.toggle(track.value) }
 let audioCtx
 
 onLoad((query)=>{
@@ -139,10 +144,11 @@ watch(()=>store.volume, v=>{ if(audioCtx) audioCtx.volume = v })
 </script>
 <style scoped>
 .page{ min-height:100vh; padding-bottom: 24px }
-.nav{ display:flex; justify-content:flex-end; padding: 0 16px }
+.nav{ display:flex; justify-content:space-between; align-items:center; padding: 0 16px }
 .btn{ padding:6px 10px; border-radius:6px; background:#f2f3f5 }
-.cover-wrap{ padding:24px 16px }
-.cover{ width:100%; height:220px; border-radius:12px }
+.heart{ padding:6px 10px; border-radius:999px; background: var(--input-bg); color: var(--fg) }
+.cover-wrap{ padding:24px 16px; display:flex; justify-content:center }
+.cover{ width:220px; height:220px; border-radius:50%; box-shadow: 0 4px 18px rgba(0,0,0,.15); overflow:hidden }
 .spinning{ animation: spin 6s linear infinite }
 @keyframes spin{ from{ transform: rotate(0deg) } to{ transform: rotate(360deg) } }
 .meta{ padding: 0 16px }
