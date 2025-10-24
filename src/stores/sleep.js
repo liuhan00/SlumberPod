@@ -20,6 +20,13 @@ export const useSleepStore = defineStore('sleep', {
       this.persist()
       return alarm
     },
+    updateAlarm(id, updates){ 
+      const alarm = this.alarms.find(x=>x.id===id); 
+      if(alarm){ 
+        Object.assign(alarm, updates); 
+        this.persist() 
+      }
+    },
     toggleAlarm(id){ const a=this.alarms.find(x=>x.id===id); if(a){ a.enabled=!a.enabled; this.persist() } },
     removeAlarm(id){ this.alarms = this.alarms.filter(x=>x.id!==id); this.persist() },
     setAlarmTime(id, { hour, minute }){ const a=this.alarms.find(x=>x.id===id); if(a){ a.hour=hour; a.minute=minute; this.persist() } },

@@ -23,43 +23,15 @@
     
     <BannerCarousel />
     
-    <!-- 随机白噪音色子 -->
-    <view class="dice-section">
-      <view class="dice-header">
-        <text class="dice-title">随机白噪音</text>
-        <view class="dice-btn" @click="randomizeNoises">
-          <text class="dice-icon">🎲</text>
-          <text class="dice-text">随机</text>
-        </view>
+    <!-- 两个图片风格卡片：听白噪音 & 我的创作 -->
+    <view class="two-card-wrap" style="padding:12px 16px; display:flex; gap:12px;">
+      <view class="img-card left" @click="goToFree" style="flex:1; border-radius:14px; padding:18px; color:#07261a; background:linear-gradient(135deg,#bff2df 0%,#61c291 100%);">
+        <text style="font-size:18px;font-weight:700; margin-bottom:6px; display:block;">听白噪音</text>
+        <text style="font-size:12px; opacity:0.9; display:block;">1000+ 自由组合</text>
       </view>
-      <view class="dice-grid">
-        <view 
-          v-for="(noise, index) in randomNoises" 
-          :key="index" 
-          class="dice-item"
-          :class="{ active: isPlayingNoise(noise.id) }"
-          @click="toggleNoisePlay(noise)"
-        >
-          <view class="dice-icon-wrapper">
-            <text class="noise-icon">{{ getNoiseIcon(noise.name) }}</text>
-            <view v-if="isPlayingNoise(noise.id)" class="playing-dot"></view>
-          </view>
-          <text class="noise-name">{{ noise.name }}</text>
-        </view>
-      </view>
-    </view>
-    
-    <!-- 创作模块 -->
-    <view class="creation-section">
-      <view class="creation-header">
-        <text class="creation-title">创作你的白噪音</text>
-        <view class="creation-btn" @click="goToCreation">
-          <text class="creation-icon">🎵</text>
-          <text class="creation-text">开始创作</text>
-        </view>
-      </view>
-      <view class="creation-desc">
-        <text class="desc-text">录制、混音、创作属于你的独特白噪音，分享到社区与大家交流</text>
+      <view class="img-card right" @click="goToCreation" style="flex:1; border-radius:14px; padding:18px; color:#0f1538; background:linear-gradient(135deg,#d1d7ff 0%,#8b82ff 100%);">
+        <text style="font-size:18px;font-weight:700; margin-bottom:6px; display:block;">我的创作</text>
+        <text style="font-size:12px; opacity:0.9; display:block;">记录并分享你的声音</text>
       </view>
     </view>
     
@@ -182,6 +154,11 @@ function goToCreation() {
   } catch(e) {
     if(typeof location !== 'undefined') location.hash = '#/pages/creation/index'
   }
+}
+
+// 跳转到自由组合页面（听白噪音）
+function goToFree(){
+  try{ uni.navigateTo({ url: '/pages/noise/Free' }) }catch(e){ if(typeof location!=='undefined') location.hash = '#/pages/noise/Free' }
 }
 
 // 未读消息数量（模拟数据）

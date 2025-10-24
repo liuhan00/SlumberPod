@@ -27,7 +27,8 @@
     { "path": "pages/search/index", "style": { "navigationBarTitleText": "搜索" } },
     { "path": "pages/creation/index", "style": { "navigationBarTitleText": "创作白噪音" } },
     { "path": "pages/creation/share", "style": { "navigationBarTitleText": "分享创作" } },
-    { "path": "pages/creations/index", "style": { "navigationBarTitleText": "我的创作" } }
+    { "path": "pages/creations/index", "style": { "navigationBarTitleText": "我的创作" } },
+    { "path": "pages/noise/Free", "style": { "navigationBarTitleText": "自由组合" } }
   ],
   "globalStyle": {
     "navigationBarTextStyle": "black",
