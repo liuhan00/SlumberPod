@@ -20,16 +20,55 @@ function computeTheme(h){
   return 'night'
 }
 
-onLoad((query)=>{
+onLoad(async (query)=>{
   const now = new Date()
   const mockHour = query?.hour ? Number(query.hour) : now.getHours()
   theme.value = computeTheme(mockHour)
-  setTimeout(()=> enter(), 1500)
+  
+  // 检查用户是否已登录
+  const isLoggedIn = await checkAuthStatus()
+  
+  setTimeout(()=> {
+    if(isLoggedIn) {
+      // 已登录，跳转到首页
+      enterHome()
+    } else {
+      // 未登录，跳转到登录页面
+      enterLogin()
+    }
+  }, 1500)
 })
 
-function enter(){
+// 检查认证状态
+async function checkAuthStatus() {
+  try {
+    // 检查本地存储的认证信息
+    const authData = localStorage.getItem('app_auth_user')
+    if(!authData) return false
+    
+    const auth = JSON.parse(authData)
+    if(!auth || !auth.token) return false
+    
+    // 验证token是否有效 - 使用完整的后端URL
+    const response = await fetch('http://localhost:3002/api/auth/me', {
+      headers: { Authorization: `Bearer ${auth.token}` }
+    })
+    
+    return response.ok
+  } catch(error) {
+    console.warn('Auth check failed:', error)
+    return false
+  }
+}
+
+function enterHome(){
   // 进入首页 tab
   try { uni.switchTab({ url:'/pages/home/index' }) } catch(e) { uni.navigateTo({ url:'/pages/home/index' }) }
+}
+
+function enterLogin(){
+  // 跳转到登录页面
+  uni.navigateTo({ url:'/pages/auth/Login' })
 }
 </script>
 <style scoped>

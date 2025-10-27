@@ -9,6 +9,17 @@
       </view>
     </view>
 
+    <view class="auth-actions" style="padding:12px 16px;">
+      <view v-if="!authUser">
+        <button class="btn primary" @click="openLogin">登录</button>
+        <button class="btn" @click="openRegister">注册</button>
+      </view>
+      <view v-else>
+        <text>已登录：{{ authUser.name || authUser.id }}</text>
+        <button class="btn" @click="logout">登出</button>
+      </view>
+    </view>
+
     <StatsGrid :stats="user.stats" />
 
     <view class="section">
@@ -23,6 +34,8 @@ import ProfileHeader from '@/components/ProfileHeader.vue'
 import StatsGrid from '@/components/StatsGrid.vue'
 import SettingsList from '@/components/SettingsList.vue'
 import { useGlobalTheme } from '@/composables/useGlobalTheme'
+import { getAuthLocal } from '@/store/auth'
+import { ref } from 'vue'
 const { bgStyle } = useGlobalTheme()
 
 const userStore = useUserStore()
@@ -30,6 +43,12 @@ const { avatar, nickname, stats } = storeToRefs(userStore)
 const user = { avatar: avatar.value, nickname: nickname.value, stats: stats.value }
 
 const pageStyle = bgStyle
+
+// auth state
+const authUser = ref(getAuthLocal())
+function openLogin(){ try{ uni.navigateTo({ url:'/pages/auth/Login' }) }catch(e){ location.hash='#/pages/auth/Login' } }
+function openRegister(){ try{ uni.navigateTo({ url:'/pages/auth/Register' }) }catch(e){ location.hash='#/pages/auth/Register' } }
+async function logout(){ try{ const api = await import('@/api/auth'); api.logout(); authUser.value = null; const { useUserStore } = await import('@/stores/user'); useUserStore().applyAuth(null); uni.showToast({ title:'已登出' }) }catch(e){ uni.showToast({ title:'登出失败', icon:'none' }) } }
 
 
 const settings = [
