@@ -27,7 +27,8 @@ export const useSleepStore = defineStore('sleep', {
         this.persist() 
       }
     },
-    toggleAlarm(id){ const a=this.alarms.find(x=>x.id===id); if(a){ a.enabled=!a.enabled; this.persist() } },
+    toggleAlarm(id){ const a=this.alarms.find(x=>x.id===id); if(a){ const prev = a.enabled; a.enabled=!a.enabled; this.persist(); // if user turned alarm off and it's a wake alarm, open feedback prompt
+      try{ if(prev && !a.enabled && /起床|起床闹钟|起床/.test(a.label || '')){ uni.navigateTo({ url:'/pages/feedback/ModalPrompt' }) } }catch(e){} } },
     removeAlarm(id){ this.alarms = this.alarms.filter(x=>x.id!==id); this.persist() },
     setAlarmTime(id, { hour, minute }){ const a=this.alarms.find(x=>x.id===id); if(a){ a.hour=hour; a.minute=minute; this.persist() } },
     setAlarmRingtone(id, name){ const a=this.alarms.find(x=>x.id===id); if(a){ a.ringtone=name; this.persist() } },

@@ -38,14 +38,7 @@
         <circle :cx="knobX" :cy="knobY" r="10" class="knob" @touchstart.stop.prevent="startDrag" @touchmove.stop.prevent="onDrag" @touchend.stop.prevent="endDrag" @mousedown.stop.prevent="startDragMouse" @mousemove.stop.prevent="onDragMouse" @mouseup.stop.prevent="endDragMouse" />
       </svg>
       <text class="timer-center" v-if="showTime">{{ formattedRemaining }}</text>
-    </view>
 
-    <!-- icons at triangle corners showing selected noises -->
-    <view class="triangle-icons">
-      <view v-for="(n, idx) in threeTracks" :key="idx" class="tri-icon" :style="triStyle(idx)">
-        <button class="tri-btn" @click="toggleCorner(idx)">{{ getNoiseIcon(n) }}</button>
-        <text class="tri-label">{{ n?.name || '' }}</text>
-      </view>
     </view>
 
     <!-- meta area -->
@@ -170,25 +163,23 @@ const threePositions = ref([{left:0,top:0},{left:0,top:0},{left:0,top:0}])
 function updateTriPositions(){
   const svgRect = svgRef.value?.getBoundingClientRect?.() || null
   if(!svgRect) return
-  
-  // 使用固定像素值定位，基于SVG的300x300尺寸
-  const svgCenterX = 150 // SVG中心X
-  const svgCenterY = 150 // SVG中心Y
-  
-  // 三角形顶点相对于SVG中心的偏移（像素）
-  const topOffset = -110   // 顶部顶点
-  const sideOffsetX = 95   // 左右顶点的X偏移
-  const sideOffsetY = 55   // 左右顶点的Y偏移
-  
-  // 计算在页面中的实际位置
-  const scaleX = svgRect.width / 300
-  const scaleY = svgRect.height / 300
-  
-  threePositions.value = [
-    { left: (svgRect.left + svgCenterX * scaleX) + 'px', top: (svgRect.top + (svgCenterY + topOffset) * scaleY) + 'px' },
-    { left: (svgRect.left + (svgCenterX + sideOffsetX) * scaleX) + 'px', top: (svgRect.top + (svgCenterY + sideOffsetY) * scaleY) + 'px' },
-    { left: (svgRect.left + (svgCenterX - sideOffsetX) * scaleX) + 'px', top: (svgRect.top + (svgCenterY + sideOffsetY) * scaleY) + 'px' }
-  ]
+
+n  // compute center and scale based on SVG (300x300 viewBox)
+  const scale = svgRect.width / 300
+  const cx = svgRect.left + (150 * scale)
+  const cy = svgRect.top + (150 * scale)
+  // place icons evenly around outer ring, slightly outside radius
+  const outerRadius = 110 * scale
+  const offsetOut = 36 * scale // distance beyond ring to place icons
+  const r = outerRadius + offsetOut
+  // angles for three icons: top (-90deg), bottom-left (150deg), bottom-right (30deg)
+  const angles = [-90, 150, 30]
+  threePositions.value = angles.map(a=>{
+    const rad = a * Math.PI / 180
+    const x = cx + r * Math.cos(rad)
+    const y = cy + r * Math.sin(rad)
+    return { left: x + 'px', top: y + 'px' }
+  })
 }
 function triStyle(idx){ const p = threePositions.value[idx] || {left:'0px', top:'0px'}; return { left: p.left, top: p.top, transform: 'translate(-50%,-50%)' } }
 
@@ -472,9 +463,16 @@ onMounted(()=>{
 .tri-icon{ position:absolute }
 .triangle-icons{ position:relative }
 .tri-icon{ left:50%; top:50%; transform:translate(-50%,-50%) }
-.pos-0{ transform: translate(-50%,-50%) translateY(-110px) }
-.pos-1{ transform: translate(-50%,-50%) translate(95px,55px) }
-.pos-2{ transform: translate(-50%,-50%) translate(-95px,55px) }
+/* position classes for triangle corner icons relative to timer-wrap center */
+.tri-icon.pos-0{ transform: translate(-50%,-50%) translateY(-110px) }
+.tri-icon.pos-1{ transform: translate(-50%,-50%) translate(95px,55px) }
+.tri-icon.pos-2{ transform: translate(-50%,-50%) translate(-95px,55px) }
+
+/* ensure triangle icons are positioned over the timer, not page bottom */
+.timer-wrap{ height:420px; position:relative; display:flex; align-items:center; justify-content:center }
+.triangle-icons{ position:absolute; left:0; top:0; right:0; bottom:0; pointer-events:none }
+.tri-icon{ position:absolute; left:50%; top:50% }
+
 .ticks .tick{ fill:rgba(255,255,255,0.6) }
 .tick-label{ font-size:12px; fill:rgba(255,255,255,0.6); text-anchor:middle }
 .triangles .tri{ fill:rgba(255,255,255,0.04) }

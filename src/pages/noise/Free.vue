@@ -5,7 +5,13 @@
       <text class="title">自由组合</text>
       <view class="actions">
         <button class="icon" @click="openSearch">🔍</button>
-        <button class="icon" @click="openPlayerQuick">🔊</button>
+        <view v-if="player.currentTrack" class="playing-icon" @click="openPlayerQuick">
+          <image class="cover" :src="player.currentTrack.cover" mode="aspectFill" />
+          <view v-if="player.isPlaying" class="playing-indicator"></view>
+        </view>
+        <view v-else class="player-icon" @click="openPlayerQuick">
+          <text class="icon">▶</text>
+        </view>
       </view>
     </view>
 
@@ -42,7 +48,7 @@
         </view>
       </view>
       <view class="mini-right">
-        <button class="mini-play" @click="onMiniPlayClick">
+        <button class="mini-play" @click="goToPlayer">
           <text v-if="anyPlaying">⮝</text>
           <text v-else>▶</text>
         </button>
@@ -172,6 +178,13 @@ function openPlayerQuick(){
   try{ uni.navigateTo({ url: '/pages/player/index' }) }catch(e){ location.hash = '#/pages/player/index' }
 }
 
+function goToPlayer(){
+  // navigate to player detail page and pass current first mini noise id if available
+  const first = randomNoises.value[0]
+  const id = first?.id ? `?id=${first.id}` : ''
+  try{ uni.navigateTo({ url: `/pages/player/index${id}` }) }catch(e){ location.hash = `#/pages/player/index${id}` }
+}
+
 function goBack(){ try{ uni.navigateBack() }catch(e){ history.back() } }
 
 const playingList = computed(()=> Array.from(playing.value))
@@ -256,11 +269,17 @@ function endDrag(e){ dragging=false }
 
 <style scoped>
 .page{ padding:12px 16px; min-height:100vh }
-.topbar{ display:flex; align-items:center; justify-content:space-between }
-.back{ background:transparent; border:none; font-size:22px }
-.title{ font-size:18px; font-weight:700 }
-.actions{ display:flex; gap:8px }
+.topbar{ display:flex; align-items:center; justify-content:space-between; padding:8px 6px }
+.back{ background:transparent; border:none; font-size:22px; position:relative; left:0 }
+.title{ font-size:18px; font-weight:700; text-align:center; flex:1 }
+.actions{ display:flex; gap:8px; min-width:110px; justify-content:flex-end }
 .icon{ background:transparent; border:none; font-size:18px }
+
+/* reuse home header player styles */
+.playing-icon{ width:36px; height:36px; border-radius:6px; overflow:hidden; position:relative }
+.playing-icon .cover{ width:100%; height:100% }
+.playing-indicator{ position:absolute; right:0; bottom:0; width:10px; height:10px; background:var(--accent,#2EA56B); border-radius:999px; box-shadow:0 0 6px rgba(46,165,107,0.6) }
+.player-icon{ width:36px; height:36px; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.06); border-radius:6px }
 
 .tabs{ display:flex; gap:8px; margin:12px 0 }
 .tab{ padding:8px 12px; background:rgba(0,0,0,0.05); border-radius:18px }
