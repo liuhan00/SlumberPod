@@ -14,6 +14,7 @@
     
     <!-- 内容区域 -->
     <view class="content-area">
+      <text v-if="post.title" class="post-title" @click="viewDetail">{{ post.title }}</text>
       <text class="content" @click="viewDetail">{{ post.content }}</text>
       
       <!-- 图片展示 -->
@@ -212,7 +213,7 @@ function showMoreActions() {
 
 .name {
   font-weight: 600;
-  color: #333;
+  color: var(--text-primary);
   font-size: 14px;
   margin-bottom: 2px;
 }
@@ -235,8 +236,9 @@ function showMoreActions() {
   margin-bottom: 16px;
 }
 
+.post-title{ font-size:18px; font-weight:700; color: var(--text-primary); margin-bottom:6px }
 .content {
-  color: #333;
+  color: var(--text-primary);
   font-size: 15px;
   line-height: 1.5;
   margin-bottom: 12px;
@@ -344,7 +346,7 @@ function showMoreActions() {
 }
 
 .comment-content {
-  color: #333;
+  color: var(--text-primary);
   flex: 1;
 }
 

@@ -24,7 +24,7 @@ function format(ms){ const s=Math.floor(ms/1000); const mm=String(Math.floor(s/6
 .controls{ padding:12px 16px; border-top:1px solid #eee; backdrop-filter:saturate(1.2) blur(6px) }
 .row{ display:flex; align-items:center; justify-content:center; gap:10px; margin-top:8px }
 .space-between{ justify-content:space-between }
-.btn{ padding:8px 12px; border-radius:8px; background:#f2f3f5; color:#333; transition: all .2s ease }
+.btn{ padding:8px 12px; border-radius:8px; background:#f2f3f5; color:var(--text-color); transition: all .2s ease }
 .btn:active{ transform: scale(0.98) }
 .primary{ background:#111; color:#fff }
 .range{ width:100% }

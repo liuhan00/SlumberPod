@@ -190,7 +190,7 @@ setPreset(24)
 
 .scroller{ position:absolute; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px }
 .scroller-item{ font-size:28px; color: rgba(255,255,255,0.5) }
-.scroller-item.current{ font-size:56px; font-weight:800; color:#fff; text-shadow:0 6px 18px rgba(0,0,0,0.35) }
+.scroller-item.current{ font-size:56px; font-weight:800; color:var(--text-color); text-shadow:0 6px 18px rgba(0,0,0,0.35) }
 .scroller-item.faint{ font-size:28px; opacity:0.3 }
 
 .time-number{ position:absolute; display:flex; flex-direction:row; align-items:baseline; gap:8px }

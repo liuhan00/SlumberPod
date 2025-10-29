@@ -19,7 +19,7 @@ const props = defineProps({ plan: { type: Object, required: true } })
 .row{ display:flex; justify-content:space-between; align-items:center }
 .title{ font-size:16px; font-weight:600 }
 .tag{ font-size:12px; color:#666; background:#f2f3f5; padding:2px 6px; border-radius:6px }
-.desc{ display:block; margin:8px 0; color:#333 }
+.desc{ display:block; margin:8px 0; color: var(--text-primary) }
 .progress{ color:#666 }
 .btn{ padding:6px 10px; border-radius:8px; background:#111; color:#fff }
 </style>

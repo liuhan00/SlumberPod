@@ -40,8 +40,14 @@
         
         <!-- 空状态 -->
         <view v-else class="empty-state">
-          <text class="empty-icon">💭</text>
-          <text class="empty-text">暂无内容，快来发布第一条动态吧！</text>
+          <text class="empty-icon">{{ activeTab === '关注' ? '👥' : '💭' }}</text>
+          <text class="empty-text">
+            {{ activeTab === '关注' ? '你关注的人还没有发过帖子哦' : '暂无内容，快来发布第一条动态吧！' }}
+            {{ activeTab === '关注' ? '去「精选」逛逛吧' : '' }}
+          </text>
+          <button v-if="activeTab === '关注'" class="explore-btn" @click="goToFeatured">
+            去逛逛
+          </button>
         </view>
       </view>
     </scroll-view>
@@ -141,10 +147,22 @@ function showSearch() {
 }
 
 function showMessages() {
+  try {
+    uni.navigateTo({ url: '/pages/messages/index' })
+  } catch(e) {
+    if(typeof location !== 'undefined') location.hash = '#/pages/messages/index'
+  }
+}
+
+function showNotifications() {
   uni.showToast({
-    title: '消息功能开发中',
+    title: '通知功能开发中',
     icon: 'none'
   })
+}
+
+function goToFeatured() {
+  activeTab.value = '综合'
 }
 
 function onLike(id) { 
@@ -176,22 +194,67 @@ function onComment(id) {
   })
 }
 
-function createPost(data) {
-  const id = `p${Date.now()}`
-  posts.value.unshift({ 
-    id, 
-    time: '刚刚', 
-    content: data.content, 
-    image: data.image || '', 
-    likes: 0, 
-    comments: [], 
-    author: { name: '我', avatar: 'https://picsum.photos/seed/me/100' } 
-  })
-  uni.showToast({ title: '发布成功', icon: 'success' })
+import * as apiPosts from '@/api/posts'
+import { getAuthLocal } from '@/store/auth'
+
+async function createPost(data) {
+  try{
+    const auth = getAuthLocal()
+    const token = auth?.token || auth?.access_token || null
+    // 如果鉴权信息缺失，使用后端要求的默认 userId
+    const userId = auth?.id || (auth && auth.user && auth.user.id) || '11111111-1111-1111-1111-111111111111'
+    // support image -> imageUrls conversion
+    const imageUrls = data.image ? [data.image] : []
+    const result = await apiPosts.createPost({ userId, title: data.title || '', content: data.content, imageUrls })
+    // prepend returned post if any, fallback to local
+    const returned = result.data || result.post || result || {}
+    const newPost = {
+      id: returned.id || result.id || `p${Date.now()}`,
+      time: returned.time || '刚刚',
+      title: returned.title || data.title || '',
+      content: returned.content || data.content,
+      image: (returned.imageUrls && returned.imageUrls[0]) || returned.image || data.image || '',
+      likes: returned.likes || 0,
+      comments: returned.comments || [],
+      author: returned.author || { name: '我', avatar: 'https://picsum.photos/seed/me/100' }
+    }
+    posts.value.unshift(newPost)
+    uni.showToast({ title: '发布成功', icon: 'success' })
+  }catch(e){
+    // fallback to local mock if network fails
+    const id = `p${Date.now()}`
+    posts.value.unshift({ 
+      id, 
+      time: '刚刚', 
+      content: data.content, 
+      image: data.image || '', 
+      likes: 0, 
+      comments: [], 
+      author: { name: '我', avatar: 'https://picsum.photos/seed/me/100' } 
+    })
+    uni.showToast({ title: '离线已保存，稍后同步', icon: 'none' })
+  }
 }
 
-onMounted(() => {
-  // 初始化操作
+onMounted(async () => {
+  // 初始化操作：加载帖子列表（从后端）
+  try{
+    const result = await apiPosts.getPosts({ page: 1, limit: 20 })
+    const list = result.data || result.posts || result || []
+    // normalize items to expected shape (title, content, image, author...)
+    posts.value = list.map(item => ({
+      id: item.id || item._id || `p${Date.now()}`,
+      time: item.time || item.createdAt || '刚刚',
+      title: item.title || '',
+      content: item.content || item.body || '',
+      image: (item.imageUrls && item.imageUrls[0]) || item.image || '',
+      likes: item.likes || 0,
+      comments: item.comments || [],
+      author: item.author || { name: item.userName || item.user || '用户', avatar: (item.author && item.author.avatar) || (item.userAvatar) || 'https://picsum.photos/seed/a1/100' }
+    }))
+  }catch(e){
+    console.warn('load posts failed', e)
+  }
 })
 </script>
 
@@ -297,5 +360,23 @@ onMounted(() => {
 .empty-text {
   color: #999;
   font-size: 14px;
+  line-height: 1.4;
+  margin-bottom: 16px;
+}
+
+.explore-btn {
+  background: #10b981;
+  color: white;
+  border: none;
+  padding: 10px 24px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+
+.explore-btn:active {
+  background: #0f9f6e;
+  transform: scale(0.98);
 }
 </style>

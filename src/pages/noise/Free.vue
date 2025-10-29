@@ -20,11 +20,9 @@
     </view>
 
     <scroll-view class="grid" scroll-y>
-      <view class="item" v-for="n in filteredNoises" :key="n.id">
-        <button class="thumb" :class="{ playing: isPlaying(n.id) }" @click="toggle(n)">
-          <text class="icon">{{ getNoiseIcon(n.name) }}</text>
-        </button>
-        <text class="name">{{ n.name }}</text>
+      <view class="item" v-for="n in filteredNoises" :key="n.id" @click="playRemote(n)">
+        <!-- 取消图标，直接显示名称 -->
+        <text class="name">{{ n.title || n.name || '未命名' }}</text>
       </view>
     </scroll-view>
 
@@ -42,9 +40,9 @@
       <view class="mini-center">
         <view v-for="(n, idx) in randomNoises" :key="n?.id || idx" class="mini-box">
           <button class="mini-thumb" :class="{ on: isMiniPlaying(n?.id) }" @click="toggleMini(n)">
-            <text class="icon">{{ getNoiseIcon(n?.name) }}</text>
+            <text class="icon">♪</text>
           </button>
-          <text class="mini-name">{{ n?.name || '—' }}</text>
+          <text class="mini-name">{{ n?.title || n?.name || n?.audioName || '—' }}</text>
         </view>
       </view>
       <view class="mini-right">
@@ -77,15 +75,16 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useGlobalTheme } from '@/composables/useGlobalTheme'
 import { allNoises } from '@/data/noises'
 import { usePlayerStore } from '@/stores/player'
+import * as apiAudios from '@/api/audios'
 
 const { bgStyle } = useGlobalTheme()
 const player = usePlayerStore()
 
-const categories = ['全部','免费','雨声','自然','环境','ASMR']
+const categories = ['全部','免费','雨声','自然','环境','我的创作']
 const activeCat = ref('全部')
 const playing = ref(new Set())
 
@@ -93,9 +92,50 @@ const playing = ref(new Set())
 const randomNoises = ref([null,null,null])
 const miniPlaying = ref(new Set())
 
+const remoteList = ref([])
+
+// 当 activeCat 变化，remoteList 已由之前的 watch 填充
+// 现在我们让页面主体始终基于 remoteList（若为空且是我的创作或本地则回退到本地数据）
 const filteredNoises = computed(()=>{
-  if(activeCat.value==='全部') return allNoises
-  return allNoises.filter(n=> n.category === activeCat.value || (activeCat.value==='雨声' && n.name.includes('雨')))
+  // 我的创作仍优先使用本地创作
+  if(activeCat.value==='我的创作'){
+    const userCreations = uni.getStorageSync('userCreations') || []
+    return userCreations.map(c=>({ id:c.id, title:c.name, audio_url:c.audioUrl || '', duration:c.duration || 0 }))
+  }
+  // 如果 remoteList 有数据，使用 remoteList（全部/免费/其他分类）
+  if(Array.isArray(remoteList.value) && remoteList.value.length) return remoteList.value
+  // 回退：全部 显示 allNoises 名称
+  if(activeCat.value==='全部'){
+    return allNoises.map(n=>({ id:n.id, title:n.name, audio_url:n.src || '', duration:n.duration || 0 }))
+  }
+  // 其他分类回退到本地过滤
+  return allNoises.filter(n=> n.category===activeCat.value).map(n=>({ id:n.id, title:n.name, audio_url:n.src||'', duration:n.duration||0 }))
+})
+
+// remote loading state
+const remoteLoading = ref(false)
+const remoteError = ref('')
+
+// 当切换标签时，从后端加载对应分类或全部音频名称（不显示封面，仅名称）
+watch(activeCat, async (v)=>{
+  remoteError.value = ''
+  // my creations handled locally
+  if(v === '我的创作') { remoteList.value = []; return }
+
+  // map certain categories to backend category_id if needed
+  const map = { '雨声': '22222222-2222-2222-2222-222222222222', '自然': '33333333-3333-3333-3333-333333333333', '环境':'44444444-4444-4444-4444-444444444444', '免费':'55555555-5555-5555-5555-555555555555' }
+  const catId = map[v] || null
+
+  remoteLoading.value = true
+  try{
+    // if catId is null and user selected 全部, call backend without category_id to get all
+    const res = await apiAudios.getAudios(catId ? { category_id: catId, limit: 100 } : { limit: 200 })
+    const raw = res && (res.data || res.items) ? (res.data || res.items) : (Array.isArray(res) ? res : [])
+    const arr = Array.isArray(raw) ? raw : []
+    // normalize to { id, title, audio_url, duration, category_id }
+    remoteList.value = arr.map(it => ({ id: it.id || it._id || it.uuid || String(Date.now()), title: it.title || it.name || it.audioName || '', audio_url: it.audio_url || it.audioUrl || it.url || it.src || '', duration: it.duration || it.period || it.length || 0, category_id: it.category_id || it.categoryId || null }))
+  }catch(e){ console.warn('load remote audios failed', e); remoteList.value = []; remoteError.value = e?.message || String(e) }
+  finally{ remoteLoading.value = false }
 })
 
 function getNoiseIcon(name){
@@ -130,16 +170,69 @@ function randomizeMini(){
 
 function toggleMini(noise){
   if(!noise) return
-  if(miniPlaying.value.has(noise.id)){
-    miniPlaying.value.delete(noise.id)
-    player.stopById?.(noise.id)
+  const id = noise.id || noise._id || noise.uuid
+  if(!id) return
+  if(miniPlaying.value.has(id)){
+    miniPlaying.value.delete(id)
+    // stop one source if supported
+    player.stopById?.(id)
   } else {
-    miniPlaying.value.add(noise.id)
-    player.play?.(noise)
+    miniPlaying.value.add(id)
+    // add to player playlist if not exists
+    const track = { id, name: noise.title || noise.name || noise.audioName || '未知', src: noise.audio_url || noise.audioUrl || noise.url || noise.src || '' }
+    player.addToQueue?.(track)
+    player.play?.(track)
   }
+  // update player.title display (joined by |)
+  updatePlayerTitleFromMini()
+}
+
+function openPlayerWithTracks(tracks){
+  // tracks: array of { id, title/name, src }
+  if(!Array.isArray(tracks) || tracks.length===0) return
+  const normalized = tracks.map(t=>({ id: t.id, name: t.title || t.name || t.audioName || '未知', src: t.audio_url || t.src || t.url || '' }))
+  // set playlist and play first
+  player.setPlaylist?.(normalized)
+  player.play?.(normalized[0])
+  // set override title in player page via history state
+  try{
+    const titles = normalized.map(t=> t.name).filter(Boolean).join(' | ')
+    // pass via query param or history state
+    try{ uni.navigateTo({ url: `/pages/player/index?title=${encodeURIComponent(titles)}` }) }catch(e){ location.hash = `#/pages/player/index?title=${encodeURIComponent(titles)}` }
+  }catch(e){}
+}
+
+function playRemote(a){
+  const track = { id: a.id || a._id || a.uuid || String(Date.now()), title: a.title || a.name || a.audioName || '', audio_url: a.audio_url || a.audioUrl || a.url || a.src || '' }
+  // navigate to player detail without auto-playing in list click
+  // use single track title override
+  try{ uni.navigateTo({ url: `/pages/player/index?title=${encodeURIComponent(track.title)}` }) }catch(e){ location.hash = `#/pages/player/index?title=${encodeURIComponent(track.title)}` }
+  // do not modify miniPlaying here
 }
 
 const anyPlaying = computed(()=> miniPlaying.value.size > 0)
+
+// player title to show in player detail (joined names)
+const playerTitle = ref('')
+
+function updatePlayerTitleFromMini(){
+  const ids = Array.from(miniPlaying.value)
+  if(ids.length===0){ playerTitle.value = '' ; return }
+  // find names from randomNoises or remoteList or allNoises
+  const names = ids.map(id=>{
+    const fromRandom = randomNoises.value.find(n=> n?.id===id)
+    if(fromRandom) return fromRandom.title || fromRandom.name || fromRandom.audioName || ''
+    const fromRemote = (remoteList.value||[]).find(r=> r.id===id)
+    if(fromRemote) return fromRemote.title || fromRemote.name || ''
+    const fromLocal = allNoises.find(l=> l.id===id)
+    if(fromLocal) return fromLocal.name || ''
+    return ''
+  }).filter(Boolean)
+  playerTitle.value = names.join(' | ')
+}
+
+// defensive: ensure remoteList is always array
+if(!Array.isArray(remoteList.value)) remoteList.value = []
 
 function togglePlayAll(){
   if(anyPlaying.value){
@@ -179,10 +272,28 @@ function openPlayerQuick(){
 }
 
 function goToPlayer(){
-  // navigate to player detail page and pass current first mini noise id if available
-  const first = randomNoises.value[0]
-  const id = first?.id ? `?id=${first.id}` : ''
-  try{ uni.navigateTo({ url: `/pages/player/index${id}` }) }catch(e){ location.hash = `#/pages/player/index${id}` }
+  // If miniPlaying has selections, build title from selected names; otherwise pass the three random names
+  const ids = Array.from(miniPlaying.value)
+  let title = ''
+  if(ids.length){
+    const names = ids.map(id=>{
+      const fromRandom = randomNoises.value.find(n=> n && n.id===id)
+      if(fromRandom) return fromRandom.title || fromRandom.name || fromRandom.audioName || ''
+      const fromRemote = (remoteList.value||[]).find(r=> r.id===id)
+      if(fromRemote) return fromRemote.title || fromRemote.name || ''
+      const fromLocal = allNoises.find(l=> l.id===id)
+      if(fromLocal) return fromLocal.name || ''
+      return ''
+    }).filter(Boolean)
+    title = names.join(' | ')
+  } else {
+    // show the three currently displayed random noises
+    const names = randomNoises.value.map(n=> n ? (n.title || n.name || n.audioName || '') : '').filter(Boolean)
+    title = names.join(' | ')
+  }
+
+  const q = title ? `?title=${encodeURIComponent(title)}` : ''
+  try{ uni.navigateTo({ url: `/pages/player/index${q}` }) }catch(e){ location.hash = `#/pages/player/index${q}` }
 }
 
 function goBack(){ try{ uni.navigateBack() }catch(e){ history.back() } }
@@ -285,25 +396,28 @@ function endDrag(e){ dragging=false }
 .tab{ padding:8px 12px; background:rgba(0,0,0,0.05); border-radius:18px }
 .tab.active{ background:var(--accent, #2EA56B); color:#fff }
 
-.grid{ display:flex; flex-wrap:wrap; gap:12px }
-.item{ width:25%; display:flex; flex-direction:column; align-items:center }
-.thumb{ width:64px; height:64px; border-radius:12px; background:rgba(0,0,0,0.06); border:none; display:flex; align-items:center; justify-content:center }
-.thumb.playing{ background:var(--accent, #2EA56B); color:#fff }
-.icon{ font-size:22px }
-.name{ margin-top:6px; font-size:12px; text-align:center }
-.play-circle{ margin-top:6px; width:34px; height:34px; border-radius:50%; background:rgba(0,0,0,0.06); border:none }
+.grid{ display:grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap:14px 24px; align-items:start; padding:12px 8px }
+.item{ display:flex; align-items:flex-start; padding:10px 14px; border-radius:12px; background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.02)); transition: background 0.18s, transform 0.12s }
+.item:hover{ background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.04)); transform: translateY(-6px) }
+.name{ font-size:14px; color:var(--text-color); line-height:1.6 }
+.play-circle{ display:none }
 
 .player-bar{ position:fixed; bottom:12px; left:16px; right:16px; background:rgba(255,255,255,0.06); padding:10px 12px; border-radius:12px; text-align:center }
 
 /* mini player - floating style */
 .mini-player{ position:fixed; left:50%; transform:translateX(-50%); bottom:22px; display:flex; align-items:center; gap:14px; background:rgba(20,24,28,0.7); padding:10px 14px; border-radius:18px; box-shadow:0 10px 30px rgba(0,0,0,0.45); backdrop-filter: blur(8px); max-width:640px; width:calc(100% - 64px); z-index:1200 }
-.mini-dice{ width:44px; height:44px; display:flex; align-items:center; justify-content:center; border-radius:10px; background:rgba(255,255,255,0.06); border:none; color:#fff }
+.mini-dice{ width:44px; height:44px; display:flex; align-items:center; justify-content:center; border-radius:10px; background:rgba(255,255,255,0.06); border:none; color:var(--text-color) }
 .mini-center{ display:flex; gap:14px; flex:1; justify-content:center }
 .mini-box{ display:flex; flex-direction:column; align-items:center }
-.mini-thumb{ width:52px; height:52px; border-radius:12px; background:rgba(255,255,255,0.06); display:flex; align-items:center; justify-content:center; border:none; color:#ddd }
-.mini-thumb.on{ background:linear-gradient(135deg,var(--accent,#2EA56B),#1f8a5e); color:#fff; box-shadow:0 6px 18px rgba(0,0,0,0.35) }
-.mini-name{ font-size:12px; margin-top:6px; color:#ddd; max-width:70px; text-align:center }
-.mini-play{ width:44px; height:44px; border-radius:22px; background:rgba(255,255,255,0.06); border:none; display:flex; align-items:center; justify-content:center; color:#fff }
+.mini-thumb{ width:52px; height:52px; border-radius:12px; background:transparent; display:flex; align-items:center; justify-content:center; border:none; color:#ddd }
+.mini-thumb.on{ background:transparent; color:#fff; box-shadow:none }
+.mini-name{ font-size:12px; margin-top:6px; color:#ddd; max-width:120px; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+
+/* remote list styles */
+.remote-list{ display:flex; flex-direction:column; gap:8px; padding:8px }
+.remote-item{ padding:8px 12px; border-radius:8px; background:transparent }
+.remote-name{ color:var(--text-color) }
+.remote-loading, .remote-error, .remote-empty{ padding:12px; color:var(--muted) }.mini-play{ width:44px; height:44px; border-radius:22px; background:rgba(255,255,255,0.06); border:none; display:flex; align-items:center; justify-content:center; color:#fff }
 
 .detail-overlay{ position:fixed; left:0; top:0; right:0; bottom:0; display:flex; align-items:flex-end; justify-content:center; z-index:1300 }
 .detail-card{ width:100%; max-width:720px; background:linear-gradient(180deg, rgba(0,0,0,0.55), rgba(0,0,0,0.7)); padding:36px; border-top-left-radius:18px; border-top-right-radius:18px; box-shadow:0 -10px 30px rgba(0,0,0,0.5) }

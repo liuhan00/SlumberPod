@@ -288,7 +288,8 @@ function goToCreation() {
 <style scoped>
 .page {
   min-height: 100vh;
-  background: var(--bg, #f8f9fa);
+  background: var(--bg-color);
+  background-image: var(--bg-gradient);
 }
 
 .header {

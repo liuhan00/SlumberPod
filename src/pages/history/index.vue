@@ -66,7 +66,7 @@ function format(ts){ const d=new Date(ts); const y=d.getFullYear(); const m=Stri
 .item.selected{ background:#f7f7f8 }
 .cover{ width:60px; height:60px; border-radius:8px }
 .meta{ flex:1; display:flex; flex-direction:column }
-.name{ font-size:16px; color:#111 }
+.name{ font-size:16px; color: var(--text-primary) }
 .author{ font-size:12px; color:#666 }
 .time{ font-size:12px; color:#999 }
 .btn{ padding:6px 10px; border-radius:6px; background:#f2f3f5 }

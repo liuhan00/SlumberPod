@@ -8,16 +8,24 @@
     <scroll-view class="form" scroll-y>
       <view class="row">
         <text>入睡时间</text>
-        <input type="time" v-model="sleepStart" />
+        <input type="time" v-model="sleepStart" placeholder="入睡时间 (HH:MM)" ref="sleepStartRef" />
       </view>
       <view class="row">
         <text>起床时间</text>
-        <input type="time" v-model="wakeTime" />
+        <input type="time" v-model="wakeTime" placeholder="起床时间 (HH:MM)" />
       </view>
       <view class="row">
-        <text>睡眠评分</text>
-        <input type="range" min="1" max="10" v-model="score" />
-        <text>{{ score }}</text>
+        <text>睡眠时长(分钟)</text>
+        <input type="number" min="0" v-model.number="durationMinutes" placeholder="单位：分钟" />
+        <text>{{ durationMinutes }}</text>
+      </view>
+      <view class="row">
+        <text>睡眠质量</text>
+        <select v-model.number="quality" aria-label="睡眠质量">
+          <option :value="null">未评分</option>
+          <option v-for="n in 5" :key="n" :value="n">{{ n }}</option>
+        </select>
+        <text>{{ quality || '-' }}</text>
       </view>
 
       <view class="section">
@@ -73,10 +81,15 @@
 <script setup>
 import { ref } from 'vue'
 import { saveFeedback } from '@/store/feedback'
+import * as apiFeedback from '@/api/feedback'
+import { getAuthToken } from '@/store/auth'
 
 const sleepStart = ref('23:00')
+const sleepStartRef = ref(null)
 const wakeTime = ref('07:00')
 const score = ref(6)
+const durationMinutes = ref(480)
+const quality = ref(null)
 const flags = ref({ dreams:false, easyWake:false, midWake:false })
 const activities = ref({ coffee:false, exercise:false, devices:false, read:false, otherAudio:false })
 const otherText = ref('')
@@ -86,10 +99,14 @@ const share = ref(false)
 
 function goBack(){ try{ uni.navigateBack() }catch(e){ location.hash='#/' } }
 
+onMounted(()=>{ if(sleepStartRef.value && sleepStartRef.value.focus) sleepStartRef.value.focus() })
+
 async function submit(){
   const payload = {
     sleepStart: sleepStart.value,
     wakeTime: wakeTime.value,
+    duration_minutes: durationMinutes.value,
+    quality: quality.value,
     score: score.value,
     flags: flags.value,
     activities: activities.value,
@@ -99,8 +116,23 @@ async function submit(){
     shared: share.value,
     createdAt: Date.now()
   }
-  await saveFeedback(payload)
-  uni.showToast({ title:'提交成功' })
+  try{
+    // try send to backend first
+    const token = getAuthToken()
+    await apiFeedback.sendFeedback({
+      userId: token ? token.userId || token.sub || null : null,
+      sleepStartTime: new Date().toISOString().slice(0,19) + 'Z',
+      sleepDuration: durationMinutes.value,
+      sleepQuality: quality.value,
+      // include original payload for compatibility
+      payload: payload
+    }, token?.access_token || token?.token)
+    uni.showToast({ title:'提交成功' })
+  }catch(e){
+    // fallback to local save
+    await saveFeedback(payload)
+    uni.showToast({ title:'已离线保存，稍后同步', icon:'none' })
+  }
   // auto return to home
   try{ uni.reLaunch({ url:'/pages/home/index' }) }catch(e){ location.hash='#/pages/home/index' }
 }
@@ -112,11 +144,16 @@ async function submit(){
 .back{ font-size:20px; background:transparent; border:none }
 .title{ font-weight:700; font-size:18px }
 .form{ margin-top:12px }
-.row{ display:flex; align-items:center; justify-content:space-between; padding:12px 0 }
+.row{ display:flex; align-items:center; justify-content:space-between; padding:12px 0; gap:12px }
+.row .label{ width:30%; color:var(--text-color); }
+.row input[type="time"], .row input[type="number"], .row input[type="text"], .row select, .row textarea{ width:65%; padding:8px 10px; border-radius:8px; border:1px solid rgba(255,255,255,0.06); background:rgba(0,0,0,0.04); color:var(--text-color) }
+.row textarea{ height:100px; resize:vertical }
 .sec-title{ font-weight:600; margin-bottom:8px }
 .checkbox-row{ display:flex; flex-wrap:wrap; gap:10px }
+.checkbox-row label{ display:flex; align-items:center; gap:6px }
 .radio-row{ display:flex; flex-direction:column; gap:8px }
+.radio-row label{ display:flex; align-items:center; gap:6px }
 .submit-row{ padding:18px 0 }
 .btn{ padding:10px 12px; border-radius:8px; background:rgba(0,0,0,0.06) }
-.btn.primary{ background:#3aa57a; color:#fff }
+.btn.primary{ background:#3aa57a; color:var(--text-color) }
 </style>

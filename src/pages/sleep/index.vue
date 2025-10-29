@@ -13,7 +13,6 @@
     <view class="section actions">
       <view class="circle" @click="goNap"><text>小憩</text></view>
       <view class="circle" @click="goAlarm"><text>闹钟与提醒</text></view>
-      <view class="circle" @click="ritual"><text>睡前仪式</text></view>
     </view>
   </scroll-view>
 </template>
@@ -35,7 +34,6 @@ const greet = computed(()=>{
 })
 function goNap(){ uni.navigateTo({ url:'/pages/sleep/Nap' }) }
 function goAlarm(){ uni.navigateTo({ url:'/pages/sleep/Alarm' }) }
-function ritual(){ uni.showToast({ title:'睡前仪式 敬请期待', icon:'none' }) }
 </script>
 <style scoped>
 .page { min-height:100vh }

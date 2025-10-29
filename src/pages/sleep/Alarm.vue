@@ -378,7 +378,7 @@ function deleteAlarm(alarm) {
 
 .header {
   padding: 20px 16px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--bg-color); background-image: var(--bg-gradient);
   color: white;
 }
 

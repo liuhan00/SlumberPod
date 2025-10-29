@@ -6,6 +6,8 @@
       <text class="username">{{ userName }}</text>
     </view>
     
+    <!-- 标题输入 -->
+    <input class="title-input" v-model="title" placeholder="标题（必填）" />
     <!-- 文本输入 -->
     <textarea 
       class="input" 
@@ -47,8 +49,8 @@
       <button 
         class="publish-btn" 
         @click="submit" 
-        :disabled="!text.trim()"
-        :class="{ disabled: !text.trim() }"
+        :disabled="!title.trim() || !text.trim()"
+        :class="{ disabled: !title.trim() || !text.trim() }"
       >
         发布
       </button>
@@ -63,6 +65,7 @@ import { useUserStore } from '@/stores/user'
 const userStore = useUserStore()
 const emit = defineEmits(['submit', 'image-upload'])
 
+const title = ref('')
 const text = ref('')
 const imageUrl = ref('')
 
@@ -72,9 +75,11 @@ const userAvatar = computed(() => userStore.user?.avatar || 'https://picsum.phot
 
 function submit() { 
   emit('submit', { 
+    title: title.value,
     content: text.value, 
     image: imageUrl.value 
   })
+  title.value = ''
   text.value = ''
   imageUrl.value = ''
 }
@@ -127,6 +132,7 @@ function addTopic() {
   margin-bottom: 16px; 
   box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
+.title-input{ width:100%; height:44px; padding:8px 12px; border-radius:8px; border:1px solid #e9ecef; margin-bottom:12px; font-size:15px; color: rgba(0,0,0,0.9) }
 
 .user-info {
   display: flex;
@@ -143,7 +149,7 @@ function addTopic() {
 
 .username {
   font-weight: 600;
-  color: #333;
+  color: var(--text-primary);
   font-size: 14px;
 }
 
@@ -151,13 +157,14 @@ function addTopic() {
   width: 100%; 
   min-height: 100px; 
   background: #f8f9fa; 
-  color: #333; 
+  color: rgba(0,0,0,0.85); /* 提高对比度，深色文字 */
   border-radius: 8px; 
   padding: 12px; 
   font-size: 14px;
   border: 1px solid #e9ecef;
   resize: none;
 }
+.input::placeholder { color: rgba(0,0,0,0.45); }
 
 .char-count {
   text-align: right;
@@ -191,7 +198,7 @@ function addTopic() {
   width: 24px;
   height: 24px;
   background: rgba(0,0,0,0.7);
-  color: #fff;
+  color: var(--text-color);
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -233,7 +240,7 @@ function addTopic() {
 .publish-btn {
   padding: 8px 20px;
   background: #007aff;
-  color: #fff;
+  color: var(--text-color);
   border-radius: 20px;
   border: none;
   font-weight: 600;

@@ -327,7 +327,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.page { min-height: 100vh; }
+.page { min-height: 100vh; background: var(--bg-color); background-image: var(--bg-gradient); }
 
 /* 顶部导航栏 */
 .header {

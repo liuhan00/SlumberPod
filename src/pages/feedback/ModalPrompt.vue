@@ -89,7 +89,7 @@ function confirmPicker(){
 .btn{ flex:1; padding:12px; border-radius:10px; background:rgba(0,0,0,0.06); border:none }
 .btn.primary{ background:#3aa57a; color:#fff }
 .footer{ display:flex; justify-content:flex-end }
-.sheet{ position:absolute; left:6%; right:6%; bottom:8%; background:#fff; padding:16px; border-radius:12px }
+.sheet{ position:absolute; left:6%; right:6%; bottom:8%; background:var(--card-bg); padding:16px; border-radius:12px }
 .sheet-title{ font-weight:600; margin-bottom:8px }
 .quick{ display:flex; gap:8px; margin-bottom:8px }
 .q{ padding:8px 12px; border-radius:8px; background:rgba(0,0,0,0.06) }

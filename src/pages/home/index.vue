@@ -25,7 +25,7 @@
     
     <!-- 两个图片风格卡片：听白噪音 & 我的创作 -->
     <view class="two-card-wrap" style="padding:12px 16px; display:flex; gap:12px;">
-      <view class="img-card left" @click="goToFree" style="flex:1; border-radius:14px; padding:18px; color:#07261a; background:linear-gradient(135deg,#bff2df 0%,#61c291 100%);">
+      <view class="img-card left" @click="goToFree" style="flex:1; border-radius:14px; padding:18px; color: var(--text-primary); background:linear-gradient(135deg,#bff2df 0%,#61c291 100%);">
         <text style="font-size:18px;font-weight:700; margin-bottom:6px; display:block;">听白噪音</text>
         <text style="font-size:12px; opacity:0.9; display:block;">1000+ 自由组合</text>
       </view>
@@ -157,10 +157,20 @@ function goToCreation() {
 }
 
 // 跳转到自由组合页面（听白噪音）
+import * as apiAudios from '@/api/audios'
+
 function goToFree(){
   try{ uni.navigateTo({ url: '/pages/noise/Free' }) }catch(e){ if(typeof location!=='undefined') location.hash = '#/pages/noise/Free' }
 }
 
+// 点击页面上的“听白噪音”前先获取音频列表（示例：按标签category_id）
+async function fetchCategoryAudios(categoryId){
+  try{
+    const res = await apiAudios.getAudios({ category_id: categoryId, limit: 20 })
+    // 返回 res.data 或 res.items 或 res
+    return res.data || res.items || res || []
+  }catch(e){ console.warn('fetch audios failed', e); return [] }
+}
 // 未读消息数量（模拟数据）
 const unreadCount = ref(3)
 </script>
@@ -285,7 +295,7 @@ const unreadCount = ref(3)
 /* 创作模块 */
 .creation-section {
   padding: 20px 16px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--bg-color); background-image: var(--bg-gradient);
   margin: 12px 16px;
   border-radius: 16px;
   box-shadow: 0 4px 20px rgba(102, 126, 234, 0.3);
@@ -407,7 +417,7 @@ const unreadCount = ref(3)
 }
 
 .dice-item.active {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--bg-color); background-image: var(--bg-gradient);
   border-color: #5a67d8;
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);

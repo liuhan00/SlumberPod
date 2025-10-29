@@ -1,5 +1,5 @@
 <template>
-  <view class="page">
+  <view class="page" @touchstart="handleTouchStart" @touchmove="handleTouchMove" @touchend="handleTouchEnd">
     <!-- Top small bar -->
     <view class="topbar">
       <button class="collapse" @click="uni.navigateBack()">˅</button>
@@ -43,8 +43,14 @@
 
     <!-- meta area -->
     <view class="meta">
-      <text class="name">{{ playlistTitle }}</text>
-      <text class="author">{{ threeNames }}</text>
+      <view class="title-row">
+        <text class="fixed-label">白噪音</text>
+        <button class="favorite-btn" @click="toggleFav">
+          <text v-if="isFav">❤️</text>
+          <text v-else>🤍</text>
+        </button>
+      </view>
+      <text class="author">{{ displayNames }}</text>
     </view>
 
     <!-- small tags -->
@@ -60,7 +66,48 @@
       <button class="ctrl" @click="prev">◀◀</button>
       <button class="play-btn" @click="toggle">{{ store.isPlaying ? '⏸' : '▶' }}</button>
       <button class="ctrl" @click="next">▶▶</button>
-      <button class="ctrl">≡</button>
+      <button class="ctrl playlist-btn" @click="showPlaylist" style="pointer-events: auto;">≡</button>
+    </view>
+
+    <!-- 播放列表弹窗 -->
+    <view class="playlist-modal" v-if="showPlaylistModal" @click="hidePlaylist">
+      <view class="playlist-content" @click.stop>
+        <view class="playlist-header">
+          <text class="playlist-title">播放列表</text>
+          <button class="playlist-close" @click="hidePlaylist">×</button>
+        </view>
+        
+        <scroll-view class="playlist-scroll" scroll-y>
+          <view class="playlist-list">
+            <view 
+              v-for="track in store.playlist" 
+              :key="track.id" 
+              :class="['playlist-item', { active: track.id === store.currentTrack?.id }]"
+              @click="playTrack(track)"
+            >
+              <image class="playlist-cover" :src="track.cover" mode="aspectFill" />
+              <view class="playlist-info">
+                <text class="playlist-name">{{ track.name }}</text>
+                <text class="playlist-author">{{ track.author }}</text>
+              </view>
+              <view class="playlist-actions">
+                <button class="playlist-action-btn" @click.stop="removeFromPlaylist(track.id)">×</button>
+              </view>
+            </view>
+            
+            <view v-if="store.playlist.length === 0" class="playlist-empty">
+              <text class="empty-icon">🎵</text>
+              <text class="empty-text">播放列表为空</text>
+              <button class="empty-btn" @click="goToHome">去首页添加</button>
+            </view>
+          </view>
+        </scroll-view>
+        
+        <view class="playlist-footer">
+          <text class="playlist-count">共 {{ store.playlist.length }} 首</text>
+          <button class="playlist-clear" @click="clearPlaylist">清空列表</button>
+        </view>
+      </view>
     </view>
 
     <!-- Play Mode Modal -->
@@ -153,8 +200,18 @@ function toggleFav(){ if(!track.value) return; favStore.toggle(track.value) }
 
 // three selected noises (for triangle corners)
 const threeTracks = ref([null,null,null])
-const playlistTitle = computed(()=> '白噪音')
-const threeNames = computed(()=> threeTracks.value.map(n=>n?.name||'').filter(Boolean).join(' | '))
+// display label and joined names for bottom line
+const playlistTitleOverride = ref('')
+const displayNames = computed(()=>{
+  // if override present (from Free.vue via query) use it
+  if(playlistTitleOverride.value) return playlistTitleOverride.value
+  // otherwise use threeTracks or store.currentTrack
+  const byThree = threeTracks.value.map(n=> n?.name || n?.title || '').filter(Boolean)
+  if(byThree.length) return byThree.join(' | ')
+  if(store.currentTrack) return store.currentTrack.name || store.currentTrack.title || ''
+  return ''
+})
+
 function getNoiseIcon(n){ if(!n) return '♪'; return getNoiseIconFromName(n.name) }
 function getNoiseIconFromName(name){ const map = { '海浪':'🌊','雨声':'🌧️','壁炉':'🔥','树林':'🌲','地铁':'🚇' }; return map[name] || '🎵' }
 
@@ -218,6 +275,36 @@ let startPoint = null
 const showPlayModeModal = ref(false)
 const timerMinutes = ref(0)
 const customTimerMinutes = ref('')
+
+// 下滑返回相关
+const touchStartY = ref(0)
+const touchMoveY = ref(0)
+const isDragging = ref(false)
+
+function handleTouchStart(e) {
+  touchStartY.value = e.touches[0].clientY
+  isDragging.value = true
+}
+
+function handleTouchMove(e) {
+  if (!isDragging.value) return
+  
+  touchMoveY.value = e.touches[0].clientY
+  const deltaY = touchMoveY.value - touchStartY.value
+  
+  // 如果向下滑动超过50px，触发返回
+  if (deltaY > 50) {
+    uni.navigateBack()
+    isDragging.value = false
+  }
+}
+
+function handleTouchEnd() {
+  isDragging.value = false
+}
+
+// Playlist modal
+const showPlaylistModal = ref(false)
 
 // Get loop mode icon
 function getLoopIcon() {
@@ -329,6 +416,11 @@ function cancelTimer(){ if(timerId){ clearInterval(timerId); timerId=null } }
 let audioCtx
 
 onLoad((query)=>{
+  // read optional title override from query
+  if(query?.title){
+    try{ playlistTitleOverride.value = decodeURIComponent(query.title) }catch(e){ playlistTitleOverride.value = query.title }
+  }
+
   audioCtx = uni.createInnerAudioContext()
   audioCtx.autoplay = false
   audioCtx.obeyMuteSwitch = false
@@ -418,6 +510,34 @@ function next(){
 }
 function goQueue(){ uni.navigateTo({ url:'/pages/queue/index' }) }
 
+// Playlist methods
+function showPlaylist() {
+  showPlaylistModal.value = true
+}
+
+function hidePlaylist() {
+  showPlaylistModal.value = false
+}
+
+function playTrack(track) {
+  store.play(track)
+  hidePlaylist()
+}
+
+function removeFromPlaylist(trackId) {
+  store.playlist = store.playlist.filter(track => track.id !== trackId)
+}
+
+function clearPlaylist() {
+  store.playlist = []
+  uni.showToast({ title: '播放列表已清空', icon: 'success' })
+}
+
+function goToHome() {
+  hidePlaylist()
+  uni.switchTab({ url: '/pages/home/index' })
+}
+
 watch(()=>store.volume, v=>{ if(audioCtx) audioCtx.volume = v })
 
 onMounted(()=>{
@@ -432,9 +552,9 @@ onMounted(()=>{
 })
 </script>
 <style scoped>
-.page{ min-height:100vh; padding-bottom: 24px; background: linear-gradient(180deg,#294a45 0%, #21363a 60%, #0f1516 100%); color: #fff; }
+.page{ min-height:100vh; padding-bottom: 24px; background: var(--bg-color); background-image: var(--bg-gradient); background-repeat: no-repeat; background-size: 100% 100%; color: var(--text-color); }
 .topbar{ display:flex; justify-content:space-between; align-items:center; padding:10px 12px; position:relative }
-.collapse, .share{ background:transparent; border:none; color:#fff; font-size:18px }
+.collapse, .share{ background:transparent; border:none; color:var(--text-color); font-size:18px }
 .collapse{ position:absolute; left:12px; top:10px }
 .share{ position:absolute; right:12px; top:10px }
 
@@ -446,7 +566,7 @@ onMounted(()=>{
 .spinning{ animation: spin 6s linear infinite }
 @keyframes spin{ from{ transform: rotate(0deg) } to{ transform: rotate(360deg) } }
 .meta{ padding: 0 16px }
-.name{ font-size:18px; font-weight:600; color:#111 }
+.name{ font-size:18px; font-weight:600; color: var(--text-primary) }
 .author{ margin-top:4px; font-size:14px; color:#666 }
 .count{ margin-top:4px; font-size:12px; color:#999 }
 .timer-wrap{ padding:28px 0; display:flex; flex-direction:column; align-items:center }
@@ -481,13 +601,185 @@ onMounted(()=>{
 .icons-row{ display:flex; justify-content:space-between; padding:12px 36px }
 .icon-left, .icon-right{ color:#fff; opacity:0.8 }
 .meta{ padding: 18px 16px }
+.title-row{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
 .name{ font-size:20px; color:#fff; font-weight:700 }
+.favorite-btn{ background: transparent; border: none; font-size: 24px; padding: 8px; margin-left: 12px; }
 .author{ margin-top:6px; color:#ddd }
 .tags{ display:flex; gap:10px; padding:8px 16px }
 .tag{ background:rgba(255,255,255,0.06); color:#fff; padding:6px 8px; border-radius:8px }
 .controls{ display:flex; align-items:center; justify-content:space-around; padding:18px 36px }
-.play-btn{ width:72px; height:72px; border-radius:36px; background:#fff; color:#111; display:flex; align-items:center; justify-content:center; font-size:26px }
+.play-btn{ width:72px; height:72px; border-radius:36px; background:#fff; color: var(--text-primary); display:flex; align-items:center; justify-content:center; font-size:26px }
 .ctrl{ background:transparent; border:none; color:#fff }
+
+/* Playlist Modal */
+.playlist-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.playlist-content {
+  background: #fff;
+  border-radius: 16px;
+  width: 90vw;
+  max-width: 400px;
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.playlist-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.playlist-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+}
+
+.playlist-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: #999;
+  padding: 4px;
+}
+
+.playlist-scroll {
+  flex: 1;
+  max-height: 300px;
+}
+
+.playlist-list {
+  padding: 0 20px;
+}
+
+.playlist-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #f8f8f8;
+}
+
+.playlist-item.active {
+  background: #f0f7ff;
+  margin: 0 -20px;
+  padding: 12px 20px;
+}
+
+.playlist-item:last-child {
+  border-bottom: none;
+}
+
+.playlist-cover {
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  margin-right: 12px;
+}
+
+.playlist-info {
+  flex: 1;
+}
+
+.playlist-name {
+  display: block;
+  font-size: 14px;
+  color: #333;
+  font-weight: 500;
+}
+
+.playlist-item.active .playlist-name {
+  color: #007aff;
+}
+
+.playlist-author {
+  display: block;
+  font-size: 12px;
+  color: #999;
+  margin-top: 2px;
+}
+
+.playlist-actions {
+  margin-left: 8px;
+}
+
+.playlist-action-btn {
+  background: none;
+  border: none;
+  color: #999;
+  font-size: 18px;
+  padding: 4px 8px;
+}
+
+.playlist-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.empty-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+
+.empty-text {
+  color: #999;
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+
+.empty-btn {
+  background: #007aff;
+  color: var(--text-primary);
+  border: none;
+  border-radius: 20px;
+  padding: 8px 16px;
+  font-size: 14px;
+}
+
+.playlist-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.playlist-count {
+  font-size: 14px;
+  color: #666;
+}
+
+.playlist-clear {
+  background: #ff4d4f;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.playlist-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 8px;
+}
 
 /* Modal Styles */
 .modal-overlay{ position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.7); display:flex; align-items:center; justify-content:center; z-index:1000 }

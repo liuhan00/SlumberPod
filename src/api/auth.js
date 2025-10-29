@@ -1,22 +1,22 @@
 // Switch to backend-auth proxy endpoints
 import { saveAuthLocal, clearAuthLocal, applySession } from '@/store/auth'
 
-const BASE = 'http://localhost:3003' // backend server URL
+const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.88.92:3003' // backend server URL
 
-export async function register({ name, identifier, password }){
+export async function register({ username, email, password }){
   const res = await fetch(BASE + '/api/auth/register', {
-    method:'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ name, identifier, password })
+    method:'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ username, email, password })
   })
   const j = await res.json()
-  if(!res.ok) throw new Error(j.error || 'register failed')
+  if(!res.ok) throw new Error(j.message || j.error || 'register failed')
   // save backend token
   if(j.token) applySession({ user: j.user, access_token: j.token })
   return j
 }
 
-export async function login({ identifier, password }){
+export async function login({ email, password }){
   const res = await fetch(BASE + '/api/auth/login', {
-    method:'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ identifier, password })
+    method:'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ email, password })
   })
   const j = await res.json()
   if(!res.ok) throw new Error(j.error || 'login failed')

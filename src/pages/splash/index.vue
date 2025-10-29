@@ -76,13 +76,13 @@ function enterLogin(){
 .center{ flex:1; display:flex; justify-content:center; align-items:center }
 .vertical{ writing-mode:vertical-rl; text-orientation:mixed; letter-spacing:2px; font-size:20px; color:#cfd3dc; opacity:.9 }
 .bottom{ padding:24px }
-.btn{ padding:8px 16px; border-radius:999px; background:rgba(255,255,255,.15); color:#fff }
+.btn{ padding:8px 16px; border-radius:999px; background:rgba(255,255,255,.15); color:var(--text-color) }
 
 /* 主题背景 */
-.night{ background: radial-gradient(120% 80% at 50% 20%, #151824 0%, #0c0f16 60%, #0a0c12 100%) }
-.dusk{ background: radial-gradient(120% 80% at 50% 20%, #1f2430 0%, #161a24 60%, #12141c 100%) }
-.day{ background: radial-gradient(120% 80% at 50% 20%, #eef1f6 0%, #dfe6f2 60%, #d7e0ee 100%); color:#222 }
-.dawn{ background: radial-gradient(120% 80% at 50% 20%, #273043 0%, #1f2737 60%, #1a2130 100%) }
+.night{ background: var(--bg-color); background-image: var(--bg-gradient); }
+.dusk{ background: var(--bg-color); background-image: var(--bg-gradient); }
+.day{ background: var(--bg-color); background-image: var(--bg-gradient); color:var(--text-color); }
+.dawn{ background: var(--bg-color); background-image: var(--bg-gradient); }
 
 @keyframes fadein{ from{ opacity:0 } to{ opacity:1 } }
 </style>
