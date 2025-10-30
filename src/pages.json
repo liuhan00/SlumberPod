@@ -14,6 +14,7 @@
     { "path": "pages/sleep/Alarm", "style": { "navigationBarTitleText": "闹钟与提醒" } },
     { "path": "pages/dream/index", "style": { "navigationBarTitleText": "AI解梦" } },
     { "path": "pages/profile/index", "style": { "navigationBarTitleText": "我的" } },
+    { "path": "pages/profile/PlayHistory", "style": { "navigationBarTitleText": "播放历史" } },
     { "path": "pages/player/index", "style": { "navigationBarTitleText": "播放" } },
     { "path": "pages/queue/index", "style": { "navigationBarTitleText": "队列" } },
     { "path": "pages/history/index", "style": { "navigationBarTitleText": "历史" } },

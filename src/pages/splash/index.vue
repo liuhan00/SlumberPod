@@ -50,7 +50,7 @@ async function checkAuthStatus() {
     if(!auth || !auth.token) return false
     
     // 验证token是否有效 - 使用完整的后端URL
-    const response = await fetch('http://localhost:3002/api/auth/me', {
+    const response = await fetch('http://192.168.163.92:3002/api/auth/me', {
       headers: { Authorization: `Bearer ${auth.token}` }
     })
     

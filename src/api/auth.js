@@ -1,7 +1,7 @@
 // Switch to backend-auth proxy endpoints
 import { saveAuthLocal, clearAuthLocal, applySession } from '@/store/auth'
 
-const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.88.92:3003' // backend server URL
+const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.163.92:3003' // backend server URL
 
 export async function register({ username, email, password }){
   const res = await fetch(BASE + '/api/auth/register', {

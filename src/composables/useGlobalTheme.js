@@ -2,6 +2,19 @@ import { ref, computed, onMounted } from 'vue'
 import { gradients, baseColors, textColors, getHour, getThemeByHour } from '@/utils/timeTheme'
 import { useThemeStore } from '@/stores/theme'
 
+// contrast helper
+function contrastTextColor(bgHex){
+  if(!bgHex) return '#fff'
+  let hex = String(bgHex).replace('#','')
+  if(hex.length===3) hex = hex.split('').map(c=>c+c).join('')
+  const num = parseInt(hex,16)
+  if(Number.isNaN(num)) return '#fff'
+  const r = (num>>16)&255, g=(num>>8)&255, b=num&255
+  const a = [r,g,b].map(v=>{ v/=255; return v<=0.03928? v/12.92: Math.pow((v+0.055)/1.055,2.4) })
+  const lum = 0.2126*a[0]+0.7152*a[1]+0.0722*a[2]
+  return lum > 0.5 ? '#000' : '#fff'
+}
+
 export function useGlobalTheme(){
   const hour = ref(getHour())
   const theme = computed(()=> getThemeByHour(hour.value))
@@ -46,6 +59,15 @@ export function useGlobalTheme(){
       '--accent': t==='day'? '#334155' : '#f7c14d',
       '--shadow': t==='day'? 'rgba(0,0,0,.08)' : 'rgba(0,0,0,.35)'
     }
+
+    // compute contrast-based colors and expose as CSS variables
+    try{
+      const bgHex = baseColors[t]
+      const textContrast = contrastTextColor(bgHex)
+      const mutedContrast = textContrast === '#fff' ? 'rgba(255,255,255,0.72)' : 'rgba(0,0,0,0.65)'
+      base['--text-contrast'] = textContrast
+      base['--muted-contrast'] = mutedContrast
+    }catch(e){}
     return themeStore.override ? { ...base, ...themeStore.override } : base
   })
 

@@ -194,7 +194,7 @@ setPreset(24)
 .scroller-item.faint{ font-size:28px; opacity:0.3 }
 
 .time-number{ position:absolute; display:flex; flex-direction:row; align-items:baseline; gap:8px }
-.minutes{ font-size:64px; font-weight:800; color:#fff; text-shadow:0 6px 18px rgba(0,0,0,0.35) }
+.minutes{ font-size:64px; font-weight:800; color:var(--text-color); text-shadow:0 6px 18px rgba(0,0,0,0.35) }
 .unit{ font-size:18px; color:rgba(255,255,255,0.9) }
 .wake-text{ position:absolute; bottom:-36px; left:0; right:0; text-align:center; color:rgba(255,255,255,0.85); font-size:14px }
 

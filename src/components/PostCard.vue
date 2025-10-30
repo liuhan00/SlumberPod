@@ -178,12 +178,14 @@ function showMoreActions() {
 
 <style scoped>
 .post { 
-  background: #fff; 
-  border-radius: 12px; 
-  padding: 16px; 
-  margin-bottom: 16px; 
-  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-  transition: transform 0.2s;
+  /* make card transparent but keep border to indicate card */
+  background: transparent;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+  border: 1px solid var(--border, rgba(0,0,0,0.06));
+  box-shadow: 0 1px 0 rgba(255,255,255,0.03) inset; /* subtle inner highlight */
+  transition: transform 0.2s, background 0.2s;
 }
 
 .post:active {
@@ -213,21 +215,21 @@ function showMoreActions() {
 
 .name {
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--text-contrast, var(--fg)) ;
   font-size: 14px;
   margin-bottom: 2px;
 }
 
 .time {
   font-size: 12px;
-  color: #999;
+  color: var(--muted-contrast, #999);
 }
 
 .more-btn {
   background: none;
   border: none;
   font-size: 18px;
-  color: #999;
+  color: var(--muted-contrast, #999);
   padding: 4px;
 }
 
@@ -236,9 +238,9 @@ function showMoreActions() {
   margin-bottom: 16px;
 }
 
-.post-title{ font-size:18px; font-weight:700; color: var(--text-primary); margin-bottom:6px }
+.post-title{ font-size:18px; font-weight:700; color: var(--text-contrast, var(--fg)) ; margin-bottom:6px }
 .content {
-  color: var(--text-primary);
+  color: var(--text-contrast, var(--fg)) ;
   font-size: 15px;
   line-height: 1.5;
   margin-bottom: 12px;
@@ -324,7 +326,7 @@ function showMoreActions() {
 
 .stat-text {
   font-size: 12px;
-  color: #999;
+  color: var(--muted-contrast, #999);
 }
 
 /* 评论预览 */
@@ -346,12 +348,12 @@ function showMoreActions() {
 }
 
 .comment-content {
-  color: var(--text-primary);
+  color: var(--text-contrast, var(--fg)) ;
   flex: 1;
 }
 
 .view-all-comments {
-  color: #999;
+  color: var(--muted-contrast, #999);
   font-size: 12px;
   margin-top: 4px;
   display: block;

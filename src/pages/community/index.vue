@@ -25,7 +25,7 @@
     <!-- 内容区域 -->
     <scroll-view class="content" scroll-y :style="bgStyle">
       <view class="section">
-        <CommunityComposer @submit="createPost" />
+        <CommunityComposer v-if="activeTab !== '关注'" @submit="createPost" />
         
         <!-- 帖子列表 -->
         <view v-if="filteredPosts.length > 0">
@@ -60,6 +60,7 @@ import CommunityComposer from '@/components/CommunityComposer.vue'
 import PostCard from '@/components/PostCard.vue'
 import { useGlobalTheme } from '@/composables/useGlobalTheme'
 import { useThemeStore } from '@/stores/theme'
+import { getAuthLocal } from '@/store/auth'
 
 const themeStore = useThemeStore()
 themeStore.load()
@@ -111,8 +112,14 @@ const filteredPosts = computed(() => {
   
   switch (activeTab.value) {
     case '关注':
-      // 模拟关注列表
-      result = result.filter(post => ['Sleepy', 'Expert'].includes(post.author.name))
+      // 关注列表：只显示你关注的人发的帖子（从后端或本地 auth 获取关注名单）
+      try{
+        const auth = getAuthLocal()
+        const following = auth?.following || auth?.user?.following || ['Sleepy','Expert']
+        result = result.filter(post => following.includes(post.author.name))
+      }catch(e){
+        result = result.filter(post => ['Sleepy', 'Expert'].includes(post.author.name))
+      }
       break
     case '综合':
       // 综合排序：按热度（点赞数+评论数）
@@ -195,7 +202,6 @@ function onComment(id) {
 }
 
 import * as apiPosts from '@/api/posts'
-import { getAuthLocal } from '@/store/auth'
 
 async function createPost(data) {
   try{

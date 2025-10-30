@@ -79,14 +79,16 @@ $uni-font-size-paragraph: 15px;
 :root {
   --bg-color: #fff;
   --bg-gradient: none;
-  --text-color: #333;
+  /* text-color now follows computed contrast from useGlobalTheme ( --text-contrast ) */
+  --text-color: var(--text-contrast, #333);
   --card-bg: #fff;
-  --muted: #999;
+  /* muted follows computed muted contrast */
+  --muted: var(--muted-contrast, #999);
   --input-bg: #f2f3f5;
-  --fg: #333;
+  --fg: var(--text-contrast, #333);
 
   /* different text levels for theme */
-  --text-primary: var(--text-color);
-  --text-secondary: rgba(0,0,0,0.6);
+  --text-primary: var(--text-contrast, var(--text-color));
+  --text-secondary: var(--muted-contrast, rgba(0,0,0,0.6));
   --text-inverse: #fff;
 }

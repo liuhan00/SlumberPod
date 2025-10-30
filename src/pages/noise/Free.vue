@@ -203,11 +203,14 @@ function openPlayerWithTracks(tracks){
 }
 
 function playRemote(a){
-  const track = { id: a.id || a._id || a.uuid || String(Date.now()), title: a.title || a.name || a.audioName || '', audio_url: a.audio_url || a.audioUrl || a.url || a.src || '' }
-  // navigate to player detail without auto-playing in list click
-  // use single track title override
-  try{ uni.navigateTo({ url: `/pages/player/index?title=${encodeURIComponent(track.title)}` }) }catch(e){ location.hash = `#/pages/player/index?title=${encodeURIComponent(track.title)}` }
-  // do not modify miniPlaying here
+  const track = { id: a.id || a._id || a.uuid || String(Date.now()), name: a.title || a.name || a.audioName || '', src: a.audio_url || a.audioUrl || a.url || a.src || '' }
+  // add to player store and start playing so player page finds currentTrack and src
+  try{
+    player.addToQueue?.(track)
+    player.play?.(track)
+  }catch(e){ console.warn('player play failed', e) }
+  // navigate to player detail and let player page attach to currentTrack
+  try{ uni.navigateTo({ url: `/pages/player/index?title=${encodeURIComponent(track.name)}` }) }catch(e){ location.hash = `#/pages/player/index?title=${encodeURIComponent(track.name)}` }
 }
 
 const anyPlaying = computed(()=> miniPlaying.value.size > 0)

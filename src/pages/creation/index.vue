@@ -51,7 +51,7 @@
                 :key="category.id" 
                 class="category-tag"
                 :class="{ active: creationData.category === category.id }"
-                @click="creationData.category = category.id"
+                @click="creationData.category = category.id; creationData.categoryName = category.name"
               >
                 <text class="category-icon">{{ category.icon }}</text>
                 <text class="category-name">{{ category.name }}</text>
@@ -70,8 +70,20 @@
                 <text class="record-text">{{ isRecording ? '停止录制' : '开始录制' }}</text>
               </view>
               
+              <view class="upload-controls">
+                <view class="file-select-btn" @click="selectAudioFile">
+                  <text class="file-icon">📁</text>
+                  <text class="file-text">{{ selectedFile ? selectedFile.name : '选择音频文件' }}</text>
+                </view>
+                <view class="upload-btn" @click="uploadSelectedFile" :class="{ disabled: !selectedFile }">
+                  <text class="upload-icon">{{ selectedFile ? '📤' : '🚫' }}</text>
+                  <text class="upload-text">{{ selectedFile ? '上传音频文件' : '请先选择文件' }}</text>
+                </view>
+                <text v-if="uploadProgress>0" class="progress-text">上传进度：{{ Math.round(uploadProgress) }}%</text>
+              </view>
+              
               <view class="audio-preview" v-if="audioUrl">
-                <text class="preview-title">录制预览</text>
+                <text class="preview-title">录制/上传预览</text>
                 <view class="audio-player">
                   <text class="play-btn" @click="togglePlayback">{{ isPlaying ? '⏸️' : '▶' }}</text>
                   <view class="progress-bar">
@@ -181,13 +193,39 @@ const creationData = ref({
 })
 
 // 分类选项
-const categories = ref([
-  { id: 'nature', name: '自然', icon: '🌿' },
-  { id: 'home', name: '居家', icon: '🏠' },
-  { id: 'environment', name: '环境', icon: '🏙️' },
-  { id: 'instrument', name: '乐器', icon: '🎵' },
-  { id: 'other', name: '其他', icon: '🎨' }
-])
+const categories = ref([])
+
+// 使用与听白噪音页面一致的分类
+import * as apiAudios from '@/api/audios'
+
+function loadCategories(){
+  // 使用听白噪音页面中的分类映射
+  const categoryMap = {
+    '22222222-2222-2222-2222-222222222222': { id: '22222222-2222-2222-2222-222222222222', name: '雨声', icon: '🌧️' },
+    '33333333-3333-3333-3333-333333333333': { id: '33333333-3333-3333-3333-333333333333', name: '自然', icon: '🌿' },
+    '44444444-4444-4444-4444-444444444444': { id: '44444444-4444-4444-4444-444444444444', name: '环境', icon: '🏙️' },
+    '55555555-5555-5555-5555-555555555555': { id: '55555555-5555-5555-5555-555555555555', name: '免费', icon: '🆓' }
+  }
+  
+  // 如果后端有分类数据，优先使用后端数据
+  apiAudios.getAudios({ limit: 1 }).then(res => {
+    if(res.categories && Array.isArray(res.categories)){
+      categories.value = res.categories.map(c => ({
+        id: c.id,
+        name: c.name,
+        icon: c.icon || categoryMap[c.id]?.icon || '🎧'
+      }))
+    } else {
+      // 使用预设的分类
+      categories.value = Object.values(categoryMap)
+    }
+  }).catch(e => {
+    console.warn('尝试从后端加载分类失败，使用预设分类', e)
+    categories.value = Object.values(categoryMap)
+  })
+}
+
+onMounted(()=> loadCategories())
 
 // 音频录制相关
 const isRecording = ref(false)
@@ -196,17 +234,25 @@ const audioUrl = ref('')
 const currentTime = ref(0)
 const duration = ref(0)
 const progress = ref(0)
+// file upload control
+const selectedFile = ref(null)
+const uploadProgress = ref(0)
 
 // 音效混合层
 const soundLayers = ref([
   { name: '基础音效', volume: 80 }
 ])
 
+// tags
+creationData.value.tags = creationData.value.tags || []
+function addTag(t){ if(!t) return; creationData.value.tags.push(t) }
+function removeTag(i){ creationData.value.tags.splice(i,1) }
+
 // 验证表单
 const isValid = computed(() => {
   return creationData.value.name.trim() && 
          creationData.value.category && 
-         audioUrl.value
+         (audioUrl.value || creationData.value.file_url)
 })
 
 // 返回上一页
@@ -224,28 +270,37 @@ function saveCreation() {
   
   uni.showLoading({ title: '保存中...' })
   
-  // 模拟保存过程
-  setTimeout(() => {
-    uni.hideLoading()
-    uni.showToast({
-      title: '创作保存成功！',
-      icon: 'success'
-    })
-    
-    // 如果选择了分享到社区，跳转到分享页面
-    if (creationData.value.shareToCommunity) {
-      setTimeout(() => {
-        uni.navigateTo({
-          url: '/pages/creation/share?id=' + Date.now()
-        })
-      }, 1500)
-    } else {
-      setTimeout(() => {
-        goBack()
-      }, 1500)
+  // 上传到后端（如果 file_url 或录音存在）
+  ;(async ()=>{
+    try{
+      const authModule = await import('@/store/auth')
+      const auth = authModule.getAuthLocal ? authModule.getAuthLocal() : (authModule.default && authModule.default.getAuthLocal ? authModule.default.getAuthLocal() : null)
+      const author_id = auth?.user?.id || auth?.id || null
+      const payload = {
+        title: creationData.value.name,
+        description: creationData.value.description,
+        category_id: creationData.value.category,
+        duration: duration.value || 0,
+        file_url: creationData.value.file_url || audioUrl.value || '',
+        tags: creationData.value.tags || []
+      }
+      const api = await import('@/api/audios')
+      const res = await api.uploadAudio(Object.assign({}, payload, { author_id }))
+      uni.hideLoading()
+      uni.showToast({ title: '上传成功', icon: 'success' })
+      if(creationData.value.shareToCommunity){
+        setTimeout(()=> uni.navigateTo({ url:'/pages/creation/share?id=' + (res.data?.id || res.id || Date.now()) }), 800)
+      } else {
+        setTimeout(()=> goBack(), 800)
+      }
+    }catch(e){
+      console.error('upload failed', e)
+      uni.hideLoading()
+      uni.showToast({ title: '保存失败：'+(e.message||String(e)), icon:'none' })
     }
-  }, 2000)
+  })()
 }
+
 
 // 切换录制状态
 function toggleRecording() {
@@ -263,6 +318,152 @@ function toggleRecording() {
     })
   }
 }
+
+// 选择音频文件
+async function selectAudioFile() {
+  try {
+    // 使用uni-app的文件选择API
+    const res = await uni.chooseFile({
+      count: 1,
+      type: 'file',
+      extension: ['mp3', 'wav', 'm4a', 'aac'],
+      sourceType: ['album', 'camera']
+    })
+    
+    if (res.tempFiles && res.tempFiles.length > 0) {
+      selectedFile.value = res.tempFiles[0]
+      uni.showToast({
+        title: '文件选择成功',
+        icon: 'success',
+        duration: 1500
+      })
+    }
+  } catch (error) {
+    console.error('选择文件失败:', error)
+    uni.showToast({
+      title: '选择文件失败',
+      icon: 'none',
+      duration: 2000
+    })
+  }
+}
+
+async function uploadSelectedFile(){
+  if(!selectedFile.value) return uni.showToast({ title:'请选择文件', icon:'none' })
+  
+  // 检查必填字段
+  if(!creationData.value.name.trim()) {
+    return uni.showToast({ title:'请先填写作品名称', icon:'none' })
+  }
+  
+  if(!creationData.value.category) {
+    return uni.showToast({ title:'请先选择作品分类', icon:'none' })
+  }
+  
+  uni.showLoading({ title: '上传中...', mask: true })
+  
+  try{
+    uploadProgress.value = 10
+    
+    // 检查文件大小限制（50MB）
+    if(selectedFile.value.size > 50 * 1024 * 1024) {
+      throw new Error('文件大小不能超过50MB')
+    }
+    
+    // 检查文件类型 - 放宽限制，因为uni.chooseFile返回的文件可能没有type属性
+    const fileName = selectedFile.value.name.toLowerCase()
+    const allowedExtensions = ['.mp3', '.wav', '.m4a', '.aac', '.ogg', '.flac']
+    const hasValidExtension = allowedExtensions.some(ext => fileName.endsWith(ext))
+    
+    if(!hasValidExtension) {
+      throw new Error('请上传音频文件（支持MP3、WAV、M4A、AAC、OGG、FLAC格式）')
+    }
+    
+    uploadProgress.value = 30
+    
+    // 获取用户ID
+    const authModule = await import('@/store/auth')
+    const auth = authModule.getAuthLocal ? authModule.getAuthLocal() : (authModule.default && authModule.default.getAuthLocal ? authModule.default.getAuthLocal() : null)
+    const author_id = auth?.user?.id || auth?.id || null
+    
+    const api = await import('@/api/audios')
+    
+    // 添加上传进度监控
+    const uploadPromise = api.uploadAudioMultipart({ 
+      file: selectedFile.value, 
+      title: creationData.value.name, 
+      description: creationData.value.description || '无描述',
+      category_id: creationData.value.category, 
+      duration: duration.value || 0, 
+      tags: creationData.value.tags || [],
+      author_id: author_id
+    })
+    
+    // 模拟上传进度
+    const progressInterval = setInterval(() => {
+      if(uploadProgress.value < 90) {
+        uploadProgress.value += 10
+      }
+    }, 500)
+    
+    const resp = await uploadPromise
+    clearInterval(progressInterval)
+    uploadProgress.value = 100
+    
+    console.log('上传响应:', resp)
+    
+    // 处理响应数据
+    let fileUrl = ''
+    if(resp.data) {
+      fileUrl = resp.data.audio_url || resp.data.file_url || resp.data.url || ''
+    } else {
+      fileUrl = resp.audio_url || resp.file_url || resp.url || ''
+    }
+    
+    if(fileUrl) {
+      creationData.value.file_url = fileUrl
+      uni.hideLoading()
+      uni.showToast({ 
+        title:'上传成功', 
+        icon:'success',
+        duration: 2000
+      })
+      
+      // 自动设置音频时长（如果后端没有返回）
+      if(!duration.value && (resp.data?.duration || resp.duration)) {
+        duration.value = resp.data?.duration || resp.duration
+      }
+      
+      // 清空已选文件
+      selectedFile.value = null
+    } else {
+      throw new Error('上传成功但未获取到文件URL，响应：' + JSON.stringify(resp))
+    }
+    
+  }catch(e){ 
+    console.error('上传失败详情:', e)
+    uni.hideLoading()
+    
+    // 更详细的错误信息
+    let errorMessage = '上传失败'
+    if(e.message && e.message.includes('Network')) {
+      errorMessage = '网络连接失败，请检查网络设置'
+    } else if(e.message && e.message.includes('Failed to fetch')) {
+      errorMessage = '服务器连接失败，请稍后重试'
+    } else if(e.message) {
+      errorMessage = e.message
+    }
+    
+    uni.showToast({ 
+      title: errorMessage, 
+      icon:'none',
+      duration: 3000
+    }) 
+  } finally {
+    setTimeout(() => { uploadProgress.value = 0 }, 2000)
+  }
+}
+
 
 // 切换播放状态
 function togglePlayback() {
@@ -554,6 +755,82 @@ onMounted(() => {
 .record-text {
   font-size: 14px;
   font-weight: 500;
+}
+
+/* 文件上传控制 */
+.file-select-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  background: var(--input-bg, #f8f9fa);
+  border: 2px solid var(--border, #f0f0f0);
+  border-radius: 25px;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: 12px;
+}
+
+.file-select-btn:active {
+  transform: scale(0.95);
+  border-color: var(--uni-color-primary, #007aff);
+}
+
+.file-icon {
+  font-size: 16px;
+}
+
+.file-text {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--fg, #333);
+}
+
+.upload-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  background: var(--uni-color-primary, #007aff);
+  border: 2px solid var(--uni-color-primary, #007aff);
+  border-radius: 25px;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: 12px;
+}
+
+.upload-btn.disabled {
+  background: var(--muted, #ccc);
+  border-color: var(--muted, #ccc);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.upload-btn:not(.disabled):active {
+  transform: scale(0.95);
+}
+
+.upload-icon {
+  font-size: 16px;
+}
+
+.upload-text {
+  font-size: 14px;
+  font-weight: 500;
+  color: white;
+}
+
+.upload-btn.disabled .upload-text {
+  color: var(--fg, #666);
+}
+
+.progress-text {
+  font-size: 12px;
+  color: var(--uni-color-primary, #007aff);
+  font-weight: 500;
+  text-align: center;
+  display: block;
+  margin-top: 8px;
 }
 
 .audio-preview {

@@ -30,7 +30,7 @@
         <view class="field">
           <view class="field-icon">🔒</view>
           <input :type="passwordVisible ? 'text' : 'password'" v-model="password" placeholder="请输入密码" class="input" />
-          <button type="button" class="eye" @click="passwordVisible = !passwordVisible">{{ passwordVisible ? '🙈' : '👁️' }}</button>
+          <button type="button" class="eye" @click="passwordVisible = !passwordVisible">{{ passwordVisible ? '👁️' : '🙈' }}</button>
         </view>
         
         <button class="btn primary" @click="submit" :disabled="loading">
@@ -246,7 +246,7 @@ function goRegister(){
 
 .subtitle {
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--muted);
 }
 
 .form {
@@ -281,12 +281,12 @@ function goRegister(){
   background: transparent;
   border: none;
   outline: none;
-  color: rgba(255,255,255,0.95); /* 更高对比度 */
+  color: var(--text-primary); /* 更高对比度 */
   font-size: 16px;
 }
 
 .input::placeholder {
-  color: rgba(255, 255, 255, 0.65);
+  color: var(--muted);
 }
 
 /* 眼睛按钮改为透明背景、移除圆角 */
@@ -317,8 +317,8 @@ function goRegister(){
 
 .btn.secondary {
   background: transparent;
-  color: rgba(255, 255, 255, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: var(--muted);
+  border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .btn.secondary:active {
@@ -344,7 +344,7 @@ function goRegister(){
 
 .divider-text {
   padding: 0 16px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--muted);
   font-size: 14px;
 }
 
@@ -354,7 +354,7 @@ function goRegister(){
 
 .hint {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--muted);
 }
 
 @keyframes float {

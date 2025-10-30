@@ -34,7 +34,7 @@
         <view class="field">
           <view class="field-icon">🔒</view>
           <input :type="passwordVisible ? 'text' : 'password'" v-model="password" placeholder="" class="input" />
-          <button type="button" class="eye" @click="passwordVisible = !passwordVisible">{{ passwordVisible ? '🙈' : '👁️' }}</button>
+          <button type="button" class="eye" @click="passwordVisible = !passwordVisible">{{ passwordVisible ? '👁️' : '🙈' }}</button>
         </view>
         <view class="password-hint">密码需包含大小写字母和数字，且长度至少为8位</view>
         
@@ -255,7 +255,7 @@ function goLogin(){
 
 .subtitle {
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--muted);
 }
 
 .form {
@@ -281,7 +281,7 @@ function goLogin(){
 .field-icon {
   font-size: 18px;
   margin-right: 12px;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--muted);
 }
 
 .input {
@@ -290,16 +290,16 @@ function goLogin(){
   background: transparent;
   border: none;
   outline: none;
-  color: rgba(255,255,255,0.95); /* 更高对比度 */
+  color: var(--text-primary); /* 更高对比度 */
   font-size: 16px;
 }
 
 .input::placeholder {
-  color: rgba(255, 255, 255, 0.65); /* 提高可见性 */
+  color: var(--muted); /* 提高可见性 */
 }
 
 .eye{ background:transparent; border:none; margin-left:8px; font-size:18px }
-.password-hint{ color:rgba(255,255,255,0.6); font-size:12px; margin-bottom:12px }
+.password-hint{ color:var(--muted); font-size:12px; margin-bottom:12px }
 .btn {
   width: 100%;
   height: 56px;
@@ -325,8 +325,8 @@ function goLogin(){
 
 .btn.secondary {
   background: transparent;
-  color: rgba(255, 255, 255, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: var(--muted);
+  border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .btn.secondary:active {
@@ -352,7 +352,7 @@ function goLogin(){
 
 .divider-text {
   padding: 0 16px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--muted);
   font-size: 14px;
 }
 
@@ -362,7 +362,7 @@ function goLogin(){
 
 .hint {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--muted);
 }
 
 @keyframes float {
