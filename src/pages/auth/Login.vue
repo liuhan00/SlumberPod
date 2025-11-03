@@ -51,7 +51,7 @@
       
       <!-- 底部提示 -->
       <view class="footer">
-        <text class="hint">测试账号：任意非空字段即可登录</text>
+        <!-- 提示已移除 -->
       </view>
     </view>
   </view>
@@ -108,8 +108,15 @@ function applyThemeByTime(){
   const h = new Date().getHours()
   const bg = colorForHour(h)
   const text = contrastTextColor(bg)
+  // Only manipulate document in web environment
+  // #ifndef MP-WEIXIN
   document.documentElement.style.setProperty('--card-bg', bg)
   document.documentElement.style.setProperty('--text-color', text)
+  // #endif
+  // #ifdef MP-WEIXIN
+  // For mini-programs set css variables on body via uni.setNavigationBarColor or keep styles in-page
+  try{ uni.setNavigationBarColor && uni.setNavigationBarColor({ frontColor: text, backgroundColor: bg }) }catch(e){}
+  // #endif
 }
 onMounted(()=>{
   applyThemeByTime()
@@ -134,10 +141,25 @@ async function submit(){
   loading.value = true
   try{
     const api = await import('@/api/auth')
+    // #ifdef MP-WEIXIN
+    // 优先尝试小程序授权登录（wx.login -> 后端换 token）
+    try{
+      await api.wxLogin()
+      uni.showToast({ title: '登录成功', icon: 'success' })
+      uni.reLaunch({ url: '/pages/home/index' })
+      return
+    }catch(e){
+      console.warn('wxLogin failed, fallback to credential login', e)
+      // 如果用户未填写账号密码，则抛出原错误提示
+      if(!email.value.trim() || !password.value.trim()) throw e
+    }
+    // #endif
+
+    // #ifndef MP-WEIXIN
     await api.login({ email: email.value, password: password.value })
     uni.showToast({ title: '登录成功', icon: 'success' })
-    // 使用uni-app的路由跳转
     uni.reLaunch({ url: '/pages/home/index' })
+    // #endif
   }catch(e){
     uni.showToast({ title: e.message || '登录失败', icon: 'none' })
   }finally{ loading.value = false }

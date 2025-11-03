@@ -1,5 +1,6 @@
 {
   "pages": [
+    { "path": "pages/noise/Free", "style": { "navigationBarTitleText": "自由组合" } },
     {
       "path": "pages/splash/index",
       "style": { "navigationBarTitleText": "启动", "navigationStyle": "custom" }
@@ -12,7 +13,7 @@
     { "path": "pages/sleep/index", "style": { "navigationBarTitleText": "睡觉" } },
     { "path": "pages/sleep/Nap", "style": { "navigationBarTitleText": "小憩" } },
     { "path": "pages/sleep/Alarm", "style": { "navigationBarTitleText": "闹钟与提醒" } },
-    { "path": "pages/dream/index", "style": { "navigationBarTitleText": "AI解梦" } },
+
     { "path": "pages/profile/index", "style": { "navigationBarTitleText": "我的" } },
     { "path": "pages/profile/PlayHistory", "style": { "navigationBarTitleText": "播放历史" } },
     { "path": "pages/player/index", "style": { "navigationBarTitleText": "播放" } },
@@ -29,7 +30,6 @@
     { "path": "pages/creation/index", "style": { "navigationBarTitleText": "创作白噪音" } },
     { "path": "pages/creation/share", "style": { "navigationBarTitleText": "分享创作" } },
     { "path": "pages/creations/index", "style": { "navigationBarTitleText": "我的创作" } },
-    { "path": "pages/noise/Free", "style": { "navigationBarTitleText": "自由组合" } },
     { "path": "pages/feedback/ModalPrompt", "style": { "navigationBarTitleText": "睡眠反馈" } },
     { "path": "pages/feedback/Form", "style": { "navigationBarTitleText": "睡眠反馈" } },
     { "path": "pages/auth/Login", "style": { "navigationBarTitleText": "登录" } },
@@ -48,34 +48,35 @@
     "backgroundColor": "#ffffff",
     "list": [
       {
-        "pagePath": "pages/home/index",
+        "pagePath": "pages/noise/Free",
         "text": "首页",
-        "iconPath": "static/tabbar/home.svg",
-        "selectedIconPath": "static/tabbar/home.svg"
+        "iconPath": "static/tab_home.png",
+        "selectedIconPath": "static/tab_home_active.png"
       },
+
       {
         "pagePath": "pages/community/index",
         "text": "社区",
-        "iconPath": "static/tabbar/community.svg",
-        "selectedIconPath": "static/tabbar/community.svg"
+        "iconPath": "static/tab_community.png",
+        "selectedIconPath": "static/tab_community_active.png"
       },
       {
         "pagePath": "pages/sleep/index",
         "text": "睡觉",
-        "iconPath": "static/tabbar/sleep.svg",
-        "selectedIconPath": "static/tabbar/sleep.svg"
+        "iconPath": "static/tab_sleep.png",
+        "selectedIconPath": "static/tab_sleep_active.png"
       },
       {
-        "pagePath": "pages/dream/index",
+        "pagePath": "pages/home/index",
         "text": "AI解梦",
-        "iconPath": "static/tabbar/dream.svg",
-        "selectedIconPath": "static/tabbar/dream.svg"
+        "iconPath": "static/tab_dream.png",
+        "selectedIconPath": "static/tab_dream_active.png"
       },
       {
         "pagePath": "pages/profile/index",
         "text": "我的",
-        "iconPath": "static/tabbar/profile.svg",
-        "selectedIconPath": "static/tabbar/profile.svg"
+        "iconPath": "static/tab_profile.png",
+        "selectedIconPath": "static/tab_profile_active.png"
       }
     ]
   }

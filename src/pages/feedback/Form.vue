@@ -21,10 +21,12 @@
       </view>
       <view class="row">
         <text>睡眠质量</text>
-        <select v-model.number="quality" aria-label="睡眠质量">
-          <option :value="null">未评分</option>
-          <option v-for="n in 5" :key="n" :value="n">{{ n }}</option>
-        </select>
+        <!-- use native picker for MP-WEIXIN: bindchange for <picker> -->
+        <picker mode="selector" :range="qualityOptions" @change="onQualityChange">
+          <view class="picker">
+            {{ qualityIdx === 0 ? '未评分' : quality }}
+          </view>
+        </picker>
         <text>{{ quality || '-' }}</text>
       </view>
 
@@ -90,6 +92,13 @@ const wakeTime = ref('07:00')
 const score = ref(6)
 const durationMinutes = ref(480)
 const quality = ref(null)
+const qualityOptions = ['未评分','1','2','3','4','5']
+const qualityIdx = ref(0)
+function onQualityChange(e){
+  const idx = parseInt(e.detail.value || 0)
+  qualityIdx.value = idx
+  quality.value = idx === 0 ? null : idx
+}
 const flags = ref({ dreams:false, easyWake:false, midWake:false })
 const activities = ref({ coffee:false, exercise:false, devices:false, read:false, otherAudio:false })
 const otherText = ref('')

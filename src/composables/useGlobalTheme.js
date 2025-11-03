@@ -67,6 +67,15 @@ export function useGlobalTheme(){
       const mutedContrast = textContrast === '#fff' ? 'rgba(255,255,255,0.72)' : 'rgba(0,0,0,0.65)'
       base['--text-contrast'] = textContrast
       base['--muted-contrast'] = mutedContrast
+
+      // 同步写入 :root，确保首屏渲染时变量已生效，避免先暗后亮的闪烁
+      try{
+        if(typeof document !== 'undefined' && document.documentElement && document.documentElement.style){
+          Object.entries(base).forEach(([k,v]) => {
+            if(k.startsWith('--')) document.documentElement.style.setProperty(k, v)
+          })
+        }
+      }catch(_e){}
     }catch(e){}
     return themeStore.override ? { ...base, ...themeStore.override } : base
   })

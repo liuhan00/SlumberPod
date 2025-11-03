@@ -1,4 +1,6 @@
 import { defineStore } from 'pinia'
+import { getFavorites, addFavorite, removeFavorite } from '@/api/users'
+import { getAuthLocal } from '@/store/auth'
 
 export const useFavoritesStore = defineStore('favorites', {
   state: () => ({ items: [] }),
@@ -7,9 +9,44 @@ export const useFavoritesStore = defineStore('favorites', {
       try { const arr = uni.getStorageSync('favoriteItems'); if(Array.isArray(arr)) this.items = arr } catch(e){}
     },
     save(){ try { uni.setStorageSync('favoriteItems', this.items) } catch(e){} },
-    add(item){ if(!item) return; const exists = this.items.some(x=>x.id===item.id); if(!exists){ this.items.unshift({ ...item, ts: Date.now() }); this.save() } },
-    remove(id){ this.items = this.items.filter(x=>x.id!==id); this.save() },
+    async syncFromServer(){
+      try{
+        const auth = getAuthLocal()
+        if(!auth?.user?.id) return
+        const data = await getFavorites(auth.user.id)
+        if(Array.isArray(data)){
+          this.items = data.map(d=> ({ ...d, ts: Date.now() }))
+          this.save()
+        }
+      }catch(e){ console.warn('sync favorites failed', e) }
+    },
+    async add(item){
+      if(!item) return; const exists = this.items.some(x=>x.id===item.id); if(exists) return
+      // optimistic update
+      this.items.unshift({ ...item, ts: Date.now() }); this.save()
+      try{
+        const auth = getAuthLocal()
+        if(auth?.user?.id){
+          await addFavorite(auth.user.id, { item_id: item.id })
+        }
+      }catch(e){
+        // rollback on error
+        this.items = this.items.filter(x=>x.id!==item.id); this.save(); throw e
+      }
+    },
+    async remove(id){
+      const had = this.items.some(x=>x.id===id)
+      this.items = this.items.filter(x=>x.id!==id); this.save()
+      try{
+        const auth = getAuthLocal()
+        if(auth?.user?.id){ await removeFavorite(auth.user.id, id) }
+      }catch(e){
+        // rollback on error
+        if(had){ /* re-add minimal item */ this.items.unshift({ id, ts: Date.now() }); this.save() }
+        throw e
+      }
+    },
     clear(){ this.items = []; uni.removeStorageSync('favoriteItems') },
-    toggle(item){ if(!item) return; const exists = this.items.some(x=>x.id===item.id); if(exists) this.remove(item.id); else this.add(item) }
+    async toggle(item){ if(!item) return; const exists = this.items.some(x=>x.id===item.id); if(exists) await this.remove(item.id); else await this.add(item) }
   }
 })

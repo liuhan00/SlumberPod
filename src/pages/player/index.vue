@@ -602,9 +602,10 @@ onMounted(()=>{
 .icon-left, .icon-right{ color:#fff; opacity:0.8 }
 .meta{ padding: 18px 16px }
 .title-row{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.fixed-label{ font-size:24px; font-weight:800; color: var(--text-primary); }
 .name{ font-size:20px; color:#fff; font-weight:700 }
 .favorite-btn{ background: transparent; border: none; font-size: 24px; padding: 8px; margin-left: 12px; }
-.author{ margin-top:6px; color:#ddd }
+.author{ margin-top:6px; color: var(--text-primary) }
 .tags{ display:flex; gap:10px; padding:8px 16px }
 .tag{ background:rgba(255,255,255,0.06); color:#fff; padding:6px 8px; border-radius:8px }
 .controls{ display:flex; align-items:center; justify-content:space-around; padding:18px 36px }

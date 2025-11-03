@@ -45,10 +45,10 @@ onMounted(()=>{ setBottomSafe(!!track.value) })
 .mini{ position: fixed; left: 12px; right: 12px; bottom: 12px; z-index: 999; display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:14px; box-shadow: 0 6px 20px rgba(0,0,0,.2); backdrop-filter: blur(6px) }
 .thumb{ width:40px; height:40px; border-radius:8px }
 .info{ flex:1; display:flex; flex-direction:column }
-.title{ font-size:14px; font-weight:600 }
-.sub{ font-size:12px; color: var(--muted) }
+.title{ font-size:14px; font-weight:600; color: var(--text-contrast) }
+.sub{ font-size:12px; color: var(--muted) } /* 保持muted */
 .progress{ margin-top:6px; width:100%; height:4px; border-radius:999px; background: var(--input-bg); overflow:hidden }
 .inner{ height:100%; background: var(--accent) }
 .actions{ display:flex; align-items:center; gap:6px }
-.icon{ padding:6px 10px; border-radius:10px; background: var(--input-bg); color: var(--fg) }
+.icon{ padding:6px 10px; border-radius:10px; background: var(--input-bg); color: var(--text-contrast) }
 </style>

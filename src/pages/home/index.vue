@@ -23,6 +23,10 @@
     
     <BannerCarousel />
     
+    <!-- 把 home 的主体替换为 Free 组件的内容 -->
+    <FreeComp :hideTopbar="true" />
+    <AIHelper />
+    
     <!-- 两个图片风格卡片：听白噪音 & 我的创作 -->
     <view class="two-card-wrap" style="padding:12px 16px; display:flex; gap:12px;">
       <view class="img-card left" @click="goToFree" style="flex:1; border-radius:14px; padding:18px; color: var(--text-primary); background:linear-gradient(135deg,#bff2df 0%,#61c291 100%);">
@@ -58,6 +62,8 @@ import { useGlobalTheme } from '@/composables/useGlobalTheme'
 import { useThemeStore } from '@/stores/theme'
 import { usePlayerStore } from '@/stores/player'
 import { storeToRefs } from 'pinia'
+import FreeComp from '@/pages/noise/Free.vue'
+const FreeCompRef = FreeComp
 
 const themeStore = useThemeStore(); themeStore.load()
 const { bgStyle } = useGlobalTheme()
@@ -162,6 +168,7 @@ import * as apiAudios from '@/api/audios'
 function goToFree(){
   try{ uni.navigateTo({ url: '/pages/noise/Free' }) }catch(e){ if(typeof location!=='undefined') location.hash = '#/pages/noise/Free' }
 }
+
 
 // 点击页面上的“听白噪音”前先获取音频列表（示例：按标签category_id）
 async function fetchCategoryAudios(categoryId){

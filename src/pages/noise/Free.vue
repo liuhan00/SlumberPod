@@ -1,6 +1,6 @@
 <template>
   <view class="page" :style="bgStyle">
-    <view class="topbar">
+    <view v-if="!hideTopbar" class="topbar">
       <button class="back" @click="goBack">‹</button>
       <text class="title">自由组合</text>
       <view class="actions">
@@ -75,6 +75,7 @@
 </template>
 
 <script setup>
+const props = defineProps({ hideTopbar: { type: Boolean, default: false } })
 import { ref, computed, onMounted, watch } from 'vue'
 import { useGlobalTheme } from '@/composables/useGlobalTheme'
 import { allNoises } from '@/data/noises'
@@ -399,7 +400,11 @@ function endDrag(e){ dragging=false }
 .tab{ padding:8px 12px; background:rgba(0,0,0,0.05); border-radius:18px }
 .tab.active{ background:var(--accent, #2EA56B); color:#fff }
 
-.grid{ display:grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap:14px 24px; align-items:start; padding:12px 8px }
+.grid{ display:grid !important; grid-template-columns: repeat(4, 1fr) !important; gap:14px 24px; grid-auto-flow: row; padding:12px 8px }
+.grid .item{ display:block !important; width:100% }
+@media (max-width:1200px){ .grid{ grid-template-columns: repeat(3, 1fr) !important; } }
+@media (max-width:800px){ .grid{ grid-template-columns: repeat(2, 1fr) !important; } }
+@media (max-width:480px){ .grid{ grid-template-columns: repeat(1, 1fr) !important; } }
 .item{ display:flex; align-items:flex-start; padding:10px 14px; border-radius:12px; background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.02)); transition: background 0.18s, transform 0.12s }
 .item:hover{ background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.04)); transform: translateY(-6px) }
 .name{ font-size:14px; color:var(--text-color); line-height:1.6 }
@@ -408,13 +413,13 @@ function endDrag(e){ dragging=false }
 .player-bar{ position:fixed; bottom:12px; left:16px; right:16px; background:rgba(255,255,255,0.06); padding:10px 12px; border-radius:12px; text-align:center }
 
 /* mini player - floating style */
-.mini-player{ position:fixed; left:50%; transform:translateX(-50%); bottom:22px; display:flex; align-items:center; gap:14px; background:rgba(20,24,28,0.7); padding:10px 14px; border-radius:18px; box-shadow:0 10px 30px rgba(0,0,0,0.45); backdrop-filter: blur(8px); max-width:640px; width:calc(100% - 64px); z-index:1200 }
-.mini-dice{ width:44px; height:44px; display:flex; align-items:center; justify-content:center; border-radius:10px; background:rgba(255,255,255,0.06); border:none; color:var(--text-color) }
-.mini-center{ display:flex; gap:14px; flex:1; justify-content:center }
+.mini-player{ position:fixed; left:50%; transform:translateX(-50%); bottom:12px; display:flex; align-items:center; gap:8px; background:rgba(20,24,28,0.7); padding:6px 8px; border-radius:12px; box-shadow:0 6px 14px rgba(0,0,0,0.45); backdrop-filter: blur(6px); max-width:520px; width: min(520px, calc(100% - 96px)); z-index:1200 }
+.mini-dice{ width:36px; height:36px; display:flex; align-items:center; justify-content:center; border-radius:8px; background:rgba(255,255,255,0.06); border:none; color:var(--text-contrast) }
+.mini-center{ display:flex; gap:8px; flex:1; justify-content:center }
 .mini-box{ display:flex; flex-direction:column; align-items:center }
-.mini-thumb{ width:52px; height:52px; border-radius:12px; background:transparent; display:flex; align-items:center; justify-content:center; border:none; color:#ddd }
-.mini-thumb.on{ background:transparent; color:#fff; box-shadow:none }
-.mini-name{ font-size:12px; margin-top:6px; color:#ddd; max-width:120px; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.mini-thumb{ width:44px; height:44px; border-radius:10px; background:transparent; display:flex; align-items:center; justify-content:center; border:none; color:var(--text-contrast); transition: transform .12s ease, box-shadow .12s ease, background-color .12s ease; }
+.mini-thumb.on{ background:transparent; color:var(--text-contrast); box-shadow:none }
+.mini-name{ font-size:12px; margin-top:6px; color:var(--text-contrast); max-width:120px; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
 
 /* remote list styles */
 .remote-list{ display:flex; flex-direction:column; gap:8px; padding:8px }
@@ -432,4 +437,11 @@ function endDrag(e){ dragging=false }
 .timer-text{ position:absolute; left:0; right:0; top:86px; text-align:center; color:#fff; font-size:20px }
 .detail-actions{ display:flex; gap:12px; justify-content:center; margin-top:18px }
 .btn{ background:rgba(255,255,255,0.06); color:#fff; padding:10px 16px; border-radius:10px; border:none }
+/* 字体与对比度优化 */
+.mini-dice{ font-size:16px; }
+.mini-name{ font-size:14px; color:#eef3ff; }
+:root{ --text-color: #e8f0fb; }
+/* 字体对比度提升与激活文本增强 */
+.mini-name{ color:#eaf3ff; font-weight:500; font-size:14px; }
+:root{ --text-color: #e8f0fb; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
 </style>

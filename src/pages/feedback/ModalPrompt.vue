@@ -9,7 +9,7 @@
         <button class="btn" @click="askLater">稍后反馈</button>
       </view>
       <view class="footer">
-        <checkbox v-model="noMore">不再提示</checkbox>
+        <label class="checkbox"><input type="checkbox" v-model="noMore" /> 不再提示</label>
       </view>
     </view>
 

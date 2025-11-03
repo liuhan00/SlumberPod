@@ -3,6 +3,26 @@
   <head>
     <meta charset="UTF-8" />
     <script>
+      // 立即修复 Function.prototype.bind 问题 - 在微信小程序运行时之前执行
+      (function() {
+        'use strict';
+        
+        // 检查并修复 Function.prototype.bind
+        if (typeof Function.prototype.bind === 'undefined' || !Function.prototype.bind) {
+          console.log('[HTML Preload] Function.prototype.bind is undefined, applying immediate fix...');
+          Function.prototype.bind = function(thisArg) {
+            var fn = this;
+            return function() {
+              return fn.apply(thisArg, arguments);
+            };
+          };
+          console.log('[HTML Preload] Function.prototype.bind fix applied successfully');
+        }
+        
+        // 检查修复是否成功
+        console.log('[HTML Preload] Function.prototype.bind status:', typeof Function.prototype.bind);
+      })();
+      
       var coverSupport = 'CSS' in window && typeof CSS.supports === 'function' && (CSS.supports('top: env(a)') ||
         CSS.supports('top: constant(a)'))
       document.write(

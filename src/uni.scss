@@ -92,3 +92,29 @@ $uni-font-size-paragraph: 15px;
   --text-secondary: var(--muted-contrast, rgba(0,0,0,0.6));
   --text-inverse: #fff;
 }
+
+/* 输入框、placeholder 跟随主题对比色 */
+input, textarea, .input, .uni-input {
+  color: var(--text-contrast);
+  caret-color: var(--text-contrast);
+  background-color: transparent;
+}
+
+/* placeholder */
+input::placeholder, textarea::placeholder, .input::placeholder, .uni-input::placeholder {
+  color: var(--muted-contrast);
+  opacity: 1;
+}
+
+/* 强制覆盖常见深色/浅色写死样式 */
+.text-contrast { color: var(--text-contrast) !important }
+.text-inverse { color: var(--text-inverse) !important }
+
+
+/* 全局默认文字颜色，跟随主题自动取对比色 */
+body, .page {
+  color: var(--text-color);
+}
+/* 便捷类：强制使用对比文字色（浅底深字 或 深底浅字） */
+.text-contrast { color: var(--text-contrast) !important }
+.text-inverse { color: var(--text-inverse) !important }

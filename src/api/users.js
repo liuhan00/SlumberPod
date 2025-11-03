@@ -21,3 +21,30 @@ export async function getPlayHistory(userId){
   if(!res.ok) throw new Error(j.message || 'fetch play history failed')
   return j.data || j || []
 }
+
+export async function getFavorites(userId){
+  const url = `${BASE}/api/users/${userId}/favorites`
+  const res = await fetch(url, { method: 'GET', headers: buildHeaders() })
+  if(res.status === 304) return []
+  if(res.status === 404) return []
+  const j = await res.json()
+  if(!res.ok) throw new Error(j.message || 'fetch favorites failed')
+  return j.data || j || []
+}
+
+export async function addFavorite(userId, payload){
+  const url = `${BASE}/api/users/${userId}/favorites`
+  const res = await fetch(url, { method: 'POST', headers: buildHeaders(), body: JSON.stringify(payload) })
+  const j = await res.json()
+  if(!res.ok) throw new Error(j.message || 'add favorite failed')
+  return j.data || j || {}
+}
+
+export async function removeFavorite(userId, favoriteId){
+  const url = `${BASE}/api/users/${userId}/favorites/${favoriteId}`
+  const res = await fetch(url, { method: 'DELETE', headers: buildHeaders() })
+  if(res.status === 404) return null
+  const j = await res.json()
+  if(!res.ok) throw new Error(j.message || 'remove favorite failed')
+  return j.data || j || null
+}
