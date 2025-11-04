@@ -2,12 +2,37 @@
   <scroll-view class="page" scroll-y :style="bgStyle">
     <!-- 顶部导航栏 -->
     <view class="header">
-      <SearchBar />
+      <view class="create-icon" @click="goToCreation">
+        <text class="create-symbol">✏️</text>
+      </view>
+      <SearchBar>
+        <view class="right-icons" slot="right-icons">
+          <view class="create-icon" @click="goToCreation">
+            <text class="create-symbol">✏️</text>
+          </view>
+          <view class="message-icon" @click="goToMessages">
+            <text class="message-badge" v-if="unreadCount > 0">{{ unreadCount > 99 ? '99+' : unreadCount }}</text>
+            <text class="message-symbol">💬</text>
+          </view>
+          <view v-if="currentTrack" class="playing-icon" @click="goToPlayer">
+            <image class="cover" :src="currentTrack.cover" mode="aspectFill" />
+            <view v-if="isPlaying" class="playing-indicator"></view>
+          </view>
+          <view v-else class="player-icon" @click="goToPlayer">
+            <text class="icon">▶</text>
+          </view>
+        </view>
+      </SearchBar>
       <view class="header-right">
         <!-- 消息图标 -->
         <view class="message-icon" @click="goToMessages">
           <text class="message-badge" v-if="unreadCount > 0">{{ unreadCount > 99 ? '99+' : unreadCount }}</text>
           <text class="message-symbol">💬</text>
+        </view>
+        
+        <!-- 创作入口按钮 -->
+        <view class="create-icon" @click="goToCreation">
+          <text class="create-symbol">✏️</text>
         </view>
         
         <!-- 播放器图标 -->
@@ -64,6 +89,7 @@ import { usePlayerStore } from '@/stores/player'
 import { storeToRefs } from 'pinia'
 import FreeComp from '@/pages/noise/Free.vue'
 const FreeCompRef = FreeComp
+import AIHelper from '@/components/AIHelper.vue'
 
 const themeStore = useThemeStore(); themeStore.load()
 const { bgStyle } = useGlobalTheme()
@@ -481,4 +507,21 @@ const unreadCount = ref(3)
 .section { padding: 12px 16px }
 .section-title { font-size:16px; font-weight:600; margin-bottom:8px }
 .grid { display:flex; flex-wrap:wrap; justify-content:space-between }
+
+/* 创建按钮样式 */
+.create-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg,#ffd7a8 0%,#ff9a44 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(255,154,68,0.25);
+  position: relative;
+  z-index: 60;
+  outline: 2px solid rgba(255,0,0,0.9); /* 调试边框，构建后请移除 */
+}
+.create-symbol { font-size: 16px; }
 </style>

@@ -189,6 +189,7 @@ import { usePlayerStore } from '@/stores/player'
 import { useHistoryStore } from '@/stores/history'
 import { useFavoritesStore } from '@/stores/favorites'
 import { allNoises } from '@/data/noises'
+import { getAuthLocal } from '@/store/auth'
 
 const store = usePlayerStore()
 const historyStore = useHistoryStore()
@@ -196,7 +197,43 @@ const favStore = useFavoritesStore(); favStore.load()
 historyStore.load()
 const track = computed(()=> store.currentTrack)
 const isFav = computed(()=> !!track.value && favStore.items.some(x=>x.id===track.value.id))
-function toggleFav(){ if(!track.value) return; favStore.toggle(track.value) }
+
+async function toggleFav(){ 
+  if(!track.value) return; 
+  
+  // 检查用户是否登录
+  const auth = getAuthLocal()
+  if(!auth?.id && !auth?.user?.id) {
+    uni.showToast({
+      title: '请先登录',
+      icon: 'none',
+      duration: 2000
+    })
+    // 跳转到登录页面
+    setTimeout(() => {
+      uni.navigateTo({
+        url: '/pages/auth/Login'
+      })
+    }, 1500)
+    return
+  }
+  
+  try {
+    await favStore.toggle(track.value)
+    uni.showToast({
+      title: isFav.value ? '已取消收藏' : '收藏成功',
+      icon: 'success',
+      duration: 1000
+    })
+  } catch (error) {
+    console.error('收藏操作失败:', error)
+    uni.showToast({
+      title: '操作失败，请重试',
+      icon: 'none',
+      duration: 2000
+    })
+  }
+}
 
 // three selected noises (for triangle corners)
 const threeTracks = ref([null,null,null])

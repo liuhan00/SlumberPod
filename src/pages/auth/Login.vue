@@ -23,30 +23,15 @@
       
       <!-- 登录表单 -->
       <view class="form">
-        <view class="field">
-          <view class="field-icon">📱</view>
-          <input v-model="email" name="email" placeholder="手机号或邮箱" class="input" />
+        <view class="auth-actions">
+          <button class="btn primary" @click="wxAuthLogin" :disabled="loading">
+            <text v-if="!loading">使用微信登录</text>
+            <text v-else>登录中...</text>
+          </button>
+          <button class="btn secondary" @click="guestLogin" :disabled="loading">
+            以游客身份进入
+          </button>
         </view>
-        <view class="field">
-          <view class="field-icon">🔒</view>
-          <input :type="passwordVisible ? 'text' : 'password'" v-model="password" placeholder="请输入密码" class="input" />
-          <button type="button" class="eye" @click="passwordVisible = !passwordVisible">{{ passwordVisible ? '👁️' : '🙈' }}</button>
-        </view>
-        
-        <button class="btn primary" @click="submit" :disabled="loading">
-          <text v-if="!loading">进入梦乡</text>
-          <text v-else>登录中...</text>
-        </button>
-        
-        <view class="divider">
-          <view class="line"></view>
-          <text class="divider-text">或</text>
-          <view class="line"></view>
-        </view>
-        
-        <button class="btn secondary" @click="goRegister">
-          创建新账号
-        </button>
       </view>
       
       <!-- 底部提示 -->
@@ -61,8 +46,14 @@
 import { ref, onMounted } from 'vue'
 import { saveAuthLocal } from '@/store/auth'
 
-const email = ref('')
-const password = ref('')
+// 微信登录函数引用
+let wxLoginFunction = null
+// #ifdef MP-WEIXIN
+// 在微信环境下直接导入
+import { wxLogin } from '@/api/auth'
+wxLoginFunction = wxLogin
+// #endif
+
 const loading = ref(false)
 const passwordVisible = ref(false)
 
@@ -115,7 +106,7 @@ function applyThemeByTime(){
   // #endif
   // #ifdef MP-WEIXIN
   // For mini-programs set css variables on body via uni.setNavigationBarColor or keep styles in-page
-  try{ uni.setNavigationBarColor && uni.setNavigationBarColor({ frontColor: text, backgroundColor: bg }) }catch(e){}
+  try{ uni.setNavigationBarColor && uni.setNavigationBarColor({ frontColor: (text==='\#000'? '#000000': text), backgroundColor: bg }) }catch(e){}
   // #endif
 }
 onMounted(()=>{
@@ -123,51 +114,46 @@ onMounted(()=>{
   setInterval(applyThemeByTime, 60*1000)
 })
 
-function validate(){
-
-  console.log('email:', email.value)
-  console.log('password:', password.value)
-
-
-
-  if(!email.value.trim()) return '请输入手机号或邮箱'
-  if(!password.value.trim()) return '请输入密码'
-  return null
-}
+function validate(){ return null }
 
 async function submit(){
-  const err = validate()
-  if(err) return uni.showToast({ title: err, icon: 'none' })
+  // deprecated
+}
+
+async function wxAuthLogin(){
   loading.value = true
   try{
-    const api = await import('@/api/auth')
     // #ifdef MP-WEIXIN
-    // 优先尝试小程序授权登录（wx.login -> 后端换 token）
-    try{
-      await api.wxLogin()
+    if (typeof wxLoginFunction === 'function') {
+      await wxLoginFunction()
       uni.showToast({ title: '登录成功', icon: 'success' })
-      uni.reLaunch({ url: '/pages/home/index' })
-      return
-    }catch(e){
-      console.warn('wxLogin failed, fallback to credential login', e)
-      // 如果用户未填写账号密码，则抛出原错误提示
-      if(!email.value.trim() || !password.value.trim()) throw e
+      uni.reLaunch({ url: '/pages/noise/Free' })
+    } else {
+      uni.showToast({ title: '微信登录功能不可用', icon: 'none' })
     }
     // #endif
-
+    
     // #ifndef MP-WEIXIN
-    await api.login({ email: email.value, password: password.value })
-    uni.showToast({ title: '登录成功', icon: 'success' })
-    uni.reLaunch({ url: '/pages/home/index' })
+    uni.showToast({ title: '微信登录功能仅在微信小程序中可用', icon: 'none' })
     // #endif
   }catch(e){
+    console.error('微信登录错误:', e)
     uni.showToast({ title: e.message || '登录失败', icon: 'none' })
   }finally{ loading.value = false }
+}
+
+function guestLogin(){
+  // create a temporary guest session locally
+  const guest = { id: `guest_${Date.now()}`, guest: true }
+  try{ uni.setStorageSync('app_auth_user', { token: null, user: guest }) }catch(e){}
+  uni.reLaunch({ url: '/pages/noise/Free' })
 }
 
 function goRegister(){ 
   uni.navigateTo({ url:'/pages/auth/Register' })
 }
+
+
 </script>
 
 <style scoped>

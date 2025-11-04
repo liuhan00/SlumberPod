@@ -2,7 +2,7 @@
   <view class="page" :style="bgStyle">
     <view v-if="!hideTopbar" class="topbar">
       <button class="back" @click="goBack">‹</button>
-      <text class="title">自由组合</text>
+      <text class="title">首页</text>
       <view class="actions">
         <button class="icon" @click="openSearch">🔍</button>
         <view v-if="player.currentTrack" class="playing-icon" @click="openPlayerQuick">
@@ -14,6 +14,8 @@
         </view>
       </view>
     </view>
+
+    <AIHelper />
 
     <view class="tabs">
       <view v-for="c in categories" :key="c" :class="['tab', { active: c===activeCat }]" @click="activeCat=c">{{ c }}</view>
@@ -81,6 +83,7 @@ import { useGlobalTheme } from '@/composables/useGlobalTheme'
 import { allNoises } from '@/data/noises'
 import { usePlayerStore } from '@/stores/player'
 import * as apiAudios from '@/api/audios'
+import AIHelper from '@/components/AIHelper.vue'
 
 const { bgStyle } = useGlobalTheme()
 const player = usePlayerStore()
@@ -330,7 +333,7 @@ const knobY = computed(()=> knobPos.value.y)
 const remainingSeconds = ref(durationMinutes.value * 60)
 const formattedRemaining = computed(()=>{
   const mm = String(Math.floor(remainingSeconds.value/60)).padStart(2,'0')
-  const ss = String(remainingSeconds.value%60).padStart(2,'0')
+  const ss = String(remainingSeconds.value%60)).padStart(2,'0')
   return `${mm}:${ss}`
 })
 
@@ -361,15 +364,15 @@ function startTimer(){
   }, 1000)
 }
 
-function cancelTimer(){ if(timerId){ clearInterval(timerId); timerId=null } showDetail.value=false }
+function cancelTimer(){ if(timerId){ clearInterval(timerId); timerId=null } showDetail value=false }
 
 // drag handling
 let dragging = false
 function startDrag(e){ dragging = true }
 function onDrag(e){ if(!dragging) return
-  const touch = e.touches && e.touches[0]
+  const touch = e.touches and e.touches[0]
   if(!touch) return
-  const rect = circleRef.value?.getBoundingClientRect?.() || { left:0, top:0 }
+  const rect = circleRef.value?.getBoundingClientRect?.() or { left:0, top:0 }
   const cx = rect.left + 100; const cy = rect.top + 100
   const dx = touch.clientX - cx; const dy = touch.clientY - cy
   let ang = Math.atan2(dy, dx) * 180 / Math.PI + 90

@@ -8,21 +8,16 @@
     <view class="avatar-wrap">
       <image class="avatar" :src="user.avatar" mode="cover" />
       <button class="camera-btn" @click="changeAvatar">
-        <text class="camera-icon">📷</text>
+        <text class="camera-icon"></text>
       </button>
     </view>
 
-    <!-- 原生日期选择器（隐藏） -->
     <picker mode="date" :value="birthdayValue" @change="onBirthdayChange" ref="birthdayPicker">
       <view style="display:none"></view>
     </picker>
 
     <scroll-view class="container" scroll-y>
       <view class="card">
-        <view class="row">
-          <text class="label">枕眠ID</text>
-          <text class="value">{{ user.userId }}</text>
-        </view>
 
         <view class="row clickable" @click="editNickname">
           <text class="label">昵称</text>
@@ -34,7 +29,10 @@
 
         <view class="row clickable" @click="editBio">
           <text class="label">简介</text>
-          <text class="arrow">›</text>
+          <view class="right">
+            <text class="value">{{ user.bio || '未填写' }}</text>
+            <text class="arrow">›</text>
+          </view>
         </view>
 
         <view class="row clickable" @click="editGender">
@@ -53,22 +51,33 @@
           </view>
         </view>
 
-    
+
       </view>
 
       <view class="card small">
         <view class="row clickable" @click="editPhone">
           <text class="label">手机号</text>
           <view class="right">
-            <text class="value">{{ user.phone || '198****9177' }}</text>
+            <text class="value">{{ maskedPhone(user.phone) }}</text>
             <text class="arrow">›</text>
           </view>
         </view>
 
-        
+        <view class="row clickable" @click="openThirdParty">
+          <text class="label">第三方应用</text>
+          <view class="right">
+            <text class="value">绑定设置</text>
+            <text class="arrow">›</text>
+          </view>
+        </view>
       </view>
 
-      <view style="height:60px"></view>
+      <view class="actions-block">
+        <button class="btn logout" @click="logout">退出登录</button>
+        <button class="btn delete" @click="deleteAccount">注销账号</button>
+      </view>
+
+      <view style="height:80px"></view>
     </scroll-view>
   </view>
 </template>
@@ -95,6 +104,13 @@ try{
 const birthdayValue = ref('1995-01-01')
 const birthdayPicker = ref(null)
 
+function maskedPhone(phone){
+  if(!phone) return '未绑定'
+  const s = String(phone)
+  if(s.length>=7) return s.slice(0,3) + '****' + s.slice(-4)
+  return s
+}
+
 function onBirthdayChange(e){
   const val = e.detail.value
   user.value.birthday = val
@@ -103,7 +119,6 @@ function onBirthdayChange(e){
 
 function openBirthdayPicker(){
   try{ birthdayPicker.value?.$el?.open ? birthdayPicker.value.$el.open() : birthdayPicker.value && birthdayPicker.value.$el }catch(e){ }
-  // 在小程序/uni-app中，建议直接触发 focus 或 click，但这里尽量保持兼容，使用 showModal 作为回退
   uni.showToast({ title:'使用顶部年份滚轮选择生日（平台特性）', icon:'none' })
 }
 
@@ -116,7 +131,7 @@ if (!user.value || !user.value.userId) {
     gender: '',
     birthday: '',
     location: '',
-    phone: '198****9177',
+    phone: '19800009177',
     background: 'https://picsum.photos/seed/bg/200'
   }
 }
@@ -138,19 +153,32 @@ function editGender(){
   uni.showActionSheet({ itemList:['男','女','保密','取消'], success(res){ if(res.tapIndex===3) return; const g=['男','女','保密']; user.value.gender = g[res.tapIndex]; uni.showToast({ title:'性别已更新' }) } })
 }
 
-
 function editLocation(){
   const provinces = ['北京市','天津市','河北省','山西省','内蒙古自治区','辽宁省','吉林省','黑龙江省','上海市','江苏省','浙江省','安徽省','福建省','江西省','山东省','河南省','湖北省','湖南省','广东省','广西壮族自治区','海南省','重庆市','四川省','贵州省','云南省','西藏自治区','陕西省','甘肃省','青海省','宁夏回族自治区','新疆维吾尔自治区']
-  uni.showModal({ title:'请选择', cancelText:'取消', confirmText:'确定', editable:false, content:'', success(res){ /* 由于uni.showModal不支持列表, 使用 ActionSheet 更合适 */ } })
-  uni.showActionSheet({ itemList: provinces, success(res){ const sel = provinces[res.tapIndex]; if(sel){ user.value.location = sel; uni.showToast({ title:'已选择 ' + sel }) } }, fail(){ /* no-op */ } })
+  uni.showActionSheet({ itemList: provinces, success(res){ const sel = provinces[res.tapIndex]; if(sel){ user.value.location = sel; uni.showToast({ title:'已选择 ' + sel }) } }, fail(){ } })
 }
 
 function editBackground(){
-  uni.showToast({ title:'更换背景功能开发中', icon:'none' })
+  uni.chooseImage({ count:1, success(res){ const temp = res.tempFilePaths[0]; user.value.background = temp; uni.showToast({ title:'背景已更新' }) } })
 }
 
 function editPhone(){
   uni.showModal({ title:'修改手机号', editable:true, placeholderText:'请输入手机号', success(res){ if(res.confirm && res.content){ user.value.phone = res.content; uni.showToast({ title:'手机号已更新' }) } } })
+}
+
+function openThirdParty(){
+  uni.showToast({ title:'第三方绑定设置', icon:'none' })
+}
+
+function logout(){
+  uni.showModal({ title:'退出登录', content:'确定要退出当前账号吗？', success(res){ if(res.confirm){ // 清除用户状态示例
+      user.value = {};
+      uni.reLaunch({ url:'/pages/login/index' })
+    } } })
+}
+
+function deleteAccount(){
+  uni.showModal({ title:'注销账号', content:'注销后数据无法恢复，确定继续吗？', success(res){ if(res.confirm){ uni.showToast({ title:'已提交注销申请', icon:'none' }) } } })
 }
 
 // picker refs for uni-app H5 compatibility
@@ -158,28 +186,33 @@ const refs = { birthdayPicker }
 </script>
 
 <style scoped>
-.page{ background:var(--bg-color, #0f0f10); background-image: var(--bg-gradient, none); background-repeat: no-repeat; background-size: 100% 100%; min-height:100vh; color:var(--text-color, #fff); display:flex; flex-direction:column }
+.page{ background:var(--bg-color, #0b0b0d); background-image: var(--bg-gradient, none); background-repeat: no-repeat; background-size: 100% 100%; min-height:100vh; color:var(--text-color, #fff); display:flex; flex-direction:column }
 .top{ height:56px; display:flex; align-items:center; justify-content:center; position:relative; padding-top: env(safe-area-inset-top); }
-.back{ position:absolute; left:14px; top:calc(14px + env(safe-area-inset-top)); font-size:26px; color:var(--fg) }
-.title{ font-size:20px; font-weight:700; color:var(--fg) }
+.back{ position:absolute; left:14px; top:calc(12px + env(safe-area-inset-top)); font-size:22px; color:var(--fg) }
+.title{ font-size:18px; font-weight:700; color:var(--fg) }
 
-.avatar-wrap{ display:flex; justify-content:center; align-items:center; margin:12px 0; position:relative }
-.avatar{ width:22vw; height:22vw; max-width:140px; max-height:140px; min-width:88px; min-height:88px; border-radius:50%; border:calc(0.02 * 100vw) solid rgba(255,255,255,0.06); box-shadow:0 8px 20px rgba(0,0,0,0.6); object-fit:cover }
-.camera-btn{ position:absolute; right:calc(50% - (22vw)/2 + 12px); bottom:6px; background:linear-gradient(180deg,#444,#222); width:10vw; max-width:44px; height:10vw; max-height:44px; border-radius:50%; display:flex; align-items:center; justify-content:center; border:3px solid var(--bg-color, #0f0f10); padding:0 }
-.camera-icon{ color:var(--fg); font-size:16px }
+.avatar-wrap{ display:flex; justify-content:center; align-items:center; margin:16px 0; position:relative }
+.avatar{ width:26vw; height:26vw; max-width:140px; max-height:140px; min-width:90px; min-height:90px; border-radius:50%; border:4px solid rgba(255,255,255,0.04); box-shadow:0 10px 30px rgba(0,0,0,0.7); object-fit:cover }
+.camera-btn{ position:absolute; right:calc(50% - (26vw)/2 + 10px); bottom:6px; background:linear-gradient(180deg,#444,#222); width:44px; height:44px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:18px; color:var(--fg); border:3px solid var(--bg-color, #0b0b0d); padding:0 }
+.camera-icon{ color:var(--fg); font-size:18px }
 
 .container{ padding:18px; flex:1; overflow:hidden }
 scroll-view.container{ flex:1 }
-.card{ background:var(--card-bg, rgba(28,28,30,0.9)); border-radius:12px; padding:12px; margin-bottom:12px; box-shadow:0 6px 18px rgba(0,0,0,0.6) }
+.card{ background:rgba(255,255,255,0.02); border-radius:12px; padding:12px; margin-bottom:12px; box-shadow:0 8px 20px rgba(0,0,0,0.6) }
 .card.small{ padding-top:8px }
 .row{ display:flex; align-items:center; justify-content:space-between; padding:14px 6px; border-bottom:1px solid rgba(255,255,255,0.03) }
 .row:last-child{ border-bottom:none }
-.label{ color:var(--muted); font-size:4.2vw; max-font-size:16px }
-.value{ color:var(--fg); font-size:4.2vw; max-font-size:16px }
+.label{ color:var(--muted); font-size:14px }
+.value{ color:var(--fg); font-size:14px }
 .clickable{ cursor:pointer }
 .arrow{ color:#8e8e93; margin-left:8px }
 .right{ display:flex; align-items:center; gap:10px }
 .bg-thumb{ width:22vw; max-width:80px; height:calc(22vw * 0.65); border-radius:6px }
+
+.actions-block{ padding:0 18px; display:flex; flex-direction:column; gap:12px }
+.btn{ padding:14px 12px; border-radius:10px; border:none; font-weight:600 }
+.btn.logout{ background:linear-gradient(180deg,#2b2b4a,#1b1b2a); color:#9fb0ff }
+.btn.delete{ background:linear-gradient(180deg,#3b1a1a,#260909); color:#ff9fb0 }
 
 /* safe area bottom padding */
 .page::after{ content:''; height:env(safe-area-inset-bottom); display:block }

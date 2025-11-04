@@ -22,13 +22,23 @@ export default {
       store.isMuted = s.isMuted || false
       store.loopMode = s.loopMode || 'all'
     }
+    // Auth check: require login before showing homepage
+    try{
+      const auth = uni.getStorageSync('app_auth_user')
+      if(!auth || !auth.token){
+        // redirect to login page
+        uni.reLaunch({ url: '/pages/auth/Login' })
+      }
+    }catch(e){
+      uni.reLaunch({ url: '/pages/auth/Login' })
+    }
   },
   onShow() {
     const h = getHour()
     const t = getThemeByHour(h)
     try {
       uni.setNavigationBarColor({
-        frontColor: textColors[t] === '#0f172a' ? '#000000' : '#ffffff',
+        frontColor: (textColors[t] === '#0f172a' || textColors[t] === '#000') ? '#000000' : '#ffffff',
         backgroundColor: baseColors[t]
       })
     } catch (e) {}

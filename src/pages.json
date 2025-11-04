@@ -1,6 +1,6 @@
 {
   "pages": [
-    { "path": "pages/noise/Free", "style": { "navigationBarTitleText": "自由组合" } },
+    { "path": "pages/noise/Free", "style": { "navigationBarTitleText": "首页" } },
     {
       "path": "pages/splash/index",
       "style": { "navigationBarTitleText": "启动", "navigationStyle": "custom" }
@@ -16,6 +16,13 @@
 
     { "path": "pages/profile/index", "style": { "navigationBarTitleText": "我的" } },
     { "path": "pages/profile/PlayHistory", "style": { "navigationBarTitleText": "播放历史" } },
+    { "path": "pages/profile/pages/favorites/index", "style": { "navigationBarTitleText": "我喜欢的" } },
+    { "path": "pages/profile/pages/creations/index", "style": { "navigationBarTitleText": "我的创作" } },
+    { "path": "pages/profile/pages/account/index", "style": { "navigationBarTitleText": "账号资料" } },
+    { "path": "pages/profile/pages/history/index", "style": { "navigationBarTitleText": "历史" } },
+    { "path": "pages/profile/pages/comments/index", "style": { "navigationBarTitleText": "我的评论" } },
+    { "path": "pages/profile/pages/help/index", "style": { "navigationBarTitleText": "帮助与客服" } },
+    { "path": "pages/profile/pages/about/index", "style": { "navigationBarTitleText": "关于 SlumberPod" } },
     { "path": "pages/player/index", "style": { "navigationBarTitleText": "播放" } },
     { "path": "pages/queue/index", "style": { "navigationBarTitleText": "队列" } },
     { "path": "pages/history/index", "style": { "navigationBarTitleText": "历史" } },
@@ -53,7 +60,6 @@
         "iconPath": "static/tab_home.png",
         "selectedIconPath": "static/tab_home_active.png"
       },
-
       {
         "pagePath": "pages/community/index",
         "text": "社区",
@@ -65,12 +71,6 @@
         "text": "睡觉",
         "iconPath": "static/tab_sleep.png",
         "selectedIconPath": "static/tab_sleep_active.png"
-      },
-      {
-        "pagePath": "pages/home/index",
-        "text": "AI解梦",
-        "iconPath": "static/tab_dream.png",
-        "selectedIconPath": "static/tab_dream_active.png"
       },
       {
         "pagePath": "pages/profile/index",

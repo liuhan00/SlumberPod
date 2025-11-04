@@ -12,8 +12,9 @@ export const useFavoritesStore = defineStore('favorites', {
     async syncFromServer(){
       try{
         const auth = getAuthLocal()
-        if(!auth?.user?.id) return
-        const data = await getFavorites(auth.user.id)
+        if(!auth?.id && !auth?.user?.id) return
+        const userId = auth?.id || auth?.user?.id
+        const data = await getFavorites(userId)
         if(Array.isArray(data)){
           this.items = data.map(d=> ({ ...d, ts: Date.now() }))
           this.save()
@@ -26,8 +27,9 @@ export const useFavoritesStore = defineStore('favorites', {
       this.items.unshift({ ...item, ts: Date.now() }); this.save()
       try{
         const auth = getAuthLocal()
-        if(auth?.user?.id){
-          await addFavorite(auth.user.id, { item_id: item.id })
+        if(auth?.id || auth?.user?.id){
+          const userId = auth?.id || auth?.user?.id
+          await addFavorite(userId, { item_id: item.id })
         }
       }catch(e){
         // rollback on error
@@ -39,7 +41,10 @@ export const useFavoritesStore = defineStore('favorites', {
       this.items = this.items.filter(x=>x.id!==id); this.save()
       try{
         const auth = getAuthLocal()
-        if(auth?.user?.id){ await removeFavorite(auth.user.id, id) }
+        if(auth?.id || auth?.user?.id){ 
+          const userId = auth?.id || auth?.user?.id
+          await removeFavorite(userId, id) 
+        }
       }catch(e){
         // rollback on error
         if(had){ /* re-add minimal item */ this.items.unshift({ id, ts: Date.now() }); this.save() }

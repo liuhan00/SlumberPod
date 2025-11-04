@@ -74,10 +74,17 @@ function formatDate(v){ if(!v) return ''
 }
 
 async function loadHistory(){
+  const _fetchFallback = async (u, h) => {
+    if (typeof fetch === 'function') { return fetch(u, { headers: h }); }
+    // fallback using uni.request
+    return new Promise((resolve, reject) => {
+      uni.request({ url: u, header: h, success: (res) => resolve({ ok: res.statusCode >= 200 && res.statusCode < 300, json: () => res.data }), fail: (err)=> reject(err) });
+    });
+  }
   loading.value = true
   try{
     const auth = getAuthLocal()
-    const base = import.meta.env.VITE_API_BASE || 'http://192.168.163.92:3003'
+    const base = import.meta.env.VITE_API_BASE || 'http://192.168.1.151:3003'
     const userId = '11111111-1111-1111-1111-111111111111'
     const url = `${base}/api/users/${userId}/play-history`
     const headers = {}

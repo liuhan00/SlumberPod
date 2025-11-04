@@ -49,29 +49,34 @@ function readHourFromHash(){
 }
 
 export function getThemeByHour(h){
-  if(h>=5 && h<10) return 'dawn'
-  if(h>=10 && h<17) return 'day'
+  // 更直观的时间段：晨光(dawn)5-9, 日间(day)9-17, 傍晚(dusk)17-20, 夜间(night)20-5
+  if(h>=5 && h<9) return 'dawn'
+  if(h>=9 && h<17) return 'day'
   if(h>=17 && h<20) return 'dusk'
   return 'night'
 }
 
 export const gradients = {
-  night: 'radial-gradient(120% 80% at 50% 20%, #151824 0%, #0c0f16 60%, #0a0c12 100%)',
-  dusk:  'radial-gradient(120% 80% at 50% 20%, #1f2430 0%, #161a24 60%, #12141c 100%)',
-  day:   'radial-gradient(120% 80% at 50% 20%, #eef1f6 0%, #dfe6f2 60%, #d7e0ee 100%)',
-  dawn:  'radial-gradient(120% 80% at 50% 20%, #273043 0%, #1f2737 60%, #1a2130 100%)',
+  // 夜晚：冷色暗调，轻微星辉
+  night: 'radial-gradient(120% 80% at 50% 10%, #05060a 0%, #09101a 50%, #071019 100%), linear-gradient(180deg, rgba(10,14,22,0.6), rgba(4,6,10,0.9))',
+  // 傍晚：温暖橙紫混合，体现落日余晖
+  dusk:  'radial-gradient(120% 80% at 50% 20%, rgba(44,24,60,1) 0%, rgba(32,18,48,0.85) 50%, rgba(18,12,30,0.95) 100%), linear-gradient(180deg, rgba(255,140,84,0.06), rgba(120,60,120,0.04))',
+  // 白天：明亮蓝天渐变
+  day:   'linear-gradient(180deg, #a8d8ff 0%, #dff1ff 50%, #ffffff 100%)',
+  // 晨光：柔和暖光与薄雾感
+  dawn:  'radial-gradient(120% 80% at 50% 10%, rgba(255,220,180,0.12) 0%, rgba(255,200,120,0.06) 40%, rgba(30,40,60,0.9) 100%)'
 }
 
 export const baseColors = {
-  night: '#0c0f16',
-  dusk: '#171b26',
-  day: '#e6ecf8',
-  dawn: '#202838',
+  night: '#061018',
+  dusk: '#171220',
+  day: '#eaf6ff',
+  dawn: '#2a3a50',
 }
 
 export const textColors = {
   night: '#e7e9ee',
-  dusk: '#e7e9ee',
-  day: '#0f172a',
-  dawn: '#e7e9ee',
+  dusk: '#f0e9f6',
+  day: '#0b2340',
+  dawn: '#f3f6ff',
 }
