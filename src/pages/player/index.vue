@@ -27,17 +27,28 @@
         </g>
 
         <!-- three layered triangles -->
-        <g class="triangles" transform="translate(150,150)">
+                <g class="triangles" transform="translate(150,150)">
           <!-- enlarged triangles -->
           <polygon points="0,-70 60,35 -60,35" class="tri tri1" />
           <polygon points="0,-110 95,60 -95,60" class="tri tri2" />
           <polygon points="0,-150 130,85 -130,85" class="tri tri3" />
         </g>
 
-        <!-- knob -->
-        <circle :cx="knobX" :cy="knobY" r="10" class="knob" @touchstart.stop.prevent="startDrag" @touchmove.stop.prevent="onDrag" @touchend.stop.prevent="endDrag" @mousedown.stop.prevent="startDragMouse" @mousemove.stop.prevent="onDragMouse" @mouseup.stop.prevent="endDragMouse" />
+        <!-- outer ring with tick marks -->
+        <g class="ring-group" transform="translate(150,150)">
+          <circle cx="0" cy="0" r="120" class="outer-ring-bg" />
+          <circle cx="0" cy="0" r="120" class="outer-ring-progress" :stroke-dasharray="ringCircumference" :stroke-dashoffset="ringCircumference - (ringCircumference * (knobAngle.value/360))" />
+          <!-- ticks -->
+          <g v-for="(label, idx) in ringLabels" :key="idx" :transform="`rotate(${label.angle}) translate(0 -120)`">
+            <circle cx="0" cy="0" r="2" class="tick" />
+            <text x="0" y="-12" class="tick-label">{{ label.text }}</text>
+          </g>
+        </g>
+
+        <!-- knob on outer ring -->
+        <circle :cx="ringKnobX" :cy="ringKnobY" r="10" class="knob" @touchstart.stop.prevent="startDrag" @touchmove.stop.prevent="onDrag" @touchend.stop.prevent="endDrag" @mousedown.stop.prevent="startDragMouse" @mousemove.stop.prevent="onDragMouse" @mouseup.stop.prevent="endDragMouse" />
       </svg>
-      <text class="timer-center" v-if="showTime">{{ formattedRemaining }}</text>
+      <text class="timer-center" v-if="true">{{ formattedRemaining }}</text>
 
     </view>
 
@@ -281,8 +292,9 @@ function triStyle(idx){ const p = threePositions.value[idx] || {left:'0px', top:
 
 // timer UI state
 const svgRef = ref(null)
-const radius = 110
+const radius = 120
 const circumference = 2 * Math.PI * radius
+const ringCircumference = circumference
 const knobAngle = ref(0)
 const durationMinutes = ref(30)
 const remainingSeconds = ref(durationMinutes.value*60)
@@ -300,6 +312,18 @@ const knobPos = computed(()=>{
 })
 const knobX = computed(()=> knobPos.value.x)
 const knobY = computed(()=> knobPos.value.y)
+
+// ring knob coordinates for outer ring (use radius)
+const ringKnobPos = computed(()=>{
+  const ang = (knobAngle.value - 90) * (Math.PI/180)
+  const x = 150 + radius * Math.cos(ang)
+  const y = 150 + radius * Math.sin(ang)
+  return { x, y }
+})
+const ringKnobX = computed(()=> ringKnobPos.value.x)
+const ringKnobY = computed(()=> ringKnobPos.value.y)
+
+const ringLabels = [ { angle:0, text:'∞' }, { angle:60, text:'120' }, { angle:120, text:'90' }, { angle:180, text:'60' }, { angle:240, text:'30' }, { angle:300, text:'0' } ]
 
 
 let timerId = null
@@ -402,7 +426,7 @@ function toggleCorner(idx){ const n = threeTracks.value[idx]; if(!n) return; // 
 }
 function onDrag(e){ 
   if(!dragging) return; 
-  e.preventDefault?.();
+  try{ e.preventDefault?.(); }catch(_e){}
   showTime.value = true; 
   const touch = e.touches && e.touches[0]; 
   if(!touch) return; 
@@ -433,16 +457,19 @@ function onDragMouse(e){
   remainingSeconds.value = durationMinutes.value * 60 
 }
 function endDrag(e){ 
-  e.preventDefault?.();
+  try{ e.preventDefault?.(); }catch(_e){}
   dragging=false; 
+  // if already playing, start the countdown based on selected duration
+  try{ if(store.isPlaying){ durationMinutes.value = Math.max(0, Math.min(120, durationMinutes.value)); remainingSeconds.value = durationMinutes.value * 60; startTimer(); } }catch(_e){}
   if(hideTimeout) clearTimeout(hideTimeout); 
-  hideTimeout = setTimeout(()=>{ showTime.value = false; hideTimeout = null }, 800) 
+  hideTimeout = setTimeout(()=>{ showTime.value = false; hideTimeout = null }, 800)
 }
 function endDragMouse(e){ 
-  e.preventDefault?.();
+  try{ e.preventDefault?.(); }catch(_e){}
   dragging=false; 
+  try{ if(store.isPlaying){ durationMinutes.value = Math.max(0, Math.min(120, durationMinutes.value)); remainingSeconds.value = durationMinutes.value * 60; startTimer(); } }catch(_e){}
   if(hideTimeout) clearTimeout(hideTimeout); 
-  hideTimeout = setTimeout(()=>{ showTime.value = false; hideTimeout = null }, 800) 
+  hideTimeout = setTimeout(()=>{ showTime.value = false; hideTimeout = null }, 800)
 }
 
 function startTimer(){ if(timerId) clearInterval(timerId); remainingSeconds.value = durationMinutes.value*60; timerId = setInterval(()=>{ remainingSeconds.value -=1; if(remainingSeconds.value <=0){ clearInterval(timerId); timerId=null; // stop playback and close page
@@ -464,28 +491,37 @@ onLoad((query)=>{
   audioCtx.src = ''
 
   audioCtx.onCanplay(()=>{
-    if (audioCtx.duration) store.durationMs = audioCtx.duration * 1000
-    if (store.isPlaying) audioCtx.play()
+    try{ if (audioCtx.duration) store.durationMs = audioCtx.duration * 1000 }catch(e){}
+    try{ if (store.isPlaying) audioCtx.play() }catch(e){}
   })
   audioCtx.onTimeUpdate(()=>{
-    store.positionMs = audioCtx.currentTime * 1000
+    try{ store.positionMs = audioCtx.currentTime * 1000 }catch(e){}
   })
   audioCtx.onEnded(()=>{
-    store.isPlaying = false
+    try{ store.isPlaying = false }catch(e){}
+  })
+  audioCtx.onError((err)=>{
+    try{
+      console.warn('audioCtx error', err)
+      uni.showToast({ title:'音频加载失败，请检查网络或更换音源', icon:'none' })
+      store.isPlaying = false
+    }catch(e){}
   })
 
-  if(query?.id){
-    const target = allNoises.find(n=>n.id===query.id)
-    if(target){
-      store.setPlaylist(allNoises)
-      store.play(target)
-      historyStore.add(target)
-      audioCtx.src = target.src
-      store.durationMs = 180000
+  try{
+    if(query?.id){
+      const target = allNoises.find(n=>n.id===query.id)
+      if(target){
+        store.setPlaylist(allNoises)
+        store.play(target)
+        historyStore.add(target)
+        try{ audioCtx.src = target.src }catch(e){ console.warn('set src failed', e); uni.showToast({ title:'音频地址无效', icon:'none' }) }
+        store.durationMs = 180000
+      }
+    } else if (store.currentTrack) {
+      try{ audioCtx.src = store.currentTrack.src }catch(e){ console.warn('set src failed', e) }
     }
-  } else if (store.currentTrack) {
-    audioCtx.src = store.currentTrack.src
-  }
+  }catch(e){ console.warn('audio init failed', e) }
 })
 
 onUnload(()=>{
@@ -585,7 +621,7 @@ onMounted(()=>{
   threeTracks.value = [shuffled[0]||null, shuffled[1]||null, shuffled[2]||null]
   // compute triangle icon positions after render
   setTimeout(updateTriPositions, 120)
-  window.addEventListener?.('resize', updateTriPositions)
+  try{ if(typeof window !== 'undefined' && typeof window.addEventListener === 'function') window.addEventListener('resize', updateTriPositions) }catch(e){}
 })
 </script>
 <style scoped>

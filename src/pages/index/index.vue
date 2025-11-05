@@ -1,6 +1,6 @@
 <template>
   <view class="container">
-    <text class="title">SlumberPod</text>
+    <text class="title">星眠坞</text>
     <text class="subtitle">欢迎使用 uni-app Vite 脚手架</text>
   </view>
 </template>

@@ -1,5 +1,5 @@
 import { getAuthLocal } from '@/store/auth'
-const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.151:3003'
+const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.43.89:3003'
 
 function buildHeaders(token){
   const headers = { 'Content-Type': 'application/json' }
@@ -19,12 +19,10 @@ export async function createPost({ userId, title='', content='', imageUrls = [] 
 }
 
 export async function getPosts({ page = 1, limit = 10 } = {}){
-  const url = new URL(BASE + '/api/posts')
-  url.searchParams.set('page', page)
-  url.searchParams.set('limit', limit)
-  const res = await fetch(url.toString(), { method: 'GET', headers: buildHeaders() })
+  // URL constructor is not available in some mini program runtimes; build query string manually
+  const url = BASE + '/api/posts?page=' + encodeURIComponent(page) + '&limit=' + encodeURIComponent(limit)
+  const res = await fetch(url, { method: 'GET', headers: buildHeaders() })
   const j = await res.json()
   if(!res.ok) throw new Error(j.message || j.error || 'fetch posts failed')
-  // expect j.data or j.posts
   return j
 }

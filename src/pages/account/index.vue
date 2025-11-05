@@ -20,7 +20,7 @@
     <scroll-view class="container" scroll-y>
       <view class="card">
         <view class="row">
-          <text class="label">枕眠ID</text>
+          <text class="label">星眠坞ID</text>
           <text class="value">{{ user.userId }}</text>
         </view>
 

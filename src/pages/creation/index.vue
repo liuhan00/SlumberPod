@@ -528,7 +528,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.page { min-height: 100vh; background: var(--bg-color); background-image: var(--bg-gradient); }
+.page { min-height: 100vh; background: var(--bg-color); background-image: var(--bg-gradient); padding-top: constant(safe-area-inset-top); padding-top: env(safe-area-inset-top); }
 
 /* 顶部导航栏 */
 .header {

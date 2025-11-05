@@ -16,82 +16,37 @@ function contrastTextColor(bgHex){
 }
 
 export function useGlobalTheme(){
+  // Force single static theme for all pages (as requested)
   const hour = ref(getHour())
-  const theme = computed(()=> getThemeByHour(hour.value))
+  const theme = computed(()=> 'day')
   const themeStore = useThemeStore()
   themeStore.load()
   const bgStyle = computed(()=> {
-    const t = theme.value
-    const isLight = t === 'day'
-    const vars = isLight ? {
-      fg: '#0f172a',
-      muted: '#475569',
-      border: '#cbd5e1',
-      cardBg: 'rgba(255,255,255,0.95)',
-      cardFg: '#0f172a',
-      buttonBg: '#111827',
-      buttonFg: '#ffffff',
-      inputBg: '#f1f5f9'
-    } : {
-      fg: '#e7e9ee',
-      muted: '#cfd3dc',
-      border: 'rgba(255,255,255,0.14)',
-      cardBg: 'rgba(25,28,36,0.92)',
-      cardFg: '#e7e9ee',
-      buttonBg: '#f7c14d',
-      buttonFg: '#111111',
-      inputBg: '#232733'
-    }
+    // Use the screenshot-like soft blue gradient and matching variables
     const base = {
-      backgroundImage: gradients[t],
-      backgroundColor: baseColors[t],
-      color: textColors[t],
+      backgroundImage: 'linear-gradient(180deg, #dff3ff 0%, #eef8ff 50%, #ffffff 100%)',
+      backgroundColor: '#e6f6ff',
+      color: '#13303f',
       backgroundRepeat: 'no-repeat',
       backgroundSize: '100% 100%',
-      '--fg': vars.fg,
-      '--muted': vars.muted,
-      '--border': vars.border,
-      '--card-bg': vars.cardBg,
-      '--card-fg': vars.cardFg,
-      '--btn-bg': vars.buttonBg,
-      '--btn-fg': vars.buttonFg,
-      '--input-bg': vars.inputBg,
-      '--accent': t==='day'? '#334155' : '#f7c14d',
-      '--shadow': t==='day'? 'rgba(0,0,0,.08)' : 'rgba(0,0,0,.35)'
+      '--fg': '#13303f',
+      '--muted': '#6b7280',
+      '--border': '#d1e7f7',
+      '--card-bg': 'rgba(255,255,255,0.98)',
+      '--card-fg': '#13303f',
+      '--btn-bg': '#7fb8ff',
+      '--btn-fg': '#fff',
+      '--input-bg': '#f1f8ff',
+      '--accent': '#7fb8ff',
+      '--shadow': 'rgba(0,0,0,0.06)'
     }
-
-    // compute contrast-based colors and expose as CSS variables
-    try{
-      const bgHex = baseColors[t]
-      const textContrast = contrastTextColor(bgHex)
-      const mutedContrast = textContrast === '#fff' ? 'rgba(255,255,255,0.72)' : 'rgba(0,0,0,0.65)'
-      base['--text-contrast'] = textContrast
-      base['--muted-contrast'] = mutedContrast
-
-      // 同步写入 :root，确保首屏渲染时变量已生效，避免先暗后亮的闪烁
-      try{
-        if(typeof document !== 'undefined' && document.documentElement && document.documentElement.style){
-          Object.entries(base).forEach(([k,v]) => {
-            if(k.startsWith('--')) document.documentElement.style.setProperty(k, v)
-          })
-        }
-      }catch(_e){}
-    }catch(e){}
+    // apply any themeStore overrides if present
     return themeStore.override ? { ...base, ...themeStore.override } : base
   })
 
-  const updateFromHash = () => {
-    const h = readHourFromHash()
-    if(typeof h === 'number') hour.value = h
-  }
-
   onMounted(()=>{
-    const h = readHourFromHash()
-    if(typeof h === 'number') hour.value = h
+    // keep hour reactive for compatibility but do not change theme dynamically
     setInterval(()=>{ hour.value = getHour() }, 60*1000)
-    if(typeof window !== 'undefined') {
-      window.addEventListener('hashchange', updateFromHash)
-    }
   })
 
   return { hour, theme, bgStyle }

@@ -1,8 +1,8 @@
 <template>
   <view class="page" :style="bgStyle">
     <view v-if="!hideTopbar" class="topbar">
-      <button class="back" @click="goBack">‹</button>
-      <text class="title">首页</text>
+      <button class="back" @click="goCreation">🎨</button>
+      <text class="title" :style="{ color: textColor }">首页</text>
       <view class="actions">
         <button class="icon" @click="openSearch">🔍</button>
         <view v-if="player.currentTrack" class="playing-icon" @click="openPlayerQuick">
@@ -80,13 +80,16 @@
 const props = defineProps({ hideTopbar: { type: Boolean, default: false } })
 import { ref, computed, onMounted, watch } from 'vue'
 import { useGlobalTheme } from '@/composables/useGlobalTheme'
+import { useColorMode } from '@/composables/useColorMode'
 import { allNoises } from '@/data/noises'
 import { usePlayerStore } from '@/stores/player'
 import * as apiAudios from '@/api/audios'
 import AIHelper from '@/components/AIHelper.vue'
 
 const { bgStyle } = useGlobalTheme()
+const { colorMode } = useColorMode()
 const player = usePlayerStore()
+const textColor = computed(()=> colorMode.value === 'dark' ? '#ffffff' : '#222222')
 
 const categories = ['全部','免费','雨声','自然','环境','我的创作']
 const activeCat = ref('全部')
@@ -305,6 +308,8 @@ function goToPlayer(){
 
 function goBack(){ try{ uni.navigateBack() }catch(e){ history.back() } }
 
+function goCreation(){ try{ uni.navigateTo({ url: '/pages/creation/index' }) }catch(e){ location.hash = '#/pages/creation/index' } }
+
 const playingList = computed(()=> Array.from(playing.value))
 
 onMounted(()=>{ randomizeMini() })
@@ -333,7 +338,7 @@ const knobY = computed(()=> knobPos.value.y)
 const remainingSeconds = ref(durationMinutes.value * 60)
 const formattedRemaining = computed(()=>{
   const mm = String(Math.floor(remainingSeconds.value/60)).padStart(2,'0')
-  const ss = String(remainingSeconds.value%60)).padStart(2,'0')
+  const ss = String(remainingSeconds.value%60).padStart(2,'0')
   return `${mm}:${ss}`
 })
 
@@ -364,15 +369,15 @@ function startTimer(){
   }, 1000)
 }
 
-function cancelTimer(){ if(timerId){ clearInterval(timerId); timerId=null } showDetail value=false }
+function cancelTimer(){ if(timerId){ clearInterval(timerId); timerId=null } showDetail.value = false }
 
 // drag handling
 let dragging = false
 function startDrag(e){ dragging = true }
 function onDrag(e){ if(!dragging) return
-  const touch = e.touches and e.touches[0]
+  const touch = e.touches && e.touches[0]
   if(!touch) return
-  const rect = circleRef.value?.getBoundingClientRect?.() or { left:0, top:0 }
+  const rect = (circleRef.value && (circleRef.value.getBoundingClientRect ? circleRef.value.getBoundingClientRect() : null)) || { left:0, top:0 }
   const cx = rect.left + 100; const cy = rect.top + 100
   const dx = touch.clientX - cx; const dy = touch.clientY - cy
   let ang = Math.atan2(dy, dx) * 180 / Math.PI + 90
@@ -390,6 +395,7 @@ function endDrag(e){ dragging=false }
 .topbar{ display:flex; align-items:center; justify-content:space-between; padding:8px 6px }
 .back{ background:transparent; border:none; font-size:22px; position:relative; left:0 }
 .title{ font-size:18px; font-weight:700; text-align:center; flex:1 }
+.name, .title, .remote-name, .mini-name{ color: var(--text-color) !important }
 .actions{ display:flex; gap:8px; min-width:110px; justify-content:flex-end }
 .icon{ background:transparent; border:none; font-size:18px }
 
@@ -405,9 +411,9 @@ function endDrag(e){ dragging=false }
 
 .grid{ display:grid !important; grid-template-columns: repeat(4, 1fr) !important; gap:14px 24px; grid-auto-flow: row; padding:12px 8px }
 .grid .item{ display:block !important; width:100% }
-@media (max-width:1200px){ .grid{ grid-template-columns: repeat(3, 1fr) !important; } }
-@media (max-width:800px){ .grid{ grid-template-columns: repeat(2, 1fr) !important; } }
-@media (max-width:480px){ .grid{ grid-template-columns: repeat(1, 1fr) !important; } }
+@media (max-width:1200px){ .grid{ grid-template-columns: repeat(4, 1fr) !important; } }
+@media (max-width:800px){ .grid{ grid-template-columns: repeat(3, 1fr) !important; } }
+@media (max-width:480px){ .grid{ grid-template-columns: repeat(2, 1fr) !important; } }
 .item{ display:flex; align-items:flex-start; padding:10px 14px; border-radius:12px; background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.02)); transition: background 0.18s, transform 0.12s }
 .item:hover{ background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.04)); transform: translateY(-6px) }
 .name{ font-size:14px; color:var(--text-color); line-height:1.6 }
@@ -443,8 +449,6 @@ function endDrag(e){ dragging=false }
 /* 字体与对比度优化 */
 .mini-dice{ font-size:16px; }
 .mini-name{ font-size:14px; color:#eef3ff; }
-:root{ --text-color: #e8f0fb; }
-/* 字体对比度提升与激活文本增强 */
-.mini-name{ color:#eaf3ff; font-weight:500; font-size:14px; }
-:root{ --text-color: #e8f0fb; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+/* default variable fallback removed - using inline styles for compatibility */
+.mini-name{ color:var(--text-color); font-weight:500; font-size:14px; -webkit-font-smoothing:antialiased }
 </style>

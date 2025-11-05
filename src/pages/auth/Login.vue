@@ -17,7 +17,7 @@
       <!-- Logo和标题 -->
       <view class="header">
         <view class="logo">💤</view>
-        <text class="title">枕眠</text>
+        <text class="title">星眠坞</text>
         <text class="subtitle">给你一个婴儿般好睡眠</text>
       </view>
       

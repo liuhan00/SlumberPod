@@ -22,7 +22,7 @@
     { "path": "pages/profile/pages/history/index", "style": { "navigationBarTitleText": "历史" } },
     { "path": "pages/profile/pages/comments/index", "style": { "navigationBarTitleText": "我的评论" } },
     { "path": "pages/profile/pages/help/index", "style": { "navigationBarTitleText": "帮助与客服" } },
-    { "path": "pages/profile/pages/about/index", "style": { "navigationBarTitleText": "关于 SlumberPod" } },
+    { "path": "pages/profile/pages/about/index", "style": { "navigationBarTitleText": "关于 星眠坞" } },
     { "path": "pages/player/index", "style": { "navigationBarTitleText": "播放" } },
     { "path": "pages/queue/index", "style": { "navigationBarTitleText": "队列" } },
     { "path": "pages/history/index", "style": { "navigationBarTitleText": "历史" } },
@@ -30,7 +30,7 @@
     { "path": "pages/comments/index", "style": { "navigationBarTitleText": "我的评论" } },
     { "path": "pages/account/index", "style": { "navigationBarTitleText": "账号资料" } },
     { "path": "pages/help/index", "style": { "navigationBarTitleText": "帮助与客服" } },
-    { "path": "pages/about/index", "style": { "navigationBarTitleText": "关于 SlumberPod" } },
+    { "path": "pages/about/index", "style": { "navigationBarTitleText": "关于 星眠坞" } },
     { "path": "pages/messages/index", "style": { "navigationBarTitleText": "消息" } },
     { "path": "pages/messages/detail", "style": { "navigationBarTitleText": "消息详情" } },
     { "path": "pages/search/index", "style": { "navigationBarTitleText": "搜索" } },
@@ -44,7 +44,7 @@
   ],
   "globalStyle": {
     "navigationBarTextStyle": "black",
-    "navigationBarTitleText": "SlumberPod",
+    "navigationBarTitleText": "星眠坞",
     "navigationBarBackgroundColor": "#0c0f16",
     "backgroundColor": "#0c0f16"
   },

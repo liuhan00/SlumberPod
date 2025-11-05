@@ -186,7 +186,7 @@ function shareToCommunity() {
 
 // 复制分享链接
 function copyShareLink() {
-  const shareLink = `https://slumberpod.com/share/${creationData.value.id}`
+  const shareLink = `https://xingminwu.com/share/${creationData.value.id}`
   
   // 模拟复制到剪贴板
   uni.setClipboardData({

@@ -17,7 +17,7 @@
       <!-- Logo和标题 -->
       <view class="header">
         <view class="logo">💤</view>
-        <text class="title">加入枕眠</text>
+        <text class="title">加入星眠坞</text>
         <text class="subtitle">开启你的优质睡眠之旅</text>
       </view>
       

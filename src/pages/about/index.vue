@@ -1,16 +1,16 @@
 <template>
   <scroll-view class="page" scroll-y :style="bgStyle">
     <view class="section">
-      <text class="title">关于 SlumberPod</text>
+      <text class="title">关于 星眠坞</text>
 
       <view class="hero">
         <image class="logo" src="/static/logoo.png" mode="aspectFit" />
-        <text class="app-name">SlumberPod</text>
+        <text class="app-name">星眠坞</text>
         <text class="tagline">白噪音 · 睡眠训练 · 放松陪伴</text>
       </view>
 
       <view class="card">
-        <text class="line"><text class="muted">应用：</text> SlumberPod</text>
+        <text class="line"><text class="muted">应用：</text> 星眠坞</text>
         <text class="line"><text class="muted">版本：</text> v0.1.0</text>
         <text class="line"><text class="muted">简介：</text> 提供白噪音、睡眠引导与放松音频，帮助入睡与提高睡眠质量。</text>
       </view>
@@ -35,7 +35,7 @@
       </view>
 
       <view class="footer">
-        <text class="copyright">© 2025 SlumberPod</text>
+        <text class="copyright">© 2025 星眠坞</text>
         <text class="version">Build v0.1.0</text>
       </view>
     </view>

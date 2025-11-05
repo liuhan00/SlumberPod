@@ -27,7 +27,7 @@
       <view v-if="smartRecommend" class="recommend-sources">
         <text class="sources-title">推荐来源：</text>
         <view class="sources-list">
-          <text class="source-tag">枕边的他</text>
+          <text class="source-tag">星眠坞 · 枕边的他</text>
           <text class="source-tag">自然音效</text>
           <text class="source-tag">白噪音</text>
           <text class="source-tag">脑波音乐</text>

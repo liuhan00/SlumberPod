@@ -37,9 +37,11 @@ export default {
     const h = getHour()
     const t = getThemeByHour(h)
     try {
+      function _normHex(h){ if(!h) return '#000000'; h = String(h); if(h[0] !== '#') return h; if(h.length===4) return '#' + h[1]+h[1]+h[2]+h[2]+h[3]+h[3]; return h.length===7? h : h }
+      const front = (textColors[t] === '#0f172a' || textColors[t] === '#000') ? '#000000' : '#ffffff'
       uni.setNavigationBarColor({
-        frontColor: (textColors[t] === '#0f172a' || textColors[t] === '#000') ? '#000000' : '#ffffff',
-        backgroundColor: baseColors[t]
+        frontColor: _normHex(front),
+        backgroundColor: _normHex(baseColors[t])
       })
     } catch (e) {}
     // set global CSS variables for pages to use dynamic background

@@ -18,6 +18,7 @@
   </scroll-view>
 </template>
 <script setup>
+import { ref, computed } from 'vue'
 import { useGlobalTheme } from '@/composables/useGlobalTheme'
 import { useCommentsStore } from '@/stores/comments'
 const { bgStyle } = useGlobalTheme()

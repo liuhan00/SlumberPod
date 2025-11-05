@@ -84,7 +84,7 @@ async function loadHistory(){
   loading.value = true
   try{
     const auth = getAuthLocal()
-    const base = import.meta.env.VITE_API_BASE || 'http://192.168.1.151:3003'
+    const base = import.meta.env.VITE_API_BASE || 'http://192.168.43.89:3003'
     const userId = '11111111-1111-1111-1111-111111111111'
     const url = `${base}/api/users/${userId}/play-history`
     const headers = {}
@@ -111,7 +111,7 @@ const settings = [
   { key:'feed', label:'社区动态' },
   { key:'account', label:'账号资料' },
   { key:'help', label:'帮助与客服' },
-  { key:'about', label:'关于 SlumberPod' },
+  { key:'about', label:'关于 星眠坞' },
 ]
 function go(url){
   if(typeof location !== 'undefined') location.hash = `#/${url}`
