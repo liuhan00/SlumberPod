@@ -1,5 +1,5 @@
 import { getAuthLocal } from '@/store/auth'
-const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.43.89:3003'
+const BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3003' // 临时修改为 localhost，开发时可用 .env 恢复
 
 function buildHeaders(){
   const auth = getAuthLocal()
@@ -10,13 +10,49 @@ function buildHeaders(){
 }
 
 export async function getAudios({ category_id = null, limit = 20 } = {}){
-  const url = new URL(BASE + '/api/audios')
-  if(category_id) url.searchParams.set('category_id', category_id)
-  url.searchParams.set('limit', String(limit))
-  const res = await fetch(url.toString(), { method: 'GET', headers: buildHeaders() })
-  const j = await res.json()
-  if(!res.ok) throw new Error(j.message || j.error || 'fetch audios failed')
-  return j
+  // 兼容小程序环境：优先使用 uni.request（小程序运行时没有 fetch），同时打印日志
+  const pairs = []
+  if (category_id) pairs.push('category_id=' + encodeURIComponent(category_id))
+  pairs.push('limit=' + encodeURIComponent(String(limit)))
+  const q = pairs.length ? ('?' + pairs.join('&')) : ''
+  const url = BASE + '/api/audios' + q
+  console.log('[api/audios] GET', url)
+
+  // 如果 fetch 可用则使用 fetch，否则使用 uni.request
+  if (typeof fetch === 'function'){
+    const res = await fetch(url, { method: 'GET', headers: buildHeaders() })
+    let j = null
+    try{ j = await res.json() }catch(e){ console.warn('[api/audios] parse json failed', e) }
+    if(!res.ok) throw new Error((j && (j.message || j.error)) || 'fetch audios failed')
+    console.log('[api/audios] fetch response', j)
+    return j
+  }
+
+  // fallback to uni.request for WeChat mini program environment
+  return new Promise((resolve, reject) => {
+    try{
+      uni.request({
+        url,
+        method: 'GET',
+        header: buildHeaders(),
+        success(res){
+          console.log('[api/audios] uni.request success', res)
+          // uni.request 返回结构: { statusCode, data }
+          if(res && res.statusCode && (res.statusCode < 200 || res.statusCode >= 300)){
+            return reject(new Error('request failed: ' + res.statusCode))
+          }
+          resolve(res.data)
+        },
+        fail(err){
+          console.warn('[api/audios] uni.request fail', err)
+          reject(err)
+        }
+      })
+    }catch(e){
+      console.warn('[api/audios] uni.request throw', e)
+      reject(e)
+    }
+  })
 }
 
 // upload audio metadata (assumes file already hosted or provide file_url)

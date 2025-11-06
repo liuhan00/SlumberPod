@@ -12,13 +12,8 @@
       </button>
     </view>
 
-    <picker mode="date" :value="birthdayValue" @change="onBirthdayChange" ref="birthdayPicker">
-      <view style="display:none"></view>
-    </picker>
-
     <scroll-view class="container" scroll-y>
       <view class="card">
-
         <view class="row clickable" @click="editNickname">
           <text class="label">昵称</text>
           <view class="right">
@@ -43,41 +38,25 @@
           </view>
         </view>
 
-        <view class="row clickable" @click="openBirthdayPicker">
-          <text class="label">生日</text>
-          <view class="right">
-            <text class="value">{{ user.birthday || '未选择' }}</text>
-            <text class="arrow">›</text>
+        <!-- 生日放在同一卡片下，使用 picker 包裹行以在小程序上展示原生滚轮 -->
+        <picker mode="date" :value="birthdayValue" @change="onBirthdayChange">
+          <view class="row clickable">
+            <text class="label">生日</text>
+            <view class="right">
+              <text class="value">{{ user.birthday || '未选择' }}</text>
+              <text class="arrow">›</text>
+            </view>
           </view>
-        </view>
-
-
+        </picker>
       </view>
 
-      <view class="card small">
-        <view class="row clickable" @click="editPhone">
-          <text class="label">手机号</text>
-          <view class="right">
-            <text class="value">{{ maskedPhone(user.phone) }}</text>
-            <text class="arrow">›</text>
-          </view>
-        </view>
-
-        <view class="row clickable" @click="openThirdParty">
-          <text class="label">第三方应用</text>
-          <view class="right">
-            <text class="value">绑定设置</text>
-            <text class="arrow">›</text>
-          </view>
-        </view>
-      </view>
+      <!-- 注：已删除手机号/第三方应用卡片 -->
 
       <view class="actions-block">
         <button class="btn logout" @click="logout">退出登录</button>
         <button class="btn delete" @click="deleteAccount">注销账号</button>
       </view>
 
-      <view style="height:80px"></view>
     </scroll-view>
   </view>
 </template>
@@ -150,7 +129,8 @@ function editBio(){
 }
 
 function editGender(){
-  uni.showActionSheet({ itemList:['男','女','保密','取消'], success(res){ if(res.tapIndex===3) return; const g=['男','女','保密']; user.value.gender = g[res.tapIndex]; uni.showToast({ title:'性别已更新' }) } })
+  // 去掉“保密”选项，避免重复取消按钮
+  uni.showActionSheet({ itemList:['男','女'], success(res){ if(res.tapIndex < 0) return; const g=['男','女']; user.value.gender = g[res.tapIndex]; uni.showToast({ title:'性别已更新' }) } })
 }
 
 function editLocation(){

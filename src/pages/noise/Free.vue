@@ -17,12 +17,15 @@
 
     <AIHelper />
 
-    <view class="tabs">
-      <view v-for="c in categories" :key="c" :class="['tab', { active: c===activeCat }]" @click="activeCat=c">{{ c }}</view>
+    <view class="tabs-wrap">
+      <view class="tabs-scroll" ref="tabsRef">
+        <view v-for="c in categories" :key="c.id" :class="['tab', { active: c.id===activeCat }]" @click="activeCat=c.id">{{ c.name }}</view>
+      </view>
+      <button class="tabs-arrow" v-if="showArrow" @click="scrollTabsRight">›</button>
     </view>
 
     <scroll-view class="grid" scroll-y>
-      <view class="item" v-for="n in filteredNoises" :key="n.id" @click="playRemote(n)">
+      <view class="item" v-for="(n, idx) in filteredNoises" :key="n.id || idx" @click="playRemote(n)">
         <!-- 取消图标，直接显示名称 -->
         <text class="name">{{ n.title || n.name || '未命名' }}</text>
       </view>
@@ -91,8 +94,68 @@ const { colorMode } = useColorMode()
 const player = usePlayerStore()
 const textColor = computed(()=> colorMode.value === 'dark' ? '#ffffff' : '#222222')
 
-const categories = ['全部','免费','雨声','自然','环境','我的创作']
-const activeCat = ref('全部')
+const categories = ref([{ id: 'all', name: '全部' }])
+const activeCat = ref('all')
+
+const tabsRef = ref(null)
+const showArrow = ref(false)
+
+// load categories from backend
+async function fetchCategories(){
+  try{
+    const BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3003'
+    // 小程序运行时可能不支持 new URL，因此使用字符串拼接
+    const url = BASE + '/api/categories'
+    console.log('[api/categories] GET', url)
+    let j = null
+    if (typeof fetch === 'function'){
+      const res = await fetch(url)
+      try{ j = await res.json() }catch(e){ console.warn('[api/categories] fetch parse json failed', e); j = res }
+    } else {
+      // fallback to uni.request
+      j = await new Promise((resolve, reject)=>{
+        try{
+          uni.request({ url, method:'GET', success(r){ console.log('[api/categories] uni.request success', r); resolve(r.data) }, fail(err){ console.warn('[api/categories] uni.request fail', err); reject(err) } })
+        }catch(e){ reject(e) }
+      })
+    }
+    const items = Array.isArray(j) ? j : (j.data || j.items || [])
+    // filter top-level (parent_id === 0) and sort by sort_order desc
+    const top = items.filter(it=>Number(it.parent_id)===0).sort((a,b)=> (b.sort_order||0)-(a.sort_order||0))
+    // build list: 全部 + 免费(if exists) + top categories
+    const out = [{ id:'all', name:'全部' }]
+    const free = items.find(it=> Number(it.is_free)===1 && String(it.name).includes('免'))
+    if(free) out.push({ id:'free', name:'免费' })
+    top.forEach(t=> out.push({ id: String(t.category_id || t.id), name: t.name }))
+    out.push({ id:'mine', name:'我的创作' })
+    categories.value = out
+
+    // check if overflow
+    setTimeout(()=>{
+      try{
+        const el = tabsRef.value && tabsRef.value.$el ? tabsRef.value.$el : tabsRef.value
+        if(el && el.scrollWidth && el.clientWidth && el.scrollWidth > el.clientWidth + 8) showArrow.value = true
+      }catch(e){}
+    }, 80)
+
+  }catch(e){ console.warn('fetch categories failed', e); categories.value = [{ id:'all', name:'全部' }, { id:'free', name:'免费' }, { id:'mine', name:'我的创作' }, { id:'nature', name:'自然' }, { id:'life', name:'生活' }, { id:'weather', name:'天气' }, { id:'rain', name:'雨声' }, { id:'forest', name:'森林' }, { id:'coffee', name:'咖啡' }, { id:'fireplace', name:'壁炉' }, { id:'thunder', name:'雷雨' }, { id:'stream', name:'溪流' }, { id:'birds', name:'鸟鸣' }] }
+}
+
+function scrollTabsRight(){
+  try{
+    const el = tabsRef.value && tabsRef.value.$el ? tabsRef.value.$el : tabsRef.value
+    if(!el) return
+    el.scrollBy({ left: el.clientWidth - 40, behavior: 'smooth' })
+  }catch(e){
+    // fallback: change active to next
+    const idx = categories.value.findIndex(c=> c.id===activeCat.value)
+    if(idx >= 0 && idx < categories.value.length - 1) activeCat.value = categories.value[idx+1].id
+  }
+}
+
+onMounted(()=>{ fetchCategories(); randomizeMini(); // 组件加载时立即根据当前分类请求音频，避免用户未切换时不发起请求
+  try{ loadAudiosForCategory(activeCat.value) }catch(e){ console.warn('initial loadAudiosForCategory failed', e) }
+})
 const playing = ref(new Set())
 
 // mini player state
@@ -123,27 +186,28 @@ const filteredNoises = computed(()=>{
 const remoteLoading = ref(false)
 const remoteError = ref('')
 
-// 当切换标签时，从后端加载对应分类或全部音频名称（不显示封面，仅名称）
-watch(activeCat, async (v)=>{
+// helper: load audios for a given category id (or all)
+async function loadAudiosForCategory(catId){
   remoteError.value = ''
-  // my creations handled locally
-  if(v === '我的创作') { remoteList.value = []; return }
-
-  // map certain categories to backend category_id if needed
-  const map = { '雨声': '22222222-2222-2222-2222-222222222222', '自然': '33333333-3333-3333-3333-333333333333', '环境':'44444444-4444-4444-4444-444444444444', '免费':'55555555-5555-5555-5555-555555555555' }
-  const catId = map[v] || null
-
+  if(catId === 'mine' || catId === 'my' || catId === '我的创作') { remoteList.value = []; return }
   remoteLoading.value = true
+  console.log('[Free] loadAudiosForCategory start', catId)
   try{
-    // if catId is null and user selected 全部, call backend without category_id to get all
-    const res = await apiAudios.getAudios(catId ? { category_id: catId, limit: 100 } : { limit: 200 })
+    const isAllLike = (catId === 'all' || catId === 'free')
+    const params = isAllLike ? { limit: 200 } : { category_id: catId, limit: 200 }
+    console.log('[Free] calling apiAudios.getAudios with', params)
+    const res = await apiAudios.getAudios(params)
+    console.log('[Free] apiAudios.getAudios response', res)
     const raw = res && (res.data || res.items) ? (res.data || res.items) : (Array.isArray(res) ? res : [])
     const arr = Array.isArray(raw) ? raw : []
-    // normalize to { id, title, audio_url, duration, category_id }
     remoteList.value = arr.map(it => ({ id: it.id || it._id || it.uuid || String(Date.now()), title: it.title || it.name || it.audioName || '', audio_url: it.audio_url || it.audioUrl || it.url || it.src || '', duration: it.duration || it.period || it.length || 0, category_id: it.category_id || it.categoryId || null }))
+    console.log('[Free] remoteList length', remoteList.value.length)
   }catch(e){ console.warn('load remote audios failed', e); remoteList.value = []; remoteError.value = e?.message || String(e) }
   finally{ remoteLoading.value = false }
-})
+}
+
+// 当切换标签时，调用统一的加载函数
+watch(activeCat, (v)=>{ loadAudiosForCategory(v) })
 
 function getNoiseIcon(name){
   const map = { '海浪':'🌊','雨声':'🌧️','壁炉':'🔥','树林':'🌲','地铁':'🚇' }
@@ -405,14 +469,17 @@ function endDrag(e){ dragging=false }
 .playing-indicator{ position:absolute; right:0; bottom:0; width:10px; height:10px; background:var(--accent,#2EA56B); border-radius:999px; box-shadow:0 0 6px rgba(46,165,107,0.6) }
 .player-icon{ width:36px; height:36px; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.06); border-radius:6px }
 
-.tabs{ display:flex; gap:8px; margin:12px 0 }
-.tab{ padding:8px 12px; background:rgba(0,0,0,0.05); border-radius:18px }
-.tab.active{ background:var(--accent, #2EA56B); color:#fff }
+.tabs-wrap{ display:flex; align-items:center; gap:8px; margin:12px 0; position:relative }
+.tabs-scroll{ display:flex; gap:8px; overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:4px }
+.tabs-scroll::-webkit-scrollbar{ display:none }
+.tab{ display:inline-flex; align-items:center; justify-content:center; white-space:nowrap; padding:6px 10px; background:rgba(0,0,0,0.04); border-radius:14px; min-width:52px; font-size:13px }
+.tab.active{ background:var(--accent, #2EA56B); color:#fff; box-shadow:0 6px 14px rgba(46,165,107,0.10) }
+.tabs-arrow{ position:absolute; right:6px; top:50%; transform:translateY(-50%); background:rgba(255,255,255,0.95); border-radius:50%; width:30px; height:30px; display:flex; align-items:center; justify-content:center; border:none; box-shadow:0 6px 12px rgba(0,0,0,0.10) }
 
-.grid{ display:grid !important; grid-template-columns: repeat(4, 1fr) !important; gap:14px 24px; grid-auto-flow: row; padding:12px 8px }
-.grid .item{ display:block !important; width:100% }
+.grid{ display:grid !important; grid-template-columns: repeat(4, 1fr) !important; gap:14px 12px; grid-auto-flow: row; padding:12px 8px }
+.grid .item{ display:block !important; width:100%; padding:10px 8px; border-radius:10px; background:transparent }
 @media (max-width:1200px){ .grid{ grid-template-columns: repeat(4, 1fr) !important; } }
-@media (max-width:800px){ .grid{ grid-template-columns: repeat(3, 1fr) !important; } }
+@media (max-width:800px){ .grid{ grid-template-columns: repeat(4, 1fr) !important; } }
 @media (max-width:480px){ .grid{ grid-template-columns: repeat(2, 1fr) !important; } }
 .item{ display:flex; align-items:flex-start; padding:10px 14px; border-radius:12px; background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.02)); transition: background 0.18s, transform 0.12s }
 .item:hover{ background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.04)); transform: translateY(-6px) }

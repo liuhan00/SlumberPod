@@ -96,9 +96,9 @@ function openExternal(){ try{ if(typeof uni !== 'undefined' && uni.navigateTo){ 
 
 <style scoped>
 .floating{ position: fixed; width:64px; height:64px; z-index:2600; display:flex; align-items:center; justify-content:center; }
-.ball{ width:56px; height:56px; border-radius:28px; background: linear-gradient(180deg,#e7f6ff 0%, #cfeeff 55%, #9ed0ff 100%); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; box-shadow: 0 12px 28px rgba(36,66,102,0.18); transition: transform 160ms cubic-bezier(.2,.9,.2,1), box-shadow 160ms }
+.ball{ width:56px; height:56px; border-radius:28px; /* 绿色系：符合主题且在浅背景可见 */ background: linear-gradient(180deg,#d8f7e6 0%, #9fe6bf 60%, #69c58f 100%); color:#052912; display:flex; align-items:center; justify-content:center; font-weight:700; box-shadow: 0 12px 28px rgba(6,41,27,0.12); border: 1px solid rgba(255,255,255,0.08); transition: transform 160ms cubic-bezier(.2,.9,.2,1), box-shadow 160ms }
 .ball:active{ transform: scale(0.96) }
-.ball.pressed{ transform: scale(0.94); box-shadow:0 8px 22px rgba(36,66,102,0.12) }
+.ball.pressed{ transform: scale(0.94); box-shadow:0 10px 22px rgba(6,41,27,0.10) }
 .ball svg{ filter: drop-shadow(0 6px 12px rgba(0,0,0,0.12)) }
 
 .agent-container{ width:100%; height:100%; display:flex; flex-direction:column }

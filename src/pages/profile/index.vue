@@ -10,11 +10,8 @@
     </view>
 
     <view class="auth-actions" style="padding:12px 16px;">
-      <view v-if="!authUser">
-        <button class="btn primary" @click="openLogin">登录</button>
-        <button class="btn" @click="openRegister">注册</button>
-      </view>
-      <view v-else>
+      <!-- 登录/注册 按钮已移除。若已登录显示用户信息与退出 -->
+      <view v-if="authUser">
         <text>已登录：{{ authUser.name || authUser.id }}</text>
         <button class="btn" @click="logout">登出</button>
       </view>
@@ -84,7 +81,7 @@ async function loadHistory(){
   loading.value = true
   try{
     const auth = getAuthLocal()
-    const base = import.meta.env.VITE_API_BASE || 'http://192.168.43.89:3003'
+    const base = import.meta.env.VITE_API_BASE || 'http://192.168.90.92:3003'
     const userId = '11111111-1111-1111-1111-111111111111'
     const url = `${base}/api/users/${userId}/play-history`
     const headers = {}
@@ -108,7 +105,6 @@ const settings = [
   { key:'history', label:'播放历史' },
   { key:'comments', label:'我的评论' },
   { key:'creations', label:'我的创作' },
-  { key:'feed', label:'社区动态' },
   { key:'account', label:'账号资料' },
   { key:'help', label:'帮助与客服' },
   { key:'about', label:'关于 星眠坞' },
@@ -124,7 +120,6 @@ function onSetting(key){
   else if(key==='history') { showHistory.value = true; loadHistory() }
   else if(key==='comments') go('pages/comments/index')
   else if(key==='creations') go('pages/creations/index')
-  else if(key==='feed') { try { uni.switchTab({ url:'/pages/community/index' }) } catch(e) { go('pages/community/index') } }
   else if(key==='account') go('pages/account/index')
   else if(key==='help') go('pages/help/index')
   else if(key==='about') go('pages/about/index')

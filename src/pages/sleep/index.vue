@@ -4,12 +4,7 @@
       <text class="greet">{{ greet }}</text>
       <text class="sub">听听深睡脑波，可以减少睡前大脑兴奋</text>
     </view>
-    <view class="section">
-      <view class="record card" :style="cardStyle">
-        <text class="title">记录睡眠</text>
-        <text class="desc">记录梦话呼噜声</text>
-      </view>
-    </view>
+
     <view class="section actions">
       <view class="circle" @click="goNap"><text>小憩</text></view>
       <view class="circle" @click="goAlarm"><text>闹钟与提醒</text></view>
