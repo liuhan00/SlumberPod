@@ -198,7 +198,7 @@ const categories = ref([])
 // 使用与听白噪音页面一致的分类
 import * as apiAudios from '@/api/audios'
 
-function loadCategories(){
+async function loadCategories(){
   // 使用听白噪音页面中的分类映射
   const categoryMap = {
     '22222222-2222-2222-2222-222222222222': { id: '22222222-2222-2222-2222-222222222222', name: '雨声', icon: '🌧️' },
@@ -207,22 +207,42 @@ function loadCategories(){
     '55555555-5555-5555-5555-555555555555': { id: '55555555-5555-5555-5555-555555555555', name: '免费', icon: '🆓' }
   }
   
-  // 如果后端有分类数据，优先使用后端数据
-  apiAudios.getAudios({ limit: 1 }).then(res => {
-    if(res.categories && Array.isArray(res.categories)){
-      categories.value = res.categories.map(c => ({
-        id: c.id,
+  try {
+    // 直接从分类 API 获取数据
+    const BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3003'
+    const url = BASE + '/api/categories?limit=1000'
+    console.log('[creation] loading categories from', url)
+    
+    let res
+    if (typeof fetch === 'function'){
+      const response = await fetch(url)
+      res = await response.json()
+    } else {
+      res = await new Promise((resolve, reject) => {
+        uni.request({ 
+          url, 
+          method: 'GET', 
+          success(r){ resolve(r.data) }, 
+          fail(err){ reject(err) } 
+        })
+      })
+    }
+    
+    const items = Array.isArray(res) ? res : (res.data || res.items || [])
+    if(items.length > 0){
+      categories.value = items.map(c => ({
+        id: c.id || c.category_id,
         name: c.name,
         icon: c.icon || categoryMap[c.id]?.icon || '🎧'
       }))
+      console.log('[creation] loaded categories from backend:', categories.value)
     } else {
-      // 使用预设的分类
-      categories.value = Object.values(categoryMap)
+      throw new Error('No categories from backend')
     }
-  }).catch(e => {
-    console.warn('尝试从后端加载分类失败，使用预设分类', e)
+  } catch (e) {
+    console.warn('[creation] 尝试从后端加载分类失败，使用预设分类', e)
     categories.value = Object.values(categoryMap)
-  })
+  }
 }
 
 onMounted(()=> loadCategories())

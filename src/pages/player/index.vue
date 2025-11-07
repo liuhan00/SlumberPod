@@ -8,11 +8,39 @@
 
     <!-- Circular timer UI -->
     <view class="timer-wrap">
-      <svg viewBox="0 0 300 300" class="timer-svg" ref="svgRef">
-        <!-- outer ring -->
-        <circle cx="150" cy="150" r="110" class="ring-bg" />
-        <circle cx="150" cy="150" r="110" class="ring-progress" :stroke-dasharray="circumference" :stroke-dashoffset="circumference - (circumference * timerPercent)" />
-        <!-- tick marks & numbers -->
+      <!-- CSS fallback triangles for 小程序 (PNG/SVG may be blocked) -->
+      <view class="triangle-fallback" aria-hidden="true">
+        <view class="tri-f tri-f-outer"></view>
+        <view class="tri-f tri-f-middle"></view>
+        <view class="tri-f tri-f-inner"></view>
+        <view class="tri-center-icon">⚙️</view>
+      </view>
+      <!-- CSS Ring with draggable knob -->
+      <view class="css-timer-ring" @touchstart="onRingTouchStart" @touchmove="onRingTouchMove" @touchend="onRingTouchEnd">
+        <!-- Outer ring background -->
+        <view class="ring-outer-bg"></view>
+        <!-- Progress ring -->
+        <view class="ring-progress" :style="{ transform: `rotate(${knobAngle.value - 90}deg)` }">
+          <view class="ring-progress-fill"></view>
+        </view>
+        <!-- Tick marks and labels -->
+        <view class="tick-marks">
+          <view v-for="(label, idx) in ringLabels" :key="idx" class="tick-mark" :class="`tick-${idx}`" :style="{ transform: `rotate(${label.angle}deg)` }">
+            <view class="tick-dot"></view>
+            <text class="tick-text">{{ label.text }}</text>
+          </view>
+        </view>
+        <!-- Draggable knob -->
+        <view class="draggable-knob" :style="knobStyle" @touchstart.stop.prevent="startDrag" @touchmove.stop.prevent="onDrag" @touchend.stop.prevent="endDrag">
+          <view class="knob-shadow"></view>
+          <view class="knob-main"></view>
+          <view class="knob-inner"></view>
+        </view>
+      </view>
+      
+      <canvas class="timer-canvas" canvas-id="timerCanvas" ref="canvasRef" width="420" height="420" style="display:none" />
+      <svg viewBox="0 0 300 300" class="timer-svg" ref="svgRef" preserveAspectRatio="xMidYMid meet" style="position:relative; z-index:50;">
+        <!-- ticks & numbers (under ring) -->
         <g class="ticks">
           <circle cx="150" cy="40" r="3" class="tick" />
           <text x="150" y="30" class="tick-label">120</text>
@@ -25,13 +53,23 @@
           <!-- infinity at top center -->
           <text x="150" y="18" class="tick-label">∞</text>
         </g>
+        <!-- outer ring (below progress) -->
+        <circle cx="150" cy="150" r="110" class="outer-ring-bg" stroke="rgba(255,255,255,0.08)" stroke-width="4" />
+        <circle cx="150" cy="150" r="110" class="outer-ring-progress" :stroke-dasharray="ringCircumference" :stroke-dashoffset="ringCircumference - (ringCircumference * (knobAngle.value/360))" stroke="rgba(255,255,255,0.12)" stroke-width="4" />
+        <!-- main progress ring (on top) -->
+        <circle cx="150" cy="150" r="110" class="ring-bg" stroke="rgba(255,255,255,0.06)" stroke-width="4" />
+        <circle cx="150" cy="150" r="110" class="ring-progress" :stroke-dasharray="circumference" :stroke-dashoffset="circumference - (circumference * timerPercent)" stroke="#ffffff" stroke-width="6" />
 
         <!-- three layered triangles -->
-                <g class="triangles" transform="translate(150,150)">
-          <!-- enlarged triangles -->
-          <polygon points="0,-70 60,35 -60,35" class="tri tri1" />
-          <polygon points="0,-110 95,60 -95,60" class="tri tri2" />
-          <polygon points="0,-150 130,85 -130,85" class="tri tri3" />
+        <g class="triangles" transform="translate(150,150)">
+          <polygon points="0,-90 80,45 -80,45" fill="rgba(255,255,255,0.24)" stroke="rgba(255,255,255,0.10)" stroke-width="1" />
+          <polygon points="0,-60 50,30 -50,30" fill="rgba(255,255,255,0.18)" stroke="rgba(255,255,255,0.08)" stroke-width="1" />
+          <polygon points="0,-30 25,15 -25,15" fill="rgba(255,255,255,0.12)" stroke="rgba(255,255,255,0.06)" stroke-width="1" />
+        </g>
+        <!-- triangle center icon -->
+        <g transform="translate(150,150)">
+          <rect x="-18" y="-12" width="36" height="24" rx="6" fill="rgba(255,255,255,0.06)" />
+          <text x="0" y="6" text-anchor="middle" font-size="12" fill="rgba(255,255,255,0.85)">⚙️</text>
         </g>
 
         <!-- outer ring with tick marks -->
@@ -47,8 +85,19 @@
 
         <!-- knob on outer ring -->
         <circle :cx="ringKnobX" :cy="ringKnobY" r="10" class="knob" @touchstart.stop.prevent="startDrag" @touchmove.stop.prevent="onDrag" @touchend.stop.prevent="endDrag" @mousedown.stop.prevent="startDragMouse" @mousemove.stop.prevent="onDragMouse" @mouseup.stop.prevent="endDragMouse" />
+        <!-- knob visual handle (small white dot) -->
+        <g style="pointer-events:none">
+          <circle :cx="knobHandleX" :cy="knobHandleY" :r="10" class="knob-handle" style="filter: drop-shadow(0 10px 30px rgba(0,0,0,0.6));" />
+        </g>
       </svg>
-      <text class="timer-center" v-if="true">{{ formattedRemaining }}</text>
+      <text class="timer-center"> 
+        <span v-if="showTime"> 
+          <span class="time-big">{{ String(durationMinutes).padStart ? String(durationMinutes).padStart(2,'0') : (durationMinutes<10?('0'+durationMinutes):durationMinutes) }}:00</span>
+        </span>
+        <span v-else>
+          <span class="time-big">{{ formattedRemaining }}</span>
+        </span>
+      </text>
 
     </view>
 
@@ -247,7 +296,7 @@ async function toggleFav(){
 }
 
 // three selected noises (for triangle corners)
-const threeTracks = ref([null,null,null])
+const threeTracks = ref([null,null,null]) // will be filled on mounted; fallback to data if API fails
 // display label and joined names for bottom line
 const playlistTitleOverride = ref('')
 const displayNames = computed(()=>{
@@ -292,10 +341,11 @@ function triStyle(idx){ const p = threePositions.value[idx] || {left:'0px', top:
 
 // timer UI state
 const svgRef = ref(null)
-const radius = 120
+const canvasRef = ref(null)
+const radius = 110
 const circumference = 2 * Math.PI * radius
 const ringCircumference = circumference
-const knobAngle = ref(0)
+const knobAngle = ref(270) // default knob at 30 minutes position (270deg)
 const durationMinutes = ref(30)
 const remainingSeconds = ref(durationMinutes.value*60)
 const timerPercent = computed(()=> (knobAngle.value % 360) / 360)
@@ -304,6 +354,10 @@ const formattedRemaining = computed(()=>{
   const ss = String(remainingSeconds.value%60).padStart(2,'0')
   return `${mm}:${ss}`
 })
+
+// expose numeric duration for template formatting
+const durationMinutesNum = computed(()=> durationMinutes.value)
+
 const knobPos = computed(()=>{
   const ang = (knobAngle.value - 90) * (Math.PI/180)
   const x = 150 + radius * Math.cos(ang)
@@ -312,6 +366,13 @@ const knobPos = computed(()=>{
 })
 const knobX = computed(()=> knobPos.value.x)
 const knobY = computed(()=> knobPos.value.y)
+
+// update durationMinutes when knobAngle changes
+watch(knobAngle, v=>{
+  // 反转映射：角度越大，时间越小（从右到左滑动）
+  const minutes = Math.max(0, Math.min(120, Math.round((360 - v%360)/360*120)))
+  durationMinutes.value = minutes
+})
 
 // ring knob coordinates for outer ring (use radius)
 const ringKnobPos = computed(()=>{
@@ -323,7 +384,30 @@ const ringKnobPos = computed(()=>{
 const ringKnobX = computed(()=> ringKnobPos.value.x)
 const ringKnobY = computed(()=> ringKnobPos.value.y)
 
-const ringLabels = [ { angle:0, text:'∞' }, { angle:60, text:'120' }, { angle:120, text:'90' }, { angle:180, text:'60' }, { angle:240, text:'30' }, { angle:300, text:'0' } ]
+// safe numeric handle coordinates for template usage
+const knobHandleX = computed(()=> {
+  const ang = (knobAngle.value - 90) * (Math.PI/180)
+  return Math.round(150 + radius * Math.cos(ang))
+})
+const knobHandleY = computed(()=> {
+  const ang = (knobAngle.value - 90) * (Math.PI/180)
+  return Math.round(150 + radius * Math.sin(ang))
+})
+
+// CSS ring knob position
+const knobStyle = computed(() => {
+  const ang = knobAngle.value - 90
+  const rad = ang * Math.PI / 180
+  const x = 150 + 150 * Math.cos(rad)
+  const y = 150 + 150 * Math.sin(rad)
+  return {
+    left: `${x}px`,
+    top: `${y}px`,
+    transform: 'translate(-50%, -50%)'
+  }
+})
+
+const ringLabels = [ { angle:-90, text:'∞' }, { angle:-30, text:'0' }, { angle:30, text:'30' }, { angle:90, text:'60' }, { angle:150, text:'90' }, { angle:210, text:'120' } ]
 
 
 let timerId = null
@@ -411,6 +495,46 @@ function startDrag(e){
   if(hideTimeout) clearTimeout(hideTimeout); 
   startPoint = e && e.touches && e.touches[0] ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : null; 
 }
+
+function onRingTouchStart(e){
+  dragging = true
+  if(hideTimeout) clearTimeout(hideTimeout)
+  if(e.touches && e.touches[0]){
+    onRingMove(e.touches[0])
+  }
+}
+
+function onRingTouchMove(e){
+  if(dragging && e.touches && e.touches[0]){
+    e.preventDefault()
+    onRingMove(e.touches[0])
+  }
+}
+
+function onRingTouchEnd(){
+  dragging = false
+  if(hideTimeout) clearTimeout(hideTimeout)
+  hideTimeout = setTimeout(()=>{ showTime.value = false; hideTimeout = null }, 800)
+}
+
+function onRingMove(touch){
+  // 计算相对于圆心的角度
+  const rect = { left: 0, top: 0, width: 280, height: 280 } // CSS ring 的尺寸
+  const cx = rect.left + rect.width / 2
+  const cy = rect.top + rect.height / 2
+  const dx = touch.clientX - cx
+  const dy = touch.clientY - cy
+  // 调整角度计算：让顶部为0度，顺时针递增
+  let ang = Math.atan2(dy, dx) * 180 / Math.PI + 90
+  if(ang < 0) ang += 360
+  // 反转角度：从右到左滑动（顺时针递减）
+  ang = 360 - ang
+  if(ang >= 360) ang = ang - 360
+  knobAngle.value = ang
+  durationMinutes.value = Math.max(0, Math.min(120, Math.round((ang % 360) / 360 * 120)))
+  remainingSeconds.value = durationMinutes.value * 60
+  showTime.value = true
+}
 function startDragMouse(e){ 
   e.preventDefault?.();
   dragging = true; 
@@ -437,8 +561,11 @@ function onDrag(e){
   const dy = touch.clientY - cy; 
   let ang = Math.atan2(dy, dx) * 180 / Math.PI + 90; 
   if(ang < 0) ang += 360; 
+  // 反转角度：从右到左滑动（顺时针递减）
+  ang = 360 - ang
+  if(ang >= 360) ang = ang - 360
   knobAngle.value = ang; 
-  durationMinutes.value = Math.round((ang / 360) * 120); 
+  // update duration via watcher; keep remaining in sync
   remainingSeconds.value = durationMinutes.value * 60 
 }
 function onDragMouse(e){ 
@@ -452,8 +579,11 @@ function onDragMouse(e){
   const dy = e.clientY - cy; 
   let ang = Math.atan2(dy, dx) * 180 / Math.PI + 90; 
   if(ang < 0) ang += 360; 
+  // 反转角度：从右到左滑动（顺时针递减）
+  ang = 360 - ang
+  if(ang >= 360) ang = ang - 360
   knobAngle.value = ang; 
-  durationMinutes.value = Math.round((ang / 360) * 120); 
+  // update duration via watcher; keep remaining in sync
   remainingSeconds.value = durationMinutes.value * 60 
 }
 function endDrag(e){ 
@@ -527,6 +657,189 @@ onLoad((query)=>{
 onUnload(()=>{
   try { audioCtx?.stop(); audioCtx?.destroy() } catch(e) {}
 })
+
+// Canvas drawing and interaction for timer ring (兼容 小程序)
+function polarToCartesian(cx, cy, r, angle){
+  const a = (angle-90) * Math.PI/180
+  return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) }
+}
+
+function drawRing(ctx, cx, cy, r){
+  // background ring
+  ctx.lineWidth = 6
+  ctx.strokeStyle = 'rgba(255,255,255,0.12)'
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.stroke()
+}
+
+function drawProgress(ctx, cx, cy, r, percent){
+  const start = -Math.PI/2
+  const end = start + percent * Math.PI*2
+  ctx.lineWidth = 6
+  ctx.strokeStyle = '#ffffff'
+  ctx.beginPath(); ctx.arc(cx, cy, r, start, end); ctx.stroke()
+}
+
+function drawTicks(ctx, cx, cy, r){
+  const labels = [{angle:0,text:'∞'},{angle:60,text:'120'},{angle:120,text:'90'},{angle:180,text:'60'},{angle:240,text:'30'},{angle:300,text:'0'}]
+  ctx.fillStyle = 'rgba(255,255,255,0.6)'
+  ctx.font = '12px Arial'
+  labels.forEach(l=>{
+    const ang = (l.angle-90) * Math.PI/180
+    const x = cx + r * Math.cos(ang)
+    const y = cy + r * Math.sin(ang)
+    ctx.beginPath(); ctx.arc(x,y,2,0,Math.PI*2); ctx.fill()
+    ctx.fillText(l.text, x-6, y-12)
+  })
+}
+
+function drawKnob(ctx, cx, cy, r, angle){
+  const p = polarToCartesian(cx,cy,r,angle)
+  ctx.fillStyle = '#fff'
+  ctx.beginPath(); ctx.arc(p.x,p.y,8,0,Math.PI*2); ctx.fill()
+}
+
+function clearCanvas(ctx, w, h){ ctx.clearRect(0,0,w,h) }
+
+function initCanvas(){
+  const canvas = canvasRef.value
+  if(!canvas) {
+    console.warn('Canvas element not found')
+    return
+  }
+  
+  console.log('Initializing canvas...')
+  
+  // 微信小程序需要通过 uni.createCanvasContext 获取上下文
+  const ctx = uni.createCanvasContext('timerCanvas', this)
+  if(!ctx) {
+    console.warn('Could not get canvas context')
+    return
+  }
+  
+  const w = 420
+  const h = 420
+  const cx = w/2
+  const cy = h/2
+  const r = 140
+  
+  function render(){
+    console.log('Rendering canvas...', { knobAngle: knobAngle.value, timerPercent: timerPercent.value })
+    
+    // 清空画布
+    ctx.clearRect(0, 0, w, h)
+    
+    // 绘制外圈背景
+    ctx.setLineWidth(8)
+    ctx.setStrokeStyle('rgba(255,255,255,0.08)')
+    ctx.beginPath()
+    ctx.arc(cx, cy, r, 0, 2*Math.PI)
+    ctx.stroke()
+    
+    // 绘制刻度和标签
+    const labels = [{angle:0,text:'∞'},{angle:60,text:'120'},{angle:120,text:'90'},{angle:180,text:'60'},{angle:240,text:'30'},{angle:300,text:'0'}]
+    ctx.setFillStyle('rgba(255,255,255,0.6)')
+    ctx.setFontSize(14)
+    ctx.setTextAlign('center')
+    labels.forEach(l=>{
+      const ang = (l.angle-90) * Math.PI/180
+      const x = cx + r * Math.cos(ang)
+      const y = cy + r * Math.sin(ang)
+      // 刻度点
+      ctx.setFillStyle('rgba(255,255,255,0.6)')
+      ctx.beginPath()
+      ctx.arc(x, y, 3, 0, 2*Math.PI)
+      ctx.fill()
+      // 标签文字
+      ctx.setFillStyle('rgba(255,255,255,0.8)')
+      ctx.fillText(l.text, x, y-15)
+    })
+    
+    // 绘制进度
+    const startAngle = -Math.PI/2
+    const endAngle = startAngle + timerPercent.value * 2*Math.PI
+    ctx.setLineWidth(8)
+    ctx.setStrokeStyle('#ffffff')
+    ctx.setLineCap('round')
+    ctx.beginPath()
+    ctx.arc(cx, cy, r, startAngle, endAngle)
+    ctx.stroke()
+    
+    // 绘制可拖动的白色圆点
+    const knobAngleRad = (knobAngle.value - 90) * Math.PI/180
+    const knobX = cx + r * Math.cos(knobAngleRad)
+    const knobY = cy + r * Math.sin(knobAngleRad)
+    
+    // 外圈阴影
+    ctx.setFillStyle('rgba(0,0,0,0.3)')
+    ctx.beginPath()
+    ctx.arc(knobX+2, knobY+2, 12, 0, 2*Math.PI)
+    ctx.fill()
+    
+    // 白色主圆点
+    ctx.setFillStyle('#ffffff')
+    ctx.beginPath()
+    ctx.arc(knobX, knobY, 12, 0, 2*Math.PI)
+    ctx.fill()
+    
+    // 内部小点
+    ctx.setFillStyle('rgba(0,0,0,0.1)')
+    ctx.beginPath()
+    ctx.arc(knobX, knobY, 4, 0, 2*Math.PI)
+    ctx.fill()
+    
+    // 提交绘制
+    ctx.draw()
+  }
+  
+  // 初始渲染
+  setTimeout(render, 100)
+  
+  // watch knobAngle and timerPercent
+  watch([knobAngle, () => timerPercent.value], ()=>{ 
+    try{ 
+      console.log('Canvas update triggered')
+      render() 
+    }catch(e){ 
+      console.error('Canvas render error:', e) 
+    } 
+  })
+
+  // 微信小程序触摸事件处理
+  let draggingLocal = false
+  
+  function handleTouchStart(e){
+    console.log('Touch start on canvas')
+    draggingLocal = true
+    if(e.touches && e.touches[0]){
+      onCanvasMove(e.touches[0])
+    }
+  }
+  
+  function handleTouchMove(e){
+    if(draggingLocal && e.touches && e.touches[0]){
+      e.preventDefault()
+      onCanvasMove(e.touches[0])
+    }
+  }
+  
+  function handleTouchEnd(){
+    draggingLocal = false
+  }
+
+  function onCanvasMove(touch){
+    const rect = { left: 0, top: 0, width: w, height: h } // Canvas的矩形区域
+    const cxAbs = rect.left + cx
+    const cyAbs = rect.top + cy
+    const dx = touch.clientX - cxAbs
+    const dy = touch.clientY - cyAbs
+    let ang = Math.atan2(dy,dx) * 180/Math.PI + 90
+    if(ang<0) ang+=360
+    knobAngle.value = ang
+    durationMinutes.value = Math.max(0, Math.min(120, Math.round((ang%360)/360*120)))
+    remainingSeconds.value = durationMinutes.value * 60
+    console.log('Canvas drag:', { ang, durationMinutes: durationMinutes.value })
+  }
+}
 function toggle(){
   if (!store.currentTrack) return
   if (store.isPlaying) { fadePause() }
@@ -615,21 +928,40 @@ watch(()=>store.volume, v=>{ if(audioCtx) audioCtx.volume = v })
 
 onMounted(()=>{
   // initialize knob position from durationMinutes and pick three random noises from playlist
-  knobAngle.value = (durationMinutes.value/120) * 360
+  // 调整角度计算：30分钟应该在 -30 度位置
+  knobAngle.value = 360 - (durationMinutes.value/120) * 360
   const pool = store.playlist.length ? store.playlist : allNoises
+  // initialize canvas drawing
+  setTimeout(()=>{
+    try{ initCanvas() }catch(e){ console.warn('initCanvas failed', e) }
+  }, 150)
   const shuffled = [...pool].sort(()=>0.5 - Math.random())
-  threeTracks.value = [shuffled[0]||null, shuffled[1]||null, shuffled[2]||null]
+  // fallback: if API returns empty, use local samples
+  const fallback = [ allNoises[0] || null, allNoises[1] || null, allNoises[2] || null ]
+  threeTracks.value = [shuffled[0]||fallback[0], shuffled[1]||fallback[1], shuffled[2]||fallback[2]]
+  // place icons labels under ring positions so they look like sample image
+  setTimeout(()=>{
+    // ensure positions recomputed after layout
+    updateTriPositions()
+    // tweak offsets to push icons slightly outward
+    threePositions.value = threePositions.value.map((p,idx)=>{
+      const x = parseFloat(p.left)
+      const y = parseFloat(p.top)
+      const dx = idx===0?0: idx===1? 36: -36
+      return { left: (x+dx)+'px', top: (y+6)+'px' }
+    })
+  }, 200)
   // compute triangle icon positions after render
   setTimeout(updateTriPositions, 120)
   try{ if(typeof window !== 'undefined' && typeof window.addEventListener === 'function') window.addEventListener('resize', updateTriPositions) }catch(e){}
 })
 </script>
 <style scoped>
-.page{ min-height:100vh; padding-bottom: 24px; background: var(--bg-color); background-image: var(--bg-gradient); background-repeat: no-repeat; background-size: 100% 100%; color: var(--text-color); }
-.topbar{ display:flex; justify-content:space-between; align-items:center; padding:10px 12px; position:relative }
-.collapse, .share{ background:transparent; border:none; color:var(--text-color); font-size:18px }
-.collapse{ position:absolute; left:12px; top:10px }
-.share{ position:absolute; right:12px; top:10px }
+.page{ min-height:100vh; padding-bottom: 24px; background: linear-gradient(180deg,#4b4950 0%, #2f2d31 100%); color: #f5f5f7; position:relative }
+.topbar{ display:flex; justify-content:space-between; align-items:center; padding:12px 16px; position:relative }
+.collapse, .share{ background:transparent; border:none; color:inherit; font-size:18px }
+.collapse{ position:absolute; left:12px; top:12px }
+.share{ position:absolute; right:12px; top:12px }
 
 .nav{ display:flex; justify-content:space-between; align-items:center; padding: 0 16px }
 .btn{ padding:6px 10px; border-radius:6px; background:#f2f3f5 }
@@ -642,12 +974,42 @@ onMounted(()=>{
 .name{ font-size:18px; font-weight:600; color: var(--text-primary) }
 .author{ margin-top:4px; font-size:14px; color:#666 }
 .count{ margin-top:4px; font-size:12px; color:#999 }
-.timer-wrap{ padding:28px 0; display:flex; flex-direction:column; align-items:center }
-.timer-svg{ width:300px; height:300px }
-.ring-bg{ fill:none; stroke:rgba(255,255,255,0.08); stroke-width:6 }
-.ring-progress{ fill:none; stroke:#fff; stroke-width:6; transform:rotate(-90deg); transform-origin:center; transition: stroke-dashoffset 300ms linear }
-.knob{ fill:#fff; filter: drop-shadow(0 6px 14px rgba(0,0,0,0.35)) }
-.timer-center{ position:absolute; left:0; right:0; top:50%; transform:translateY(-50%); font-size:28px; color:#fff; text-align:center; font-weight:700 }
+.timer-wrap{ padding-top:36px; display:flex; flex-direction:column; align-items:center; position:relative }
+.timer-svg{ width:84vw; max-width:420px; height:84vw; max-height:420px }
+.timer-bg-layer{ position:absolute; width:84vw; max-width:420px; height:84vw; max-height:420px; /* background-image removed for build compatibility */ background-repeat:no-repeat; background-position:center; background-size:55%; opacity:0.0; z-index:10; pointer-events:none }
+.timer-bg-img{ position:absolute; width:84vw; max-width:420px; height:84vw; max-height:420px; top:0; left:0; right:0; bottom:0; margin:auto; opacity:0.12; z-index:10; pointer-events:none }
+.triangle-fallback{ position:absolute; width:80%; height:80%; max-width:360px; max-height:360px; display:flex; align-items:center; justify-content:center; z-index:12; pointer-events:none; opacity:0.85 }
+.tri-f{ position:absolute; left:50%; transform:translateX(-50%); border-left: 80px solid transparent; border-right: 80px solid transparent }
+.tri-f-outer{ bottom:26%; border-bottom: 140px solid rgba(255,255,255,0.20) }
+.tri-f-middle{ bottom:34%; border-bottom: 100px solid rgba(255,255,255,0.14) }
+.tri-f-inner{ bottom:42%; border-bottom: 60px solid rgba(255,255,255,0.10) }
+.tri-center-icon{ position:absolute; bottom:44%; left:50%; transform:translateX(-50%); background:rgba(255,255,255,0.08); padding:8px 10px; border-radius:8px; font-size:14px; color:rgba(255,255,255,0.95) }
+.timer-canvas{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); z-index:100; width:84vw; max-width:420px; height:84vw; max-height:420px }
+
+/* CSS Timer Ring */
+.css-timer-ring{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:300px; height:300px; z-index:200 }
+.ring-outer-bg{ position:absolute; left:0; top:0; width:100%; height:100%; border:8px solid rgba(255,255,255,0.08); border-radius:50% }
+.ring-progress{ position:absolute; left:0; top:0; width:100%; height:100%; border-radius:50% }
+.ring-progress-fill{ position:absolute; left:0; top:0; width:100%; height:100%; border:8px solid #fff; border-radius:50%; border-color: #fff transparent transparent transparent; border-width: 8px }
+
+.tick-marks{ position:absolute; left:0; top:0; width:100%; height:100% }
+.tick-mark{ position:absolute; left:50%; top:0; width:2px; height:6px; margin-left:-1px; margin-top:-3px; transform-origin: center 150px }
+.tick-dot{ position:absolute; left:50%; top:0; width:6px; height:6px; background:rgba(255,255,255,0.6); border-radius:50%; margin-left:-3px; margin-top:-3px }
+.tick-text{ position:absolute; left:50%; top:-20px; transform:translateX(-50%); font-size:12px; color:rgba(255,255,255,0.8); white-space:nowrap }
+
+.draggable-knob{ position:absolute; width:24px; height:24px; z-index:300; cursor:pointer }
+.knob-shadow{ position:absolute; left:2px; top:2px; width:24px; height:24px; background:rgba(0,0,0,0.3); border-radius:50% }
+.knob-main{ position:absolute; left:0; top:0; width:24px; height:24px; background:#fff; border-radius:50%; box-shadow:0 4px 12px rgba(0,0,0,0.4) }
+.knob-inner{ position:absolute; left:8px; top:8px; width:8px; height:8px; background:rgba(0,0,0,0.1); border-radius:50% }
+.ring-bg{ fill:none; stroke:rgba(255,255,255,0.06); stroke-width:6 }
+.ring-progress{ fill:none; stroke:rgba(255,255,255,0.98); stroke-width:6; stroke-linecap:round; transform:rotate(-90deg); transform-origin:center; transition: stroke-dashoffset 200ms linear }
+.ring-bg, .outer-ring-bg{ fill:none; stroke:rgba(255,255,255,0.06); stroke-width:4 }
+.outer-ring-progress{ fill:none; stroke:rgba(255,255,255,0.12); stroke-width:4; stroke-linecap:round; transform:rotate(-90deg); transform-origin:center }
+.knob{ fill:#fff; stroke:rgba(0,0,0,0.08); stroke-width:1; filter: drop-shadow(0 8px 26px rgba(0,0,0,0.5)); cursor:pointer }
+.knob-handle{ fill:#fff; stroke:rgba(0,0,0,0.08); stroke-width:1; filter: drop-shadow(0 8px 26px rgba(0,0,0,0.5)) }
+.tick-label{ font-size:12px; fill:rgba(255,255,255,0.75); text-anchor:middle }
+.timer-center{ position:absolute; left:0; right:0; top:44%; transform:translateY(-50%); font-size:16px; color:rgba(255,255,255,0.85); text-align:center }
+.timer-center .time-big{ display:block; font-size:22px; font-weight:800; margin-top:6px; font-family: 'Courier New', monospace }
 .timer-wrap{ height:420px; position:relative; display:flex; align-items:center; justify-content:center }
 .triangle-icons{ position:absolute; left:0; top:0; right:0; bottom:0; pointer-events:none }
 .tri-icon{ position:absolute; display:flex; flex-direction:column; align-items:center; pointer-events:auto }
@@ -668,9 +1030,9 @@ onMounted(()=>{
 
 .ticks .tick{ fill:rgba(255,255,255,0.6) }
 .tick-label{ font-size:12px; fill:rgba(255,255,255,0.6); text-anchor:middle }
-.triangles .tri{ fill:rgba(255,255,255,0.04) }
-.triangles .tri2{ fill:rgba(255,255,255,0.06) }
-.triangles .tri3{ fill:rgba(255,255,255,0.08) }
+.triangles .tri{ fill:rgba(255,255,255,0.12); stroke:rgba(255,255,255,0.06); stroke-width:1 }
+.triangles .tri2{ fill:rgba(255,255,255,0.18); stroke:rgba(255,255,255,0.08); stroke-width:1 }
+.triangles .tri3{ fill:rgba(255,255,255,0.24); stroke:rgba(255,255,255,0.1); stroke-width:1 }
 .icons-row{ display:flex; justify-content:space-between; padding:12px 36px }
 .icon-left, .icon-right{ color:#fff; opacity:0.8 }
 .meta{ padding: 18px 16px }

@@ -108,12 +108,14 @@ function updateDashInstant(){
 
 function animateDash(){
   const ease = 0.12
+  const raf = (typeof requestAnimationFrame !== 'undefined') ? requestAnimationFrame : (cb=> setTimeout(cb, 16))
+  const caf = (typeof cancelAnimationFrame !== 'undefined') ? cancelAnimationFrame : (id=> clearTimeout(id))
   function step(){
     dashOffset.value += (targetDash.value - dashOffset.value) * ease
-    rafId = requestAnimationFrame(step)
+    rafId = raf(step)
   }
-  if(rafId) cancelAnimationFrame(rafId)
-  rafId = requestAnimationFrame(step)
+  if(rafId) caf(rafId)
+  rafId = raf(step)
 }
 
 function startTimer(){

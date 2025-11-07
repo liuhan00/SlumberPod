@@ -105,7 +105,8 @@ async function fetchCategories(){
   try{
     const BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3003'
     // 小程序运行时可能不支持 new URL，因此使用字符串拼接
-    const url = BASE + '/api/categories'
+    // 添加分页参数以获取所有分类
+    const url = BASE + '/api/categories?limit=1000'
     console.log('[api/categories] GET', url)
     let j = null
     if (typeof fetch === 'function'){
@@ -120,8 +121,11 @@ async function fetchCategories(){
       })
     }
     const items = Array.isArray(j) ? j : (j.data || j.items || [])
-    // filter top-level (parent_id === 0) and sort by sort_order desc
-    const top = items.filter(it=>Number(it.parent_id)===0).sort((a,b)=> (b.sort_order||0)-(a.sort_order||0))
+    // 获取所有分类（包括子分类），按 sort_order 排序
+    const allCategories = items.sort((a,b)=> (b.sort_order||0)-(a.sort_order||0))
+    // 显示所有分类（包括子分类），如果只想显示顶级分类，使用下面的代码
+    // const top = allCategories.filter(it=>Number(it.parent_id)===0)
+    const top = allCategories // 显示所有分类
     // build list: 全部 + 免费(if exists) + top categories
     const out = [{ id:'all', name:'全部' }]
     const free = items.find(it=> Number(it.is_free)===1 && String(it.name).includes('免'))
@@ -194,7 +198,7 @@ async function loadAudiosForCategory(catId){
   console.log('[Free] loadAudiosForCategory start', catId)
   try{
     const isAllLike = (catId === 'all' || catId === 'free')
-    const params = isAllLike ? { limit: 200 } : { category_id: catId, limit: 200 }
+    const params = isAllLike ? { limit: 1000 } : { category_id: catId, limit: 1000 }
     console.log('[Free] calling apiAudios.getAudios with', params)
     const res = await apiAudios.getAudios(params)
     console.log('[Free] apiAudios.getAudios response', res)

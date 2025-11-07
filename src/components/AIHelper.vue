@@ -87,10 +87,17 @@ function onMouseUp(e){ cancelLongPress(); pressed.value=false; if(!dragging.valu
 function snapToEdge(){ try{ const centerX = (pos.x || (screenW-56-12)) + 28; const leftDist = centerX; const rightDist = screenW - centerX; if(Math.min(leftDist, rightDist) <= Math.min((pos.y||0), (screenH - (pos.y||0)))){ if(leftDist <= rightDist) pos.x = 12; else pos.x = screenW - 56 - 12 } else { if((pos.y||0) <= (screenH - (pos.y||0))) pos.y = 12; else pos.y = screenH - 56 - 12 } }catch(e){} }
 
 function onClick(){ cancelLongPress(); if(!dragStart.moved){ // click animation brief
-  pressed.value = true; setTimeout(()=> pressed.value=false, 180); showAgent.value = true } }
+  pressed.value = true; setTimeout(()=> pressed.value=false, 180); // 直接打开内置 webview 页，避免小程序内嵌被限制
+  openExternal() } }
 
 function onWebviewError(e){ console.warn('webview error', e); showDomainWarning.value = true }
-function openExternal(){ try{ if(typeof uni !== 'undefined' && uni.navigateTo){ uni.navigateTo({ url: `/pages/webview/open?u=${encodeURIComponent(agentUrl)}` }) } else if(typeof window !== 'undefined'){ window.open(agentUrl, '_blank') } }catch(e){ console.warn(e) } }
+function openExternal(){ try{ if(typeof uni !== 'undefined' && uni.navigateTo){ // 兼容当前 uni.navigateTo 在某些环境下不生效，尝试两种方式
+      const u = `/pages/webview/open?u=${encodeURIComponent(agentUrl)}`
+      try{ uni.navigateTo({ url: u }) }catch(e){ try{ // 小程序环境页面跳转也可使用 redirectTo / reLaunch
+          uni.redirectTo({ url: u })
+        }catch(e2){ console.warn('navigateTo/redirectTo failed', e, e2) } }
+    } else if(typeof window !== 'undefined'){ window.open(agentUrl, '_blank') }
+  }catch(e){ console.warn(e) } }
 
 </script>
 

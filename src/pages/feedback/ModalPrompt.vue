@@ -32,16 +32,45 @@
     <!-- later picker sheet -->
     <view class="sheet" v-if="showPicker">
       <text class="sheet-title">选择提醒时间</text>
-      <view class="quick">
-        <button class="q" @click="setQuick(60)">1 小时后</button>
-        <button class="q" @click="setQuick(120)">2 小时后</button>
-        <button class="q" @click="setQuick(24*60)">明天同一时间</button>
-      </view>
       <view class="picker-row">
-        <input type="number" v-model="pickHour" min="0" max="23" />
-        <text>时</text>
-        <input type="number" v-model="pickMinute" min="0" max="59" />
-        <text>分</text>
+        <text class="picker-label">选择延迟时长（最多 12 小时）</text>
+        <view style="margin-top:12px; display:flex; flex-direction:column; gap:10px; align-items:center;">
+          <!-- 单个圆形风格滑动器替代：使用水平range，最大720分钟，显示小时与分钟 -->
+          <!-- Wheel picker: hours (0-12) and minutes (0-59) -->
+          <template v-if="isWeixinMini">
+            <picker-view :value="pickerValue" class="wheel" @change="onPickerChange">
+              <picker-view-column class="wheel-col">
+                <view v-for="(h, idx) in hoursList" :key="h" class="wheel-item">{{ h }} 小时</view>
+              </picker-view-column>
+              <picker-view-column class="wheel-col">
+                <view v-for="(m, idx) in minutesList" :key="m" class="wheel-item">{{ m }} 分钟</view>
+              </picker-view-column>
+            </picker-view>
+          </template>
+          <template v-else>
+            <!-- H5 fallback: two scrollable columns emulating wheel -->
+            <div class="wheel-fallback">
+              <div class="wheel-col-f">
+                <div v-for="h in hoursList" :key="h" @click="selectHour(h)" class="wheel-item-f">{{ h }} 小时</div>
+              </div>
+              <div class="wheel-col-f">
+                <div v-for="m in minutesList" :key="m" @click="selectMinute(m)" class="wheel-item-f">{{ m }} 分钟</div>
+              </div>
+            </div>
+          </template>
+
+          <view style="display:flex; gap:12px; align-items:center; margin-top:6px;">
+            <text style="font-weight:600">当前选择：</text>
+            <text>{{ delayHours }} 小时</text>
+            <text>{{ delayMinutes }} 分钟</text>
+          </view>
+
+          <view style="display:flex; gap:8px; margin-top:6px;">
+            <button class="q" @click="setQuick(60)">1 小时后</button>
+            <button class="q" @click="setQuick(120)">2 小时后</button>
+            <button class="q" @click="setQuick(180)">3 小时后</button>
+          </view>
+        </view>
       </view>
       <view class="sheet-actions">
         <button class="btn" @click="cancelPicker">取消</button>
@@ -55,14 +84,20 @@
 import { ref } from 'vue'
 import { scheduleFeedbackReminder, submitFeedback } from '@/store/feedback'
 
+const isWeixinMini = (typeof wx !== 'undefined' && typeof wx.getSystemInfoSync === 'function')
 const emit = defineEmits(['close'])
 const visible = ref(true)
 const showPicker = ref(false)
 const noMore = ref(false)
-const pickHour = ref('')
-const pickMinute = ref('')
+const delayHours = ref(1)
+const delayMinutes = ref(0)
 const rating = ref(4)
 const comment = ref('')
+
+// wheel data
+const hoursList = Array.from({length:13}).map((_,i)=>i) // 0..12
+const minutesList = Array.from({length:60}).map((_,i)=>i) // 0..59
+const pickerValue = ref([1,0]) // indices for hour/minute lists
 
 function dismiss(){
   try{ emit('close') }catch(e){}
@@ -93,16 +128,31 @@ function setQuick(mins){
   emit('close')
 }
 
+function onPickerChange(e){
+  try{
+    // e.detail.value is [hourIndex, minuteIndex]
+    const val = e && e.detail && Array.isArray(e.detail.value) ? e.detail.value : pickerValue.value
+    const hIdx = Number(val[0] || 0)
+    const mIdx = Number(val[1] || 0)
+    const h = hoursList[hIdx] || 0
+    const m = minutesList[mIdx] || 0
+    delayHours.value = h
+    delayMinutes.value = m
+    pickerValue.value = [hIdx, mIdx]
+  }catch(err){ console.warn('picker change parse failed', err) }
+}
+
+function selectHour(h){ delayHours.value = Number(h); pickerValue.value[0] = hoursList.indexOf(Number(h)) }
+function selectMinute(m){ delayMinutes.value = Number(m); pickerValue.value[1] = minutesList.indexOf(Number(m)) }
+
 function confirmPicker(){
-  let h = parseInt(pickHour.value || 0)
-  let m = parseInt(pickMinute.value || 0)
-  if(isNaN(h) || isNaN(m)) return uni.showToast({ title:'请输入有效时间', icon:'none' })
-  const now = new Date()
-  const fire = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m)
-  let fireAt = fire.getTime()
-  if(fireAt <= Date.now()){
-    uni.showToast({ title:'请选择未来时间', icon:'none' }); return
-  }
+  const hrs = Number(delayHours.value||0)
+  const mins = Number(delayMinutes.value||0)
+  if(isNaN(hrs) || isNaN(mins) || hrs<0 || mins<0) return uni.showToast({ title:'请选择有效的时间', icon:'none' })
+  const total = hrs*60 + mins
+  if(total <= 0) return uni.showToast({ title:'请选择未来时间', icon:'none' })
+  if(total > 12*60) return uni.showToast({ title:'最多只能选择 12 小时', icon:'none' })
+  const fireAt = Date.now() + total * 60 * 1000
   scheduleFeedbackReminder(fireAt)
   uni.showToast({ title:'已设置提醒', icon:'success' })
   emit('close')
@@ -112,7 +162,7 @@ function confirmPicker(){
 <style scoped>
 .overlay{ position:fixed; inset:0; z-index:2500 }
 .backdrop{ position:absolute; inset:0; background:rgba(0,0,0,0.45) }
-.card{ position:absolute; left:6%; right:6%; top:14%; background:#ffffff; border-radius:14px; padding:16px; display:flex; flex-direction:column; gap:12px; box-shadow:0 10px 30px rgba(0,0,0,0.12) }
+.card{ position:relative; left:6%; right:6%; top:14%; background:#ffffff; border-radius:14px; padding:16px; display:flex; flex-direction:column; gap:12px; box-shadow:0 10px 30px rgba(0,0,0,0.12); overflow:visible; z-index:2501 }
 .header{ display:flex; gap:12px; align-items:center }
 .icon{ width:48px; height:48px; border-radius:10px; background:linear-gradient(135deg,#f6f8ff,#fff7fb); display:flex; align-items:center; justify-content:center; font-size:22px }
 .texts{ display:flex; flex-direction:column }
@@ -129,10 +179,13 @@ function confirmPicker(){
 .btn.primary{ background:#6b46c1; color:#fff }
 .footer{ display:flex; justify-content:flex-end }
 .checkbox{ font-size:13px; color:#6b7280 }
-.sheet{ position:absolute; left:6%; right:6%; bottom:8%; background:#fff; padding:14px; border-radius:12px; box-shadow:0 8px 24px rgba(0,0,0,0.12) }
+.sheet{ position:fixed; left:6%; right:6%; bottom:8%; background:#fff; padding:14px; border-radius:12px; box-shadow:0 8px 24px rgba(0,0,0,0.12); z-index:2600 }
 .sheet-title{ font-weight:600; margin-bottom:8px }
-.quick{ display:flex; gap:8px; margin-bottom:8px }
-.q{ padding:8px 12px; border-radius:8px; background:#f3f4f6; border:none }
-.picker-row{ display:flex; align-items:center; gap:8px }
+.wheel{ height:160px; width:100%; }
+.wheel-col{ }
+.wheel-item{ height:40px; display:flex; align-items:center; justify-content:center; font-size:16px }
+.wheel-fallback{ display:flex; gap:8px; width:100% }
+.wheel-col-f{ flex:1; max-height:160px; overflow:auto; text-align:center; border-radius:8px; background:#fafafa }
+.wheel-item-f{ padding:12px 0; font-size:15px; color:#222 }
 .sheet-actions{ display:flex; justify-content:space-between; margin-top:12px }
 </style>
