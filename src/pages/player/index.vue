@@ -1,116 +1,40 @@
 <template>
-  <view class="page" @touchstart="handleTouchStart" @touchmove="handleTouchMove" @touchend="handleTouchEnd">
+  <view class="page" :style="bgStyle" @touchstart="handleTouchStart" @touchmove="handleTouchMove" @touchend="handleTouchEnd">
     <!-- Top small bar -->
     <view class="topbar">
       <button class="collapse" @click="uni.navigateBack()">˅</button>
       <button class="share">⤴</button>
     </view>
 
-    <!-- Circular timer UI -->
+    <!-- Vinyl turntable visual -->
     <view class="timer-wrap">
-      <!-- CSS fallback triangles for 小程序 (PNG/SVG may be blocked) -->
-      <view class="triangle-fallback" aria-hidden="true">
-        <view class="tri-f tri-f-outer"></view>
-        <view class="tri-f tri-f-middle"></view>
-        <view class="tri-f tri-f-inner"></view>
-        <view class="tri-center-icon">⚙️</view>
-      </view>
-      <!-- CSS Ring with draggable knob -->
-      <view class="css-timer-ring" @touchstart="onRingTouchStart" @touchmove="onRingTouchMove" @touchend="onRingTouchEnd">
-        <!-- Outer ring background -->
-        <view class="ring-outer-bg"></view>
-        <!-- Progress ring -->
-        <view class="ring-progress" :style="{ transform: `rotate(${knobAngle.value - 90}deg)` }">
-          <view class="ring-progress-fill"></view>
+      <view class="vinyl">
+        <view class="vinyl-shadow"></view>
+        <view class="disk" :class="{ spinning: store.isPlaying }">
+          <view class="grooves"></view>
+          <view class="label"><text>♪</text></view>
         </view>
-        <!-- Tick marks and labels -->
-        <view class="tick-marks">
-          <view v-for="(label, idx) in ringLabels" :key="idx" class="tick-mark" :class="`tick-${idx}`" :style="{ transform: `rotate(${label.angle}deg)` }">
-            <view class="tick-dot"></view>
-            <text class="tick-text">{{ label.text }}</text>
-          </view>
-        </view>
-        <!-- Draggable knob -->
-        <view class="draggable-knob" :style="knobStyle" @touchstart.stop.prevent="startDrag" @touchmove.stop.prevent="onDrag" @touchend.stop.prevent="endDrag">
-          <view class="knob-shadow"></view>
-          <view class="knob-main"></view>
-          <view class="knob-inner"></view>
+        <view class="tonearm" :class="{ on: store.isPlaying }">
+          <view class="pivot"></view>
+          <view class="arm"></view>
+          <view class="head"></view>
         </view>
       </view>
-      
-      <canvas class="timer-canvas" canvas-id="timerCanvas" ref="canvasRef" width="420" height="420" style="display:none" />
-      <svg viewBox="0 0 300 300" class="timer-svg" ref="svgRef" preserveAspectRatio="xMidYMid meet" style="position:relative; z-index:50;">
-        <!-- ticks & numbers (under ring) -->
-        <g class="ticks">
-          <circle cx="150" cy="40" r="3" class="tick" />
-          <text x="150" y="30" class="tick-label">120</text>
-          <circle cx="238" cy="150" r="3" class="tick" />
-          <text x="250" y="154" class="tick-label">30</text>
-          <circle cx="150" cy="260" r="3" class="tick" />
-          <text x="150" y="275" class="tick-label">60</text>
-          <circle cx="62" cy="150" r="3" class="tick" />
-          <text x="38" y="154" class="tick-label">90</text>
-          <!-- infinity at top center -->
-          <text x="150" y="18" class="tick-label">∞</text>
-        </g>
-        <!-- outer ring (below progress) -->
-        <circle cx="150" cy="150" r="110" class="outer-ring-bg" stroke="rgba(255,255,255,0.08)" stroke-width="4" />
-        <circle cx="150" cy="150" r="110" class="outer-ring-progress" :stroke-dasharray="ringCircumference" :stroke-dashoffset="ringCircumference - (ringCircumference * (knobAngle.value/360))" stroke="rgba(255,255,255,0.12)" stroke-width="4" />
-        <!-- main progress ring (on top) -->
-        <circle cx="150" cy="150" r="110" class="ring-bg" stroke="rgba(255,255,255,0.06)" stroke-width="4" />
-        <circle cx="150" cy="150" r="110" class="ring-progress" :stroke-dasharray="circumference" :stroke-dashoffset="circumference - (circumference * timerPercent)" stroke="#ffffff" stroke-width="6" />
-
-        <!-- three layered triangles -->
-        <g class="triangles" transform="translate(150,150)">
-          <polygon points="0,-90 80,45 -80,45" fill="rgba(255,255,255,0.24)" stroke="rgba(255,255,255,0.10)" stroke-width="1" />
-          <polygon points="0,-60 50,30 -50,30" fill="rgba(255,255,255,0.18)" stroke="rgba(255,255,255,0.08)" stroke-width="1" />
-          <polygon points="0,-30 25,15 -25,15" fill="rgba(255,255,255,0.12)" stroke="rgba(255,255,255,0.06)" stroke-width="1" />
-        </g>
-        <!-- triangle center icon -->
-        <g transform="translate(150,150)">
-          <rect x="-18" y="-12" width="36" height="24" rx="6" fill="rgba(255,255,255,0.06)" />
-          <text x="0" y="6" text-anchor="middle" font-size="12" fill="rgba(255,255,255,0.85)">⚙️</text>
-        </g>
-
-        <!-- outer ring with tick marks -->
-        <g class="ring-group" transform="translate(150,150)">
-          <circle cx="0" cy="0" r="120" class="outer-ring-bg" />
-          <circle cx="0" cy="0" r="120" class="outer-ring-progress" :stroke-dasharray="ringCircumference" :stroke-dashoffset="ringCircumference - (ringCircumference * (knobAngle.value/360))" />
-          <!-- ticks -->
-          <g v-for="(label, idx) in ringLabels" :key="idx" :transform="`rotate(${label.angle}) translate(0 -120)`">
-            <circle cx="0" cy="0" r="2" class="tick" />
-            <text x="0" y="-12" class="tick-label">{{ label.text }}</text>
-          </g>
-        </g>
-
-        <!-- knob on outer ring -->
-        <circle :cx="ringKnobX" :cy="ringKnobY" r="10" class="knob" @touchstart.stop.prevent="startDrag" @touchmove.stop.prevent="onDrag" @touchend.stop.prevent="endDrag" @mousedown.stop.prevent="startDragMouse" @mousemove.stop.prevent="onDragMouse" @mouseup.stop.prevent="endDragMouse" />
-        <!-- knob visual handle (small white dot) -->
-        <g style="pointer-events:none">
-          <circle :cx="knobHandleX" :cy="knobHandleY" :r="10" class="knob-handle" style="filter: drop-shadow(0 10px 30px rgba(0,0,0,0.6));" />
-        </g>
-      </svg>
-      <text class="timer-center"> 
-        <span v-if="showTime"> 
-          <span class="time-big">{{ String(durationMinutes).padStart ? String(durationMinutes).padStart(2,'0') : (durationMinutes<10?('0'+durationMinutes):durationMinutes) }}:00</span>
-        </span>
-        <span v-else>
-          <span class="time-big">{{ formattedRemaining }}</span>
-        </span>
-      </text>
-
     </view>
 
     <!-- meta area -->
     <view class="meta">
       <view class="title-row">
-        <text class="fixed-label">白噪音</text>
-        <button class="favorite-btn" @click="toggleFav">
-          <text v-if="isFav">❤️</text>
-          <text v-else>🤍</text>
-        </button>
+        <text class="fixed-label text-contrast">白噪音</text>
+        <view style="display:flex;align-items:center;gap:8px">
+          <button class="favorite-btn" @click="toggleFav">
+            <text v-if="isFav">❤️</text>
+            <text v-else>🤍</text>
+          </button>
+          <button class="meta-btn" @click="openMetaPopup(store.currentTrack?.id)">⋯</button>
+        </view>
       </view>
-      <text class="author">{{ displayNames }}</text>
+      <text class="author text-contrast">{{ displayNames }}</text>
     </view>
 
     <!-- small tags -->
@@ -240,6 +164,26 @@
       </view>
     </view>
   </view>
+
+    <!-- Meta Popup -->
+    <view class="modal-overlay" v-if="showMeta" @click="closeMeta">
+      <view class="modal-content" @click.stop>
+        <view class="modal-header">
+          <text class="modal-title">音频信息</text>
+          <button class="modal-close" @click="closeMeta">×</button>
+        </view>
+        <view v-if="metaLoading">
+          <text>加载中...</text>
+        </view>
+        <view v-else>
+          <text class="meta-row">名称：{{ metaData?.title || metaData?.name || '-' }}</text>
+          <text class="meta-row">点赞：{{ metaData?.favorite_count ?? metaData?.favoriteCount ?? 0 }}</text>
+          <text class="meta-row">评论：{{ metaData?.comment_count ?? metaData?.commentCount ?? 0 }}</text>
+          <text class="meta-row">时长：{{ fmtSeconds(metaData?.duration_seconds ?? metaData?.durationSeconds) }}</text>
+        </view>
+      </view>
+    </view>
+
 </template>
 <script setup>
 import { onLoad, onUnload } from '@dcloudio/uni-app'
@@ -250,7 +194,9 @@ import { useHistoryStore } from '@/stores/history'
 import { useFavoritesStore } from '@/stores/favorites'
 import { allNoises } from '@/data/noises'
 import { getAuthLocal } from '@/store/auth'
+import { useGlobalTheme } from '@/composables/useGlobalTheme'
 
+const { bgStyle } = useGlobalTheme()
 const store = usePlayerStore()
 const historyStore = useHistoryStore()
 const favStore = useFavoritesStore(); favStore.load()
@@ -261,9 +207,18 @@ const isFav = computed(()=> !!track.value && favStore.items.some(x=>x.id===track
 async function toggleFav(){ 
   if(!track.value) return; 
   
-  // 检查用户是否登录
+  // 检查用户是否登录（兼容多种本地存储结构）
   const auth = getAuthLocal()
-  if(!auth?.id && !auth?.user?.id) {
+  console.log('[Auth] toggleFav auth value:', auth)
+  const loggedIn = Boolean(
+    auth?.id ||
+    auth?.user?.id ||
+    auth?.userId ||
+    auth?.user?.userId ||
+    auth?.token ||
+    auth?.access_token
+  )
+  if(!loggedIn){
     uni.showToast({
       title: '请先登录',
       icon: 'none',
@@ -318,7 +273,7 @@ function updateTriPositions(){
   const svgRect = svgRef.value?.getBoundingClientRect?.() || null
   if(!svgRect) return
 
-n  // compute center and scale based on SVG (300x300 viewBox)
+  // compute center and scale based on SVG (300x300 viewBox)
   const scale = svgRect.width / 300
   const cx = svgRect.left + (150 * scale)
   const cy = svgRect.top + (150 * scale)
@@ -339,87 +294,24 @@ function triStyle(idx){ const p = threePositions.value[idx] || {left:'0px', top:
 
 
 
-// timer UI state
+// keep only triangle decoration state
 const svgRef = ref(null)
 const canvasRef = ref(null)
-const radius = 110
-const circumference = 2 * Math.PI * radius
-const ringCircumference = circumference
-const knobAngle = ref(270) // default knob at 30 minutes position (270deg)
-const durationMinutes = ref(30)
-const remainingSeconds = ref(durationMinutes.value*60)
-const timerPercent = computed(()=> (knobAngle.value % 360) / 360)
-const formattedRemaining = computed(()=>{
-  const mm = String(Math.floor(remainingSeconds.value/60)).padStart(2,'0')
-  const ss = String(remainingSeconds.value%60).padStart(2,'0')
-  return `${mm}:${ss}`
-})
 
-// expose numeric duration for template formatting
-const durationMinutesNum = computed(()=> durationMinutes.value)
+const ringLabels = [ { angle:-90, text:'∞' }, { angle:-30, text:'120' }, { angle:30, text:'90' }, { angle:90, text:'60' }, { angle:150, text:'30' }, { angle:210, text:'0' } ]
 
-const knobPos = computed(()=>{
-  const ang = (knobAngle.value - 90) * (Math.PI/180)
-  const x = 150 + radius * Math.cos(ang)
-  const y = 150 + radius * Math.sin(ang)
-  return { x, y }
-})
-const knobX = computed(()=> knobPos.value.x)
-const knobY = computed(()=> knobPos.value.y)
-
-// update durationMinutes when knobAngle changes
-watch(knobAngle, v=>{
-  // 反转映射：角度越大，时间越小（从右到左滑动）
-  const minutes = Math.max(0, Math.min(120, Math.round((360 - v%360)/360*120)))
-  durationMinutes.value = minutes
-})
-
-// ring knob coordinates for outer ring (use radius)
-const ringKnobPos = computed(()=>{
-  const ang = (knobAngle.value - 90) * (Math.PI/180)
-  const x = 150 + radius * Math.cos(ang)
-  const y = 150 + radius * Math.sin(ang)
-  return { x, y }
-})
-const ringKnobX = computed(()=> ringKnobPos.value.x)
-const ringKnobY = computed(()=> ringKnobPos.value.y)
-
-// safe numeric handle coordinates for template usage
-const knobHandleX = computed(()=> {
-  const ang = (knobAngle.value - 90) * (Math.PI/180)
-  return Math.round(150 + radius * Math.cos(ang))
-})
-const knobHandleY = computed(()=> {
-  const ang = (knobAngle.value - 90) * (Math.PI/180)
-  return Math.round(150 + radius * Math.sin(ang))
-})
-
-// CSS ring knob position
-const knobStyle = computed(() => {
-  const ang = knobAngle.value - 90
-  const rad = ang * Math.PI / 180
-  const x = 150 + 150 * Math.cos(rad)
-  const y = 150 + 150 * Math.sin(rad)
-  return {
-    left: `${x}px`,
-    top: `${y}px`,
-    transform: 'translate(-50%, -50%)'
-  }
-})
-
-const ringLabels = [ { angle:-90, text:'∞' }, { angle:-30, text:'0' }, { angle:30, text:'30' }, { angle:90, text:'60' }, { angle:150, text:'90' }, { angle:210, text:'120' } ]
-
-
-let timerId = null
-let dragging = false
-const showTime = ref(false)
-let hideTimeout = null
-let startPoint = null
+// minimal runtime flags
+const draggingRef = ref(false)
 
 // Play mode modal
 const showPlayModeModal = ref(false)
 const timerMinutes = ref(0)
 const customTimerMinutes = ref('')
+
+// meta popup state
+const showMeta = ref(false)
+const metaData = ref(null)
+const metaLoading = ref(false)
 
 // 下滑返回相关
 const touchStartY = ref(0)
@@ -489,32 +381,78 @@ function setCustomTimer() {
   }
 }
 
+async function openMetaPopup(id){
+  if(!id) return uni.showToast({ title: '无音频 id', icon:'none' })
+  showMeta.value = true; metaLoading.value = true; metaData.value = null
+  const BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3003'
+  const url = `${BASE}/api/audios/${id}`
+  console.log('[openMetaPopup] fetching meta', url)
+  try{
+    // try fetch first (browser/node). In some miniapp runtimes fetch may be unavailable or blocked — fallback to uni.request below.
+    if (typeof fetch === 'function'){
+      const res = await fetch(url, { method: 'GET' })
+      console.log('[openMetaPopup] fetch status', res.status)
+      if(!res.ok) throw new Error(`HTTP ${res.status}`)
+      let j = null
+      try{ j = await res.json() }catch(e){
+        console.warn('[openMetaPopup] parse json failed, using text', e)
+        const txt = await res.text()
+        try{ j = JSON.parse(txt) }catch(_){ j = txt }
+      }
+      metaData.value = (j && (j.data || j)) ? (j.data || j) : j
+      console.log('[openMetaPopup] metaData', metaData.value)
+    } else {
+      // uni.request fallback for miniapp environments
+      await new Promise((resolve, reject)=>{
+        try{
+          uni.request({
+            url,
+            method: 'GET',
+            success(r){
+              try{
+                const payload = r?.data
+                metaData.value = (payload && (payload.data || payload)) ? (payload.data || payload) : payload
+                console.log('[openMetaPopup] uni.request success', metaData.value)
+                resolve()
+              }catch(err){ reject(err) }
+            },
+            fail(err){ reject(err) }
+          })
+        }catch(e){ reject(e) }
+      })
+    }
+  }catch(e){
+    console.warn('openMetaPopup fetch failed', e)
+    // show error in modal rather than silent toast so user sees it
+    metaData.value = { _error: String(e) }
+  } finally {
+    metaLoading.value = false
+  }
+}
+
+function closeMeta(){ showMeta.value = false; metaData.value = null }
+
+// helper to format seconds -> mm:ss
+function fmtSeconds(s){ if(!s && s!==0) return '-' ; const m = Math.floor(s/60); const sec = String(s%60).padStart(2,'0'); return `${m}:${sec}` }
+
 function startDrag(e){ 
-  e.preventDefault?.();
-  dragging = true; 
-  if(hideTimeout) clearTimeout(hideTimeout); 
-  startPoint = e && e.touches && e.touches[0] ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : null; 
+  // timer interactions disabled — static decoration only
+  return
 }
 
 function onRingTouchStart(e){
-  dragging = true
-  if(hideTimeout) clearTimeout(hideTimeout)
-  if(e.touches && e.touches[0]){
-    onRingMove(e.touches[0])
-  }
+  // disabled
+  return
 }
 
 function onRingTouchMove(e){
-  if(dragging && e.touches && e.touches[0]){
-    e.preventDefault()
-    onRingMove(e.touches[0])
-  }
+  // disabled
+  return
 }
 
 function onRingTouchEnd(){
-  dragging = false
-  if(hideTimeout) clearTimeout(hideTimeout)
-  hideTimeout = setTimeout(()=>{ showTime.value = false; hideTimeout = null }, 800)
+  // disabled
+  return
 }
 
 function onRingMove(touch){
@@ -536,10 +474,8 @@ function onRingMove(touch){
   showTime.value = true
 }
 function startDragMouse(e){ 
-  e.preventDefault?.();
-  dragging = true; 
-  if(hideTimeout) clearTimeout(hideTimeout); 
-  startPoint = { x: e.clientX, y: e.clientY } 
+  // disabled
+  return
 }
 
 function toggleCorner(idx){ const n = threeTracks.value[idx]; if(!n) return; // toggle individual play
@@ -549,57 +485,20 @@ function toggleCorner(idx){ const n = threeTracks.value[idx]; if(!n) return; // 
   store.play(n)
 }
 function onDrag(e){ 
-  if(!dragging) return; 
-  try{ e.preventDefault?.(); }catch(_e){}
-  showTime.value = true; 
-  const touch = e.touches && e.touches[0]; 
-  if(!touch) return; 
-  const rect = svgRef.value?.getBoundingClientRect?.() || { left:0, top:0, width:300, height:300 }; 
-  const cx = rect.left + (rect.width/2); 
-  const cy = rect.top + (rect.height/2); 
-  const dx = touch.clientX - cx; 
-  const dy = touch.clientY - cy; 
-  let ang = Math.atan2(dy, dx) * 180 / Math.PI + 90; 
-  if(ang < 0) ang += 360; 
-  // 反转角度：从右到左滑动（顺时针递减）
-  ang = 360 - ang
-  if(ang >= 360) ang = ang - 360
-  knobAngle.value = ang; 
-  // update duration via watcher; keep remaining in sync
-  remainingSeconds.value = durationMinutes.value * 60 
+  // disabled
+  return
 }
 function onDragMouse(e){ 
-  if(!dragging) return; 
-  e.preventDefault?.();
-  showTime.value = true; 
-  const rect = svgRef.value?.getBoundingClientRect?.() || { left:0, top:0, width:300, height:300 }; 
-  const cx = rect.left + (rect.width/2); 
-  const cy = rect.top + (rect.height/2); 
-  const dx = e.clientX - cx; 
-  const dy = e.clientY - cy; 
-  let ang = Math.atan2(dy, dx) * 180 / Math.PI + 90; 
-  if(ang < 0) ang += 360; 
-  // 反转角度：从右到左滑动（顺时针递减）
-  ang = 360 - ang
-  if(ang >= 360) ang = ang - 360
-  knobAngle.value = ang; 
-  // update duration via watcher; keep remaining in sync
-  remainingSeconds.value = durationMinutes.value * 60 
+  // disabled
+  return
 }
 function endDrag(e){ 
-  try{ e.preventDefault?.(); }catch(_e){}
-  dragging=false; 
-  // if already playing, start the countdown based on selected duration
-  try{ if(store.isPlaying){ durationMinutes.value = Math.max(0, Math.min(120, durationMinutes.value)); remainingSeconds.value = durationMinutes.value * 60; startTimer(); } }catch(_e){}
-  if(hideTimeout) clearTimeout(hideTimeout); 
-  hideTimeout = setTimeout(()=>{ showTime.value = false; hideTimeout = null }, 800)
+  // disabled
+  return
 }
 function endDragMouse(e){ 
-  try{ e.preventDefault?.(); }catch(_e){}
-  dragging=false; 
-  try{ if(store.isPlaying){ durationMinutes.value = Math.max(0, Math.min(120, durationMinutes.value)); remainingSeconds.value = durationMinutes.value * 60; startTimer(); } }catch(_e){}
-  if(hideTimeout) clearTimeout(hideTimeout); 
-  hideTimeout = setTimeout(()=>{ showTime.value = false; hideTimeout = null }, 800)
+  // disabled
+  return
 }
 
 function startTimer(){ if(timerId) clearInterval(timerId); remainingSeconds.value = durationMinutes.value*60; timerId = setInterval(()=>{ remainingSeconds.value -=1; if(remainingSeconds.value <=0){ clearInterval(timerId); timerId=null; // stop playback and close page
@@ -928,36 +827,27 @@ watch(()=>store.volume, v=>{ if(audioCtx) audioCtx.volume = v })
 
 onMounted(()=>{
   // initialize knob position from durationMinutes and pick three random noises from playlist
-  // 调整角度计算：30分钟应该在 -30 度位置
   knobAngle.value = 360 - (durationMinutes.value/120) * 360
   const pool = store.playlist.length ? store.playlist : allNoises
-  // initialize canvas drawing
   setTimeout(()=>{
-    try{ initCanvas() }catch(e){ console.warn('initCanvas failed', e) }
+    try{
+      if(canvasRef.value) {
+        initCanvas()
+      }
+    }catch(e){ console.warn('initCanvas failed', e) }
   }, 150)
   const shuffled = [...pool].sort(()=>0.5 - Math.random())
-  // fallback: if API returns empty, use local samples
   const fallback = [ allNoises[0] || null, allNoises[1] || null, allNoises[2] || null ]
   threeTracks.value = [shuffled[0]||fallback[0], shuffled[1]||fallback[1], shuffled[2]||fallback[2]]
-  // place icons labels under ring positions so they look like sample image
-  setTimeout(()=>{
-    // ensure positions recomputed after layout
-    updateTriPositions()
-    // tweak offsets to push icons slightly outward
-    threePositions.value = threePositions.value.map((p,idx)=>{
-      const x = parseFloat(p.left)
-      const y = parseFloat(p.top)
-      const dx = idx===0?0: idx===1? 36: -36
-      return { left: (x+dx)+'px', top: (y+6)+'px' }
-    })
-  }, 200)
-  // compute triangle icon positions after render
-  setTimeout(updateTriPositions, 120)
-  try{ if(typeof window !== 'undefined' && typeof window.addEventListener === 'function') window.addEventListener('resize', updateTriPositions) }catch(e){}
 })
+
+function openCozeChat(){
+  const url = encodeURIComponent('https://www.coze.cn/store/agent/7568816236197363712?bot_id=true')
+  uni.navigateTo({ url: `/pages/chat/Webview?url=${url}` })
+}
 </script>
 <style scoped>
-.page{ min-height:100vh; padding-bottom: 24px; background: linear-gradient(180deg,#4b4950 0%, #2f2d31 100%); color: #f5f5f7; position:relative }
+.page{ min-height:100vh; padding-bottom: 24px; position:relative; /* use theme background from bgStyle */ }
 .topbar{ display:flex; justify-content:space-between; align-items:center; padding:12px 16px; position:relative }
 .collapse, .share{ background:transparent; border:none; color:inherit; font-size:18px }
 .collapse{ position:absolute; left:12px; top:12px }
@@ -984,7 +874,8 @@ onMounted(()=>{
 .tri-f-middle{ bottom:34%; border-bottom: 100px solid rgba(255,255,255,0.14) }
 .tri-f-inner{ bottom:42%; border-bottom: 60px solid rgba(255,255,255,0.10) }
 .tri-center-icon{ position:absolute; bottom:44%; left:50%; transform:translateX(-50%); background:rgba(255,255,255,0.08); padding:8px 10px; border-radius:8px; font-size:14px; color:rgba(255,255,255,0.95) }
-.timer-canvas{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); z-index:100; width:84vw; max-width:420px; height:84vw; max-height:420px }
+.timer-canvas{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); /* hidden to avoid canvas/SVG render conflicts during debugging */ display:none !important; z-index:10; width:84vw; max-width:420px; height:84vw; max-height:420px } 
+.timer-svg{ position:relative; z-index:300 !important }
 
 /* CSS Timer Ring */
 .css-timer-ring{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:300px; height:300px; z-index:200 }
@@ -1038,11 +929,12 @@ onMounted(()=>{
 .meta{ padding: 18px 16px }
 .title-row{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
 .fixed-label{ font-size:24px; font-weight:800; color: var(--text-primary); }
+.author{ margin-top:6px; color: var(--text-primary) }
 .name{ font-size:20px; color:#fff; font-weight:700 }
 .favorite-btn{ background: transparent; border: none; font-size: 24px; padding: 8px; margin-left: 12px; }
 .author{ margin-top:6px; color: var(--text-primary) }
 .tags{ display:flex; gap:10px; padding:8px 16px }
-.tag{ background:rgba(255,255,255,0.06); color:#fff; padding:6px 8px; border-radius:8px }
+.tag{ background:var(--card-bg, rgba(255,255,255,0.9)); color: var(--card-fg, #13303f); padding:6px 8px; border-radius:8px; box-shadow: 0 4px 12px var(--shadow, rgba(0,0,0,0.06)); opacity:0.95 }
 .controls{ display:flex; align-items:center; justify-content:space-around; padding:18px 36px }
 .play-btn{ width:72px; height:72px; border-radius:36px; background:#fff; color: var(--text-primary); display:flex; align-items:center; justify-content:center; font-size:26px }
 .ctrl{ background:transparent; border:none; color:#fff }
@@ -1219,10 +1111,10 @@ onMounted(()=>{
 
 /* Modal Styles */
 .modal-overlay{ position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.7); display:flex; align-items:center; justify-content:center; z-index:1000 }
-.modal-content{ background:#2a3a3a; border-radius:16px; padding:20px; width:320px; max-width:90vw; max-height:80vh; overflow-y:auto }
+.modal-content{ background: var(--card-bg, #fff); border-radius:16px; padding:20px; width:320px; max-width:90vw; max-height:80vh; overflow-y:auto }
 .modal-header{ display:flex; justify-content:space-between; align-items:center; margin-bottom:20px }
-.modal-title{ font-size:18px; font-weight:600; color:#fff }
-.modal-close{ background:none; border:none; color:#fff; font-size:24px; width:30px; height:30px; display:flex; align-items:center; justify-content:center }
+.modal-title{ font-size:18px; font-weight:600; color: var(--card-fg, #13303f) }
+.modal-close{ background:none; border:none; color: var(--card-fg, #13303f); font-size:24px; width:30px; height:30px; display:flex; align-items:center; justify-content:center }
 
 .modal-section{ margin-bottom:24px }
 .section-title{ font-size:14px; color:#ccc; margin-bottom:12px; display:block }
@@ -1244,4 +1136,59 @@ onMounted(()=>{
 .custom-input{ flex:1; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); border-radius:8px; padding:8px 12px; color:#fff; font-size:14px }
 .custom-input::placeholder{ color:#999 }
 .custom-confirm{ background:#4a9; border:none; border-radius:8px; padding:8px 16px; color:#fff; font-size:14px }
+.clear-contrast-overrides{
+  /* helper class placeholder */
+}
+
+/* Override: make UI elements high-contrast on light theme */
+.meta .fixed-label, .meta .name, .meta .author, .playlist-title, .playlist-name, .playlist-count, .empty-text, .modal-title, .mode-label, .timer-label {
+  color: var(--card-fg, #13303f) !important;
+}
+
+.tri-center-icon, .icon-left, .icon-right, .ctrl, .playlist-action-btn, .playlist-close, .modal-close, .favorite-btn, .tag {
+  color: var(--card-fg, #13303f) !important;
+}
+
+.tag{ background: var(--card-bg, #ffffff); color: var(--card-fg, #13303f) !important; box-shadow: 0 6px 20px rgba(0,0,0,0.06); }
+
+.play-btn{ background: var(--card-bg, #ffffff) !important; color: var(--card-fg, #13303f) !important; box-shadow: 0 8px 24px rgba(0,0,0,0.12); }
+
+.ctrl{ color: var(--card-fg, #13303f) !important; opacity: 0.95 }
+
+.triangle-fallback .tri-f-outer{ border-bottom-color: rgba(19,48,63,0.06) }
+.triangle-fallback .tri-f-middle{ border-bottom-color: rgba(19,48,63,0.04) }
+.triangle-fallback .tri-f-inner{ border-bottom-color: rgba(19,48,63,0.02) }
+.tri-center-icon{ background: var(--card-bg, rgba(255,255,255,0.95)); color: var(--card-fg, #13303f) !important }
+
+/* Ensure contrast for modal content */
+.modal-content{ background: var(--card-bg, #ffffff) !important; color: var(--card-fg, #13303f) }
+.modal-section, .mode-option, .timer-option, .custom-input{ background: rgba(0,0,0,0.03) }
+
+/* make icons in controls clearer */
+.actions .icon, .ctrl, .playlist-btn{ background: var(--input-bg, #f1f8ff); color: var(--card-fg, #13303f) }
+
+
+/* Vinyl turntable styles */
+.vinyl{ position:relative; width:78vw; max-width:380px; height:78vw; max-height:380px; display:flex; align-items:center; justify-content:center }
+.vinyl-shadow{ position:absolute; inset:-10px; border-radius:50%; box-shadow:0 30px 60px rgba(0,0,0,0.20), inset 0 8px 22px rgba(255,255,255,0.06) }
+.disk{ position:relative; width:86%; height:86%; border-radius:50%; background:#0b0b0b; box-shadow: inset 0 0 0 10px #121212, inset 0 0 0 22px #0e0e0e, inset 0 0 0 36px #101010; display:flex; align-items:center; justify-content:center; animation: spin 12s linear infinite; animation-play-state: paused }
+.disk.spinning{ animation-play-state: running }
+.grooves{ position:absolute; inset:0; border-radius:50%; background: repeating-radial-gradient(circle at 50% 50%, rgba(255,255,255,0.06) 0px, rgba(255,255,255,0.06) 1px, transparent 2px, transparent 4px); opacity:0.15; pointer-events:none }
+.label{ width:62%; height:62%; border-radius:50%; box-shadow:0 8px 20px rgba(0,0,0,0.25), inset 0 0 0 6px rgba(255,255,255,0.06); display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg, rgba(255,255,255,0.98), rgba(240,244,255,0.9)); color:#13303f; text-align:center }
+.label text{ font-size: 56px; line-height: 1; font-weight: 800 }
+
+/* Tonearm */
+.tonearm{ position:absolute; right:-6%; top:-6%; width:56%; height:56%; pointer-events:none; transform-origin: 12% 12%; transform: rotate(-28deg); transition: transform 420ms cubic-bezier(0.34, 1.56, 0.64, 1), filter 300ms ease }
+.tonearm.on{ transform: rotate(4deg); filter: drop-shadow(0 6px 12px rgba(0,0,0,0.12)) }
+.pivot{ position:absolute; left:10%; top:10%; width:22px; height:22px; border-radius:50%; background:var(--card-bg,#fff); box-shadow:0 6px 14px rgba(0,0,0,0.18) }
+.arm{ position:absolute; left:11%; top:11%; width:58%; height:6px; background:var(--card-bg,#fff); border-radius:3px; transform-origin:left center; transform: rotate(24deg); box-shadow:0 2px 6px rgba(0,0,0,0.12) }
+.head{ position:absolute; right:12%; bottom:18%; width:34px; height:14px; background:var(--card-bg,#fff); border-radius:4px }
+
+/* Adjust wrapper */
+.timer-wrap{ padding-top:22px; min-height:360px }
+
+/* Chat FAB */
+.fab-chat{ position:fixed; right:18px; bottom:108px; width:54px; height:54px; border-radius:27px; background: linear-gradient(135deg, #66e6a2, #62c2ff); box-shadow: 0 10px 24px rgba(70,170,220,0.25); display:flex; align-items:center; justify-content:center; font-size:26px; color:#fff; z-index:1200; opacity:0.96 }
+.fab-chat:active{ transform: scale(0.98); opacity:0.9 }
+
 </style>

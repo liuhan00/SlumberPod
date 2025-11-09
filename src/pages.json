@@ -40,7 +40,8 @@
     { "path": "pages/feedback/ModalPrompt", "style": { "navigationBarTitleText": "睡眠反馈" } },
     { "path": "pages/feedback/Form", "style": { "navigationBarTitleText": "睡眠反馈" } },
     { "path": "pages/auth/Login", "style": { "navigationBarTitleText": "登录" } },
-    { "path": "pages/auth/Register", "style": { "navigationBarTitleText": "注册" } }
+    { "path": "pages/auth/Register", "style": { "navigationBarTitleText": "注册" } },
+    { "path": "pages/chat/Webview", "style": { "navigationBarTitleText": "助理聊天" } }
   ],
   "globalStyle": {
     "navigationBarTextStyle": "black",

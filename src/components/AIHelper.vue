@@ -78,11 +78,11 @@ function cancelLongPress(){ clearTimeout(longPressTimer) }
 
 function onTouchStart(e){ const t = e.touches && e.touches[0]; if(!t) return; pressed.value=true; startLongPress(); dragging.value = true; dragStart.x = t.clientX; dragStart.y = t.clientY; dragStart.elX = (pos.x === null) ? (screenW - 64 - 12) : pos.x; dragStart.elY = (pos.y === null) ? (screenH - 64 - 120) : pos.y; dragStart.moved = false }
 function onTouchMove(e){ cancelLongPress(); if(!dragging.value) return; const t = e.touches && e.touches[0]; if(!t) return; const dx = t.clientX - dragStart.x; const dy = t.clientY - dragStart.y; if(Math.abs(dx) > 4 || Math.abs(dy) > 4) dragStart.moved = true; pos.x = Math.max(8, Math.min(dragStart.elX + dx, screenW - 56 - 8)); pos.y = Math.max(8, Math.min(dragStart.elY + dy, screenH - 56 - 8)) }
-function onTouchEnd(e){ cancelLongPress(); pressed.value=false; if(!dragging.value) return; dragging.value=false; snapToEdge(); persistPos(); if(!dragStart.moved) { showAgentPrompt.value = true } }
+function onTouchEnd(e){ cancelLongPress(); pressed.value=false; if(!dragging.value) return; dragging.value=false; snapToEdge(); persistPos(); if(!dragStart.moved) { openExternal() } }
 
 function onMouseDown(e){ if(e.button !== undefined && e.button !== 0) return; pressed.value=true; startLongPress(); dragging.value = true; dragStart.x = e.clientX; dragStart.y = e.clientY; dragStart.elX = (pos.x===null)?(screenW-64-12):pos.x; dragStart.elY = (pos.y===null)?(screenH-64-120):pos.y; dragStart.moved=false }
 function onMouseMove(e){ cancelLongPress(); if(!dragging.value) return; const dx = (e.clientX||0)-dragStart.x; const dy = (e.clientY||0)-dragStart.y; if(Math.abs(dx)>4||Math.abs(dy)>4) dragStart.moved=true; pos.x = Math.max(8, Math.min(dragStart.elX+dx, screenW-56-8)); pos.y = Math.max(8, Math.min(dragStart.elY+dy, screenH-56-8)) }
-function onMouseUp(e){ cancelLongPress(); pressed.value=false; if(!dragging.value) return; dragging.value=false; snapToEdge(); persistPos(); if(!dragStart.moved) { showAgentPrompt.value = true } }
+function onMouseUp(e){ cancelLongPress(); pressed.value=false; if(!dragging.value) return; dragging.value=false; snapToEdge(); persistPos(); if(!dragStart.moved) { openExternal() } }
 
 function snapToEdge(){ try{ const centerX = (pos.x || (screenW-56-12)) + 28; const leftDist = centerX; const rightDist = screenW - centerX; if(Math.min(leftDist, rightDist) <= Math.min((pos.y||0), (screenH - (pos.y||0)))){ if(leftDist <= rightDist) pos.x = 12; else pos.x = screenW - 56 - 12 } else { if((pos.y||0) <= (screenH - (pos.y||0))) pos.y = 12; else pos.y = screenH - 56 - 12 } }catch(e){} }
 
@@ -91,13 +91,22 @@ function onClick(){ cancelLongPress(); if(!dragStart.moved){ // click animation 
   openExternal() } }
 
 function onWebviewError(e){ console.warn('webview error', e); showDomainWarning.value = true }
-function openExternal(){ try{ if(typeof uni !== 'undefined' && uni.navigateTo){ // 兼容当前 uni.navigateTo 在某些环境下不生效，尝试两种方式
-      const u = `/pages/webview/open?u=${encodeURIComponent(agentUrl)}`
-      try{ uni.navigateTo({ url: u }) }catch(e){ try{ // 小程序环境页面跳转也可使用 redirectTo / reLaunch
-          uni.redirectTo({ url: u })
-        }catch(e2){ console.warn('navigateTo/redirectTo failed', e, e2) } }
-    } else if(typeof window !== 'undefined'){ window.open(agentUrl, '_blank') }
-  }catch(e){ console.warn(e) } }
+function openExternal(){
+  const u = `/pages/chat/Webview?url=${encodeURIComponent(agentUrl)}`
+  try{
+    if(typeof uni !== 'undefined' && uni.navigateTo){
+      try{ uni.navigateTo({ url: u }); return }
+      catch(e){ try{ uni.redirectTo({ url: u }); return }catch(e2){ console.warn('navigateTo/redirectTo failed', e, e2) } }
+    }
+  }catch(e){ console.warn('uni navigate failed', e) }
+  // H5 fallback
+  try{
+    if(typeof location !== 'undefined'){ location.hash = `#${u}`; return }
+  }catch(e){}
+  try{
+    if(typeof window !== 'undefined'){ window.open(agentUrl, '_blank'); return }
+  }catch(e){}
+}
 
 </script>
 

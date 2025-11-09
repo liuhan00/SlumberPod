@@ -19,14 +19,14 @@
 
     <view class="tabs-wrap">
       <view class="tabs-scroll" ref="tabsRef">
-        <view v-for="c in categories" :key="c.id" :class="['tab', { active: c.id===activeCat }]" @click="activeCat=c.id">{{ c.name }}</view>
+        <view v-for="c in categories" :key="c.id || c._id || c.uuid" :class="['tab', { active: c.id===activeCat }]" @click="activeCat=c.id">{{ c.name }}</view>
       </view>
       <button class="tabs-arrow" v-if="showArrow" @click="scrollTabsRight">›</button>
     </view>
 
-    <scroll-view class="grid" scroll-y>
-      <view class="item" v-for="(n, idx) in filteredNoises" :key="n.id || idx" @click="playRemote(n)">
-        <!-- 取消图标，直接显示名称 -->
+    <scroll-view class="grid" scroll-y enable-flex>
+      <view class="item" v-for="(n, idx) in filteredNoises" :key="`${n?.id||n?._id||n?.uuid||'item'}-${idx}`" @click="playRemote(n)">
+        <!-- 卡片：可扩展成带封面 -->
         <text class="name">{{ n.title || n.name || '未命名' }}</text>
       </view>
     </scroll-view>
@@ -43,7 +43,7 @@
         </button>
       </view>
       <view class="mini-center">
-        <view v-for="(n, idx) in randomNoises" :key="n?.id || idx" class="mini-box">
+        <view v-for="(n, idx) in randomNoises" :key="n?.id || n?._id || n?.uuid || idx" class="mini-box">
           <button class="mini-thumb" :class="{ on: isMiniPlaying(n?.id) }" @click="toggleMini(n)">
             <text class="icon">♪</text>
           </button>
@@ -58,24 +58,6 @@
       </view>
     </view>
 
-    <!-- 播放详情浮窗（定时圆环） -->
-    <view v-if="showDetail" class="detail-overlay" @click.self="closeDetail">
-      <view class="detail-card">
-        <view class="timer-circle" ref="circleRef">
-          <svg viewBox="0 0 200 200" class="svg-wrap">
-            <circle cx="100" cy="100" r="80" class="bg-ring" />
-            <circle cx="100" cy="100" r="80" class="progress-ring" :stroke-dasharray="circumference" :stroke-dashoffset="circumference - (circumference * timerPercent)" />
-            <!-- knob -->
-            <circle :cx="knobX" :cy="knobY" r="8" class="knob" @touchstart.stop.prevent="startDrag" @touchmove.stop.prevent="onDrag" @touchend.stop.prevent="endDrag" />
-          </svg>
-          <text class="timer-text">{{ formattedRemaining }}</text>
-        </view>
-        <view class="detail-actions">
-          <button class="btn" @click="startTimer">开始定时</button>
-          <button class="btn" @click="cancelTimer">取消</button>
-        </view>
-      </view>
-    </view>
   </view>
 </template>
 
@@ -128,11 +110,16 @@ async function fetchCategories(){
     const top = allCategories // 显示所有分类
     // build list: 全部 + 免费(if exists) + top categories
     const out = [{ id:'all', name:'全部' }]
-    const free = items.find(it=> Number(it.is_free)===1 && String(it.name).includes('免'))
-    if(free) out.push({ id:'free', name:'免费' })
+    // add a "免费" tab if any category is marked free in backend — insert at position 1 (after 全部)
+    const hasFree = items.some(it=> Number(it.is_free)===1)
+    if(hasFree){ if(!out.find(x=>x.id==='free')) out.splice(1,0,{ id:'free', name:'免费' }) } else {
+      // fallback: still insert '免费' for testing if not present (remove this if you don't want default)
+      if(!out.find(x=>x.id==='free')) out.splice(1,0,{ id:'free', name:'免费' })
+    }
     top.forEach(t=> out.push({ id: String(t.category_id || t.id), name: t.name }))
     out.push({ id:'mine', name:'我的创作' })
     categories.value = out
+    console.log('[Free] categories tabs built', categories.value)
 
     // check if overflow
     setTimeout(()=>{
@@ -168,6 +155,14 @@ const miniPlaying = ref(new Set())
 
 const remoteList = ref([])
 
+// debug: log remoteList contents when updated to help diagnose duplicate IDs / count mismatch
+watch(remoteList, (val)=>{
+  try{
+    console.log('[Free] remoteList updated length', Array.isArray(val)?val.length:0)
+    console.log('[Free] remoteList ids', Array.isArray(val)? val.map(i=>({id:i?.id, _id:i?._id, uuid:i?.uuid, is_free:i?.is_free})) : val)
+  }catch(e){ console.warn('[Free] remoteList watch log failed', e) }
+})
+
 // 当 activeCat 变化，remoteList 已由之前的 watch 填充
 // 现在我们让页面主体始终基于 remoteList（若为空且是我的创作或本地则回退到本地数据）
 const filteredNoises = computed(()=>{
@@ -176,14 +171,18 @@ const filteredNoises = computed(()=>{
     const userCreations = uni.getStorageSync('userCreations') || []
     return userCreations.map(c=>({ id:c.id, title:c.name, audio_url:c.audioUrl || '', duration:c.duration || 0 }))
   }
-  // 如果 remoteList 有数据，使用 remoteList（全部/免费/其他分类）
+  // 如果 remoteList 有数据，优先使用 remoteList（远端返回的已按 category/is_free 筛选）
   if(Array.isArray(remoteList.value) && remoteList.value.length) return remoteList.value
   // 回退：全部 显示 allNoises 名称
   if(activeCat.value==='全部'){
     return allNoises.map(n=>({ id:n.id, title:n.name, audio_url:n.src || '', duration:n.duration || 0 }))
   }
-  // 其他分类回退到本地过滤
-  return allNoises.filter(n=> n.category===activeCat.value).map(n=>({ id:n.id, title:n.name, audio_url:n.src||'', duration:n.duration||0 }))
+  // 免费回退：从本地数据筛选 is_free 字段为 1 的项（如果本地数据没有该字段则为空）
+  if(activeCat.value==='free' || activeCat.value==='免费'){
+    return allNoises.filter(n=> Number(n.is_free)===1 || Number(n.free)===1).map(n=>({ id:n.id, title:n.name, audio_url:n.src||'', duration:n.duration||0 }))
+  }
+  // 其他分类回退到本地过滤（category 字段可能是 id 或名称）
+  return allNoises.filter(n=> String(n.category)===String(activeCat.value) || String(n.category_id)===String(activeCat.value)).map(n=>({ id:n.id, title:n.name, audio_url:n.src||'', duration:n.duration||0 }))
 })
 
 // remote loading state
@@ -197,15 +196,32 @@ async function loadAudiosForCategory(catId){
   remoteLoading.value = true
   console.log('[Free] loadAudiosForCategory start', catId)
   try{
-    const isAllLike = (catId === 'all' || catId === 'free')
-    const params = isAllLike ? { limit: 1000 } : { category_id: catId, limit: 1000 }
+    const isFree = (catId === 'free')
+    const isAllLike = (catId === 'all')
+    const params = isFree ? { is_free: 1, limit: 1000 } : (isAllLike ? { limit: 1000 } : { category_id: catId, limit: 1000 })
     console.log('[Free] calling apiAudios.getAudios with', params)
     const res = await apiAudios.getAudios(params)
     console.log('[Free] apiAudios.getAudios response', res)
     const raw = res && (res.data || res.items) ? (res.data || res.items) : (Array.isArray(res) ? res : [])
     const arr = Array.isArray(raw) ? raw : []
-    remoteList.value = arr.map(it => ({ id: it.id || it._id || it.uuid || String(Date.now()), title: it.title || it.name || it.audioName || '', audio_url: it.audio_url || it.audioUrl || it.url || it.src || '', duration: it.duration || it.period || it.length || 0, category_id: it.category_id || it.categoryId || null }))
-    console.log('[Free] remoteList length', remoteList.value.length)
+    // preserve original for debugging
+    const originalArr = arr.map(it=>({...it}))
+    console.log('[Free] raw items length', Array.isArray(originalArr)? originalArr.length : 0)
+    console.log('[Free] raw items sample ids', originalArr.map(i=>({ id:i?.id, _id:i?._id, uuid:i?.uuid, is_free:i?.is_free })))
+    // dedupe by id/_id/uuid - keep first occurrence
+    const seen = new Set()
+    const deduped = []
+    for(const it of arr){
+      const key = it?.id || it?._id || it?.uuid || null
+      const uid = key ? String(key) : null
+      if(uid && seen.has(uid)) continue
+      if(uid) seen.add(uid)
+      deduped.push(it)
+    }
+    // map to normalized shape
+    remoteList.value = deduped.map(it => ({ id: it.id || it._id || it.uuid || String(Date.now()), title: it.title || it.name || it.audioName || '', audio_url: it.audio_url || it.audioUrl || it.url || it.src || '', duration: it.duration || it.period || it.length || 0, category_id: it.category_id || it.categoryId || null }))
+    console.log('[Free] remoteList length (deduped)', remoteList.value.length)
+    console.log('[Free] deduped ids', remoteList.value.map(i=>({id:i.id})))
   }catch(e){ console.warn('load remote audios failed', e); remoteList.value = []; remoteError.value = e?.message || String(e) }
   finally{ remoteLoading.value = false }
 }
@@ -247,7 +263,7 @@ function toggleMini(noise){
   if(!noise) return
   const id = noise.id || noise._id || noise.uuid
   if(!id) return
-  if(miniPlaying.value.has(id)){
+    if(miniPlaying.value.has(id)){
     miniPlaying.value.delete(id)
     // stop one source if supported
     player.stopById?.(id)
@@ -257,6 +273,7 @@ function toggleMini(noise){
     const track = { id, name: noise.title || noise.name || noise.audioName || '未知', src: noise.audio_url || noise.audioUrl || noise.url || noise.src || '' }
     player.addToQueue?.(track)
     player.play?.(track)
+    try{ apiAudios.incrementPlay(track.id).catch?.(e=>console.warn('[Free] incrementPlay failed', e)) }catch(e){}
   }
   // update player.title display (joined by |)
   updatePlayerTitleFromMini()
@@ -283,6 +300,7 @@ function playRemote(a){
   try{
     player.addToQueue?.(track)
     player.play?.(track)
+    try{ apiAudios.incrementPlay(track.id).catch?.(e=>console.warn('[Free] incrementPlay failed', e)) }catch(e){}
   }catch(e){ console.warn('player play failed', e) }
   // navigate to player detail and let player page attach to currentTrack
   try{ uni.navigateTo({ url: `/pages/player/index?title=${encodeURIComponent(track.name)}` }) }catch(e){ location.hash = `#/pages/player/index?title=${encodeURIComponent(track.name)}` }
@@ -456,6 +474,21 @@ function onDrag(e){ if(!dragging) return
 }
 function endDrag(e){ dragging=false }
 
+
+function openAgent(){
+  // 打开 Coze 智能体链接：在浏览器环境直接打开新窗口；在 uni-app 环境使用 uni.navigateTo 到 web-view 页面
+  const agentUrl = 'https://www.coze.cn/store/agent/7568816236197363712?bot_id=true'
+  try{
+    if(typeof uni !== 'undefined' && uni.navigateTo){
+      // 尝试打开内置 webview 页面（需在项目中有 pages/webview 页面）
+      uni.navigateTo({ url: `/pages/webview/index?src=${encodeURIComponent(agentUrl)}` })
+    } else {
+      window.open(agentUrl, '_blank')
+    }
+  }catch(e){
+    try{ location.href = agentUrl }catch(err){}
+  }
+}
 </script>
 
 <style scoped>
@@ -480,11 +513,11 @@ function endDrag(e){ dragging=false }
 .tab.active{ background:var(--accent, #2EA56B); color:#fff; box-shadow:0 6px 14px rgba(46,165,107,0.10) }
 .tabs-arrow{ position:absolute; right:6px; top:50%; transform:translateY(-50%); background:rgba(255,255,255,0.95); border-radius:50%; width:30px; height:30px; display:flex; align-items:center; justify-content:center; border:none; box-shadow:0 6px 12px rgba(0,0,0,0.10) }
 
-.grid{ display:grid !important; grid-template-columns: repeat(4, 1fr) !important; gap:14px 12px; grid-auto-flow: row; padding:12px 8px }
-.grid .item{ display:block !important; width:100%; padding:10px 8px; border-radius:10px; background:transparent }
-@media (max-width:1200px){ .grid{ grid-template-columns: repeat(4, 1fr) !important; } }
-@media (max-width:800px){ .grid{ grid-template-columns: repeat(4, 1fr) !important; } }
-@media (max-width:480px){ .grid{ grid-template-columns: repeat(2, 1fr) !important; } }
+.grid{ display:flex !important; flex-wrap:wrap; gap:12px 14px; padding:12px 8px }
+.grid .item{ box-sizing:border-box; width:50%; padding:10px 14px; border-radius:12px; background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.02)); transition: background 0.18s, transform 0.12s }
+@media (min-width:900px){ .grid .item{ width:25% } }
+
+/* removed conflicting grid rules for responsive fixed-column layouts */
 .item{ display:flex; align-items:flex-start; padding:10px 14px; border-radius:12px; background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.02)); transition: background 0.18s, transform 0.12s }
 .item:hover{ background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.04)); transform: translateY(-6px) }
 .name{ font-size:14px; color:var(--text-color); line-height:1.6 }
@@ -494,7 +527,7 @@ function endDrag(e){ dragging=false }
 
 /* mini player - floating style */
 .mini-player{ position:fixed; left:50%; transform:translateX(-50%); bottom:12px; display:flex; align-items:center; gap:8px; background:rgba(20,24,28,0.7); padding:6px 8px; border-radius:12px; box-shadow:0 6px 14px rgba(0,0,0,0.45); backdrop-filter: blur(6px); max-width:520px; width: min(520px, calc(100% - 96px)); z-index:1200 }
-.mini-dice{ width:36px; height:36px; display:flex; align-items:center; justify-content:center; border-radius:8px; background:rgba(255,255,255,0.06); border:none; color:var(--text-contrast) }
+.mini-dice{ width:36px; height:36px; display:flex; align-items:center; justify-content:center; border-radius:8px; background:rgba(255,255,255,0.12); border:none; color:#ffffff; box-shadow:0 2px 6px rgba(0,0,0,0.28) }
 .mini-center{ display:flex; gap:8px; flex:1; justify-content:center }
 .mini-box{ display:flex; flex-direction:column; align-items:center }
 .mini-thumb{ width:44px; height:44px; border-radius:10px; background:transparent; display:flex; align-items:center; justify-content:center; border:none; color:var(--text-contrast); transition: transform .12s ease, box-shadow .12s ease, background-color .12s ease; }

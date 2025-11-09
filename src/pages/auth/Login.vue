@@ -106,7 +106,11 @@ function applyThemeByTime(){
   // #endif
   // #ifdef MP-WEIXIN
   // For mini-programs set css variables on body via uni.setNavigationBarColor or keep styles in-page
-  try{ uni.setNavigationBarColor && uni.setNavigationBarColor({ frontColor: (text==='\#000'? '#000000': text), backgroundColor: bg }) }catch(e){}
+  try{
+    const _normHex = (h)=>{ if(!h) return '#000000'; h=String(h); if(h[0]!=='#') return h; if(h.length===4) return '#' + h[1]+h[1]+h[2]+h[2]+h[3]+h[3]; return h.length===7? h : '#000000' }
+    const front = (text==='#000' || text==='\#000') ? '#000000' : (text==='#fff' || text==='\#fff') ? '#ffffff' : _normHex(text)
+    uni.setNavigationBarColor && uni.setNavigationBarColor({ frontColor: front, backgroundColor: _normHex(bg) })
+  }catch(e){}
   // #endif
 }
 onMounted(()=>{

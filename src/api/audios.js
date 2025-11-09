@@ -9,10 +9,11 @@ function buildHeaders(){
   return headers
 }
 
-export async function getAudios({ category_id = null, limit = 20 } = {}){
+export async function getAudios({ category_id = null, limit = 20, is_free = null } = {}){
   // 兼容小程序环境：优先使用 uni.request（小程序运行时没有 fetch），同时打印日志
   const pairs = []
   if (category_id) pairs.push('category_id=' + encodeURIComponent(category_id))
+  if (typeof is_free !== 'undefined' && is_free !== null) pairs.push('is_free=' + encodeURIComponent(String(is_free)))
   pairs.push('limit=' + encodeURIComponent(String(limit)))
   const q = pairs.length ? ('?' + pairs.join('&')) : ''
   const url = BASE + '/api/audios' + q
