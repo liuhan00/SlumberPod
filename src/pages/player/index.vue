@@ -224,7 +224,13 @@ const historyStore = useHistoryStore()
 const favStore = useFavoritesStore(); favStore.load()
 historyStore.load()
 const track = computed(()=> store.currentTrack)
-const isFav = computed(()=> !!track.value && favStore.items.some(x=>x.id===track.value.id))
+const isFav = computed(()=>{
+  if(!track.value) return false
+  const metaId = track.value?.metaId
+  const numericMeta = metaId != null && /^\d+$/.test(String(metaId)) ? Number(metaId) : null
+  if(numericMeta === null) return false
+  return favStore.items.some(x=> x.id === numericMeta)
+})
 
 async function toggleFav(){ 
   if(!track.value) return; 
@@ -255,10 +261,19 @@ async function toggleFav(){
     return
   }
   
+  // 仅允许使用后端真实ID metaId
+  const metaId = track.value?.metaId
+  const isNumericMeta = metaId != null && /^\d+$/.test(String(metaId))
+  if(!isNumericMeta){
+    uni.showToast({ title: '该音频暂不支持收藏', icon: 'none', duration: 1800 })
+    return
+  }
+
+  const wasFav = isFav.value
   try {
     await favStore.toggle(track.value)
     uni.showToast({
-      title: isFav.value ? '已取消收藏' : '收藏成功',
+      title: wasFav ? '已取消收藏' : '收藏成功',
       icon: 'success',
       duration: 1000
     })
@@ -412,7 +427,7 @@ function setCustomTimer() {
 
 async function openMetaPopup(id){
   showMeta.value = true; metaLoading.value = true; metaData.value = null; metaMulti.value = []
-  const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.236.92:3003'
+  const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.43.89:3003'
   // 构建ID列表：优先参数id；否则从当前播放或混合列表取 metaId/id（最多3个）
   let ids = []
   if(id){ ids = [id] }
@@ -867,6 +882,8 @@ onMounted(()=>{
   const shuffled = [...pool].sort(()=>0.5 - Math.random())
   const fallback = [ allNoises[0] || null, allNoises[1] || null, allNoises[2] || null ]
   threeTracks.value = [shuffled[0]||fallback[0], shuffled[1]||fallback[1], shuffled[2]||fallback[2]]
+  // 同步服务端收藏，确保进入播放页即可拿到最新收藏状态
+  try{ favStore.syncFromServer?.() }catch(e){ /* silent */ }
 })
 
 function openCozeChat(){
@@ -992,10 +1009,11 @@ function openCozeChat(){
 }
 
 .playlist-header {
+  position: relative;
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
-  padding: 20px;
+  padding: 20px 48px 20px 20px; /* 给右上角关闭按钮留空间 */
   border-bottom: 1px solid #f0f0f0;
 }
 
@@ -1006,11 +1024,15 @@ function openCozeChat(){
 }
 
 .playlist-close {
+  position: absolute;
+  right: 12px;
+  top: 12px;
   background: none;
   border: none;
-  font-size: 24px;
+  font-size: 22px;
   color: #999;
   padding: 4px;
+  line-height: 1;
 }
 
 .playlist-scroll {
@@ -1140,9 +1162,9 @@ function openCozeChat(){
 /* Modal Styles */
 .modal-overlay{ position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.7); display:flex; align-items:center; justify-content:center; z-index:1000 }
 .modal-content{ background: var(--card-bg, #fff); border-radius:16px; padding:20px; width:320px; max-width:90vw; max-height:80vh; overflow-y:auto }
-.modal-header{ display:flex; justify-content:space-between; align-items:center; margin-bottom:20px }
+.modal-header{ position:relative; display:flex; justify-content:flex-start; align-items:center; margin-bottom:20px; padding-right: 40px }
 .modal-title{ font-size:18px; font-weight:600; color: var(--card-fg, #13303f) }
-.modal-close{ background:none; border:none; color: var(--card-fg, #13303f); font-size:24px; width:30px; height:30px; display:flex; align-items:center; justify-content:center }
+.modal-close{ position:absolute; right:8px; top:6px; background:none; border:none; color: var(--card-fg, #13303f); font-size:22px; width:28px; height:28px; display:flex; align-items:center; justify-content:center; line-height:1 }
 
 .modal-section{ margin-bottom:24px }
 .section-title{ font-size:14px; color:#ccc; margin-bottom:12px; display:block }

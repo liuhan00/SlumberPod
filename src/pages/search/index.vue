@@ -24,7 +24,7 @@
     </view>
 
     <!-- 搜索内容区域 -->
-    <scroll-view class="search-content" scroll-y>
+    <scroll-view class="search-content" scroll-y @scrolltolower="loadMore" lower-threshold="80">
       <!-- 热门搜索 -->
       <view v-if="!searchText" class="section">
         <text class="section-title">热门搜索</text>
@@ -70,16 +70,21 @@
         <view class="search-results">
           <view 
             v-for="result in searchResults" 
-            :key="result.id" 
+            :key="result.id"
             class="result-item"
-            @click="playResult(result)"
+            @click="result.type==='audio' ? playResult(result) : openPost(result)"
           >
-            <image class="result-cover" :src="result.cover" mode="aspectFill" />
+            <image v-if="result.cover" class="result-cover" :src="result.cover" mode="aspectFill" />
             <view class="result-info">
               <text class="result-name">{{ result.name }}</text>
               <text class="result-author">{{ result.author }}</text>
+              <view v-if="result.type==='post'" class="post-stats">
+                <text class="stat">❤ {{ result.favorite_count }}</text>
+                <text class="dot">·</text>
+                <text class="stat">💬 {{ result.comment_count }}</text>
+              </view>
             </view>
-            <text class="play-icon">▶</text>
+            <text class="play-icon">{{ result.type==='audio' ? '▶' : '↗' }}</text>
           </view>
         </view>
         
@@ -97,7 +102,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useGlobalTheme } from '@/composables/useGlobalTheme'
 import { useThemeStore } from '@/stores/theme'
-import { allNoises } from '@/data/noises'
+import * as apiSearch from '@/api/search'
 
 const themeStore = useThemeStore(); themeStore.load()
 const { bgStyle } = useGlobalTheme()
@@ -113,17 +118,68 @@ const hotTags = ref([
   '睡眠', '放松', '专注', '冥想'
 ])
 
-// 搜索结果
-const searchResults = computed(() => {
-  if (!searchText.value.trim()) return []
-  
-  const query = searchText.value.toLowerCase()
-  return allNoises.filter(noise => 
-    noise.name.toLowerCase().includes(query) ||
-    noise.author.toLowerCase().includes(query) ||
-    noise.category.toLowerCase().includes(query)
-  )
-})
+// 后端搜索结果与分页
+const searchResults = ref([])
+const page = ref(1)
+const limit = ref(20)
+const loading = ref(false)
+const hasMore = ref(true)
+const errorMsg = ref('')
+
+async function doSearch(reset = true){
+  const kw = searchText.value.trim()
+  if(!kw){
+    searchResults.value = []
+    hasMore.value = true
+    page.value = 1
+    return
+  }
+  if(loading.value) return
+  loading.value = true
+  errorMsg.value = ''
+  try{
+    if(reset){ page.value = 1; hasMore.value = true; searchResults.value = [] }
+    const offset = (page.value - 1) * limit.value
+    console.log('[search] doSearch', { q: kw, page: page.value, limit: limit.value, offset })
+    const res = await apiSearch.searchAll({ q: kw, page: page.value, limit: limit.value })
+    console.log('[search] response raw', res)
+    // 兼容返回格式：{audios|posts|items|data[]} 或 {code, data:{ list|items|rows }} 或纯数组
+    let list = []
+    const top = (res?.audios ?? res?.posts ?? res?.items ?? res?.data)
+    if(Array.isArray(top)){
+      list = top
+    } else if(Array.isArray(res)){
+      list = res
+    } else if(top && typeof top === 'object'){
+      const inner = top.list ?? top.items ?? top.rows ?? top.data
+      if(Array.isArray(inner)) list = inner
+    }
+    console.log('[search] parsed list length', Array.isArray(list) ? list.length : 'n/a')
+    const mapped = list.map(it=>({
+      // 支持音频与帖子两类数据
+      type: it.type || (it.audio_id || it.duration || it.file_url ? 'audio' : 'post'),
+      id: it.post_id || it.audio_id || it.id || it._id || `${Date.now()}_${Math.random()}`,
+      name: it.title || it.name || it.content?.slice(0, 28) || '-',
+      author: it.author || it.user_name || it.username || (it.author?.name) || '用户',
+      cover: it.cover || it.cover_url || it.image || it.thumb || '',
+      duration: it.duration || it.duration_seconds || it.durationSeconds || 0,
+      favorite_count: it.favorite_count ?? it.likes ?? 0,
+      comment_count: it.comment_count ?? (Array.isArray(it.comments) ? it.comments.length : 0),
+      content: it.content || '',
+    }))
+    searchResults.value = reset ? mapped : searchResults.value.concat(mapped)
+    hasMore.value = mapped.length >= limit.value
+    if(hasMore.value){ page.value += 1 }
+  }catch(e){ 
+    errorMsg.value = String(e?.message || e)
+    console.error('[search] error', e)
+    uni.showToast({ title: errorMsg.value, icon: 'none' })
+  } finally { 
+    loading.value = false 
+  }
+}
+
+function loadMore(){ if(hasMore.value && !loading.value) doSearch(false) }
 
 // 返回上一页
 function goBack() {
@@ -136,25 +192,43 @@ function goBack() {
 
 // 处理搜索
 function handleSearch() {
-  if (searchText.value.trim()) {
-    addToHistory(searchText.value.trim())
-  }
+  const kw = searchText.value.trim()
+  if (!kw) return
+  addToHistory(kw)
+  doSearch(true)
 }
 
 // 处理输入
+let inputTimer = null
 function handleInput() {
-  // 实时搜索逻辑
+  if(inputTimer) clearTimeout(inputTimer)
+  inputTimer = setTimeout(()=>{
+    const kw = searchText.value.trim()
+    if(kw){
+      doSearch(true)
+    } else {
+      searchResults.value = []
+      page.value = 1
+      hasMore.value = true
+      errorMsg.value = ''
+    }
+  }, 400)
 }
 
 // 清空搜索
 function clearSearch() {
   searchText.value = ''
+  searchResults.value = []
+  page.value = 1
+  hasMore.value = true
+  errorMsg.value = ''
 }
 
 // 通过标签搜索
 function searchByTag(tag) {
   searchText.value = tag
   addToHistory(tag)
+  doSearch(true)
 }
 
 // 添加到搜索历史
@@ -193,11 +267,17 @@ function clearHistory() {
 
 // 播放搜索结果
 function playResult(result) {
-  uni.showToast({
-    title: `播放：${result.name}`,
-    icon: 'none'
-  })
-  // 这里可以添加实际的播放逻辑
+  uni.showToast({ title: `播放：${result.name}`, icon: 'none' })
+  // TODO: 可在此跳转播放器并传入音频ID
+}
+
+function openPost(result){
+  const id = (typeof result.id === 'number' || /^\d+$/.test(String(result.id))) ? Number(result.id) : result.post_id
+  if(id){
+    uni.navigateTo({ url: `/pages/community/detail?id=${id}` })
+  } else {
+    uni.showToast({ title:'帖子ID无效', icon:'none' })
+  }
 }
 
 onMounted(() => {

@@ -1,5 +1,5 @@
 import { getAuthLocal } from '@/store/auth'
-const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.236.92:3003'
+const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.43.89:3003'
 
 function buildHeaders(token){
   const headers = { 'Content-Type': 'application/json' }
@@ -24,5 +24,25 @@ export async function getPosts({ page = 1, limit = 10 } = {}){
   const res = await fetch(url, { method: 'GET', headers: buildHeaders() })
   const j = await res.json()
   if(!res.ok) throw new Error(j.message || j.error || 'fetch posts failed')
+  return j
+}
+
+// 获取最新帖子列表：/api/lastest
+export async function getLatest(){
+  const url = BASE + '/api/lastest'
+  const res = await fetch(url, { method:'GET', headers: buildHeaders() })
+  let j = null
+  try{ j = await res.json() }catch(e){ j = res }
+  if(!res.ok) throw new Error(j?.message || j?.error || 'fetch latest posts failed')
+  return j
+}
+
+// 获取热门帖子列表：/api/hot
+export async function getHot(){
+  const url = BASE + '/api/hot'
+  const res = await fetch(url, { method:'GET', headers: buildHeaders() })
+  let j = null
+  try{ j = await res.json() }catch(e){ j = res }
+  if(!res.ok) throw new Error(j?.message || j?.error || 'fetch hot posts failed')
   return j
 }

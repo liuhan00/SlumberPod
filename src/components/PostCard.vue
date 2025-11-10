@@ -137,8 +137,9 @@ function viewProfile() {
 }
 
 function viewDetail() {
+  const toId = (typeof props.post.backendId === 'number' && !isNaN(props.post.backendId)) ? props.post.backendId : props.post.id
   uni.navigateTo({
-    url: `/pages/community/detail?id=${props.post.id}`
+    url: `/pages/community/detail?id=${toId}`
   })
 }
 

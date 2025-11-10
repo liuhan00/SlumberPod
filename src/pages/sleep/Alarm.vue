@@ -221,21 +221,6 @@ const ringtones = ref([
 
 onMounted(() => {
   sleep.load()
-  // 如果没有闹钟，添加一个示例闹钟
-  if (sleep.alarms.length === 0) {
-    const now = new Date()
-    sleep.addAlarm({
-      hour: now.getHours(),
-      minute: now.getMinutes(),
-      label: '起床闹钟',
-      enabled: true,
-      ringtone: 'doppler',
-      repeat: 'daily',
-      volume: 0.8,
-      vibrate: true,
-      snooze: 5
-    })
-  }
 })
 
 // 格式化时间

@@ -61,6 +61,7 @@ import PostCard from '@/components/PostCard.vue'
 import { useGlobalTheme } from '@/composables/useGlobalTheme'
 import { useThemeStore } from '@/stores/theme'
 import { getAuthLocal } from '@/store/auth'
+import * as apiPosts from '@/api/posts'
 
 const themeStore = useThemeStore()
 themeStore.load()
@@ -75,7 +76,7 @@ import * as apiCommunity from '@/api/community'
 // 后端数据
 const posts = ref([
   { 
-    id: 'p1', 
+    id: 'p1', backendId: null,
     time: '刚刚', 
     content: '昨晚试了雨声+树林组合，很快入睡。推荐给失眠的朋友们！', 
     image: 'https://picsum.photos/seed/p1/800/400', 
@@ -86,7 +87,7 @@ const posts = ref([
     author: { name: 'Sleepy', avatar: 'https://picsum.photos/seed/a1/100' } 
   },
   { 
-    id: 'p2', 
+    id: 'p2', backendId: null,
     time: '1小时前', 
     content: '有谁用过壁炉声？感觉很温暖~ 特别是冬天的时候', 
     image: '', 
@@ -95,7 +96,7 @@ const posts = ref([
     author: { name: 'Cozy', avatar: 'https://picsum.photos/seed/a2/100' } 
   },
   { 
-    id: 'p3', 
+    id: 'p3', backendId: null,
     time: '3小时前', 
     content: '分享一个助眠技巧：睡前30分钟关闭电子设备，配合海浪声效果更佳', 
     image: 'https://picsum.photos/seed/p3/800/400', 
@@ -143,9 +144,43 @@ const filteredPosts = computed(() => {
   return result
 })
 
+// 归一化后端帖子为本地渲染结构
+function normalizeList(list){
+  return list.map((item, index) => ({
+    id: String(item.post_id ?? item.id ?? item._id ?? `p${Date.now()}_${index}`),
+    backendId: (typeof item.post_id === 'number' || /^\d+$/.test(String(item.post_id))) ? Number(item.post_id)
+      : (typeof item.id === 'number' || /^\d+$/.test(String(item.id))) ? Number(item.id)
+      : (typeof item._id === 'number' || /^\d+$/.test(String(item._id))) ? Number(item._id)
+      : null,
+    time: item.time || item.created_at || item.createdAt || '刚刚',
+    title: item.title || '',
+    content: item.content || item.body || '',
+    image: (item.imageUrls && item.imageUrls[0]) || item.image || '',
+    favorite_count: item.favorite_count ?? item.likes ?? 0,
+    comment_count: item.comment_count ?? (Array.isArray(item.comments) ? item.comments.length : 0),
+    likes: item.likes || item.favorite_count || 0,
+    comments: Array.isArray(item.comments) ? item.comments : [],
+    author: item.author || { name: item.userName || item.user_name || '用户', avatar: (item.author && item.author.avatar) || (item.user_avatar) || 'https://picsum.photos/seed/a1/100' }
+  }))
+}
+
+// 加载“最新”与“热门”
+async function loadLatest(){
+  const r = await apiPosts.getLatest()
+  const list = r.data || r.items || r.list || r || []
+  posts.value = normalizeList(Array.isArray(list) ? list : [])
+}
+async function loadHot(){
+  const r = await apiPosts.getHot()
+  const list = r.data || r.items || r.list || r || []
+  posts.value = normalizeList(Array.isArray(list) ? list : [])
+}
+
 // 方法
 function switchTab(tab) {
   activeTab.value = tab
+  if(tab === '最新') loadLatest().catch(()=>{})
+  if(tab === '综合') loadHot().catch(()=>{})
 }
 
 function showSearch() {
@@ -203,18 +238,26 @@ function onComment(id) {
   })
 }
 
+const creating = ref(false)
 async function createPost(data) {
+  if (creating.value) return
+  creating.value = true
   try{
     // 使用社区API创建帖子
     const result = await apiCommunity.createPost({ 
       title: data.title || '', 
       content: data.content,
-      category: 'general' // 默认分类
+      coverImage: data.image || '',
+      audioId: data.audioId || undefined
     })
     // prepend returned post if any, fallback to local
     const returned = result.data || result.post || result || {}
     const newPost = {
-      id: returned.id || result.id || `p${Date.now()}`,
+      id: String(returned.post_id ?? returned.id ?? result.id ?? `p${Date.now()}`),
+      backendId: (typeof returned.post_id === 'number' || /^\d+$/.test(String(returned.post_id))) ? Number(returned.post_id)
+        : (typeof returned.id === 'number' || /^\d+$/.test(String(returned.id))) ? Number(returned.id)
+        : (typeof result.id === 'number' || /^\d+$/.test(String(result.id))) ? Number(result.id)
+        : null,
       time: returned.time || returned.created_at || '刚刚',
       title: returned.title || data.title || '',
       content: returned.content || data.content,
@@ -226,56 +269,25 @@ async function createPost(data) {
     posts.value.unshift(newPost)
     uni.showToast({ title: '发布成功', icon: 'success' })
   }catch(e){
-    // fallback to local mock if network fails
-    const id = `p${Date.now()}`
-    posts.value.unshift({ 
-      id, 
-      time: '刚刚', 
-      content: data.content, 
-      image: data.image || '', 
-      likes: 0, 
-      comments: [], 
-      author: { name: '我', avatar: 'https://picsum.photos/seed/me/100' } 
-    })
-    uni.showToast({ title: '离线已保存，稍后同步', icon: 'none' })
+    console.error('[community] createPost failed', e)
+    const msg = (e && e.message) ? e.message : '发布失败'
+    uni.showToast({ title: msg, icon: 'none' })
+  }finally{
+    creating.value = false
   }
 }
 
 onMounted(async () => {
-  // 初始化操作：加载社区帖子列表
+  try{
+    await loadLatest()
+  }catch(e){
+    console.warn('load latest posts failed', e)
+    // 回退：使用社区列表接口，避免空白
   try{
     const result = await apiCommunity.getCommunityList({ page: 1, limit: 20 })
     const list = result.data || result.items || result || []
-    // normalize items to expected shape (title, content, image, author...)
-    posts.value = list.map(item => ({
-      id: item.id || item._id || `p${Date.now()}`,
-      time: item.time || item.created_at || item.createdAt || '刚刚',
-      title: item.title || '',
-      content: item.content || item.body || '',
-      image: (item.imageUrls && item.imageUrls[0]) || item.image || '',
-      likes: item.likes || item.favorite_count || 0,
-      comments: item.comments || [],
-      author: item.author || { name: item.userName || item.user_name || '用户', avatar: (item.author && item.author.avatar) || (item.user_avatar) || 'https://picsum.photos/seed/a1/100' }
-    }))
-    
-    // 并发拉取每条帖子的详情以获取真实的点赞和评论数
-    try{
-      const ids = posts.value.map(p=>p.id).filter(Boolean)
-      const detailResults = await Promise.allSettled(ids.map(id=> apiCommunity.getCommunityDetail(id)))
-      detailResults.forEach((res, idx)=> {
-        if(res.status === 'fulfilled') {
-          const data = res.value?.data || res.value || {}
-          const p = posts.value[idx]
-          if(p){
-            p.favorite_count = data.favorite_count ?? data.likes ?? p.favorite_count ?? 0
-            p.comment_count = data.comment_count ?? (Array.isArray(data.comments) ? data.comments.length : p.comments?.length || 0)
-            if(Array.isArray(data.comments)) p.comments = data.comments
-          }
-        }
-      })
-    }catch(enrichErr){ console.warn('enrich community counts failed', enrichErr) }
-  }catch(e){
-    console.warn('load community posts failed', e)
+      posts.value = normalizeList(list)
+    }catch(e2){ console.warn('fallback community list failed', e2) }
   }
 })
 </script>

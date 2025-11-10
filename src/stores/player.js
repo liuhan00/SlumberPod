@@ -1,4 +1,6 @@
 import { defineStore } from 'pinia'
+import * as apiHistory from '@/api/history'
+import { getAuthLocal } from '@/store/auth'
 
 export const usePlayerStore = defineStore('player', {
   state: () => ({
@@ -39,6 +41,18 @@ export const usePlayerStore = defineStore('player', {
     play(track) {
       if (track) this.currentTrack = track
       this.isPlaying = true
+      // 写入播放历史（后端）：仅在登录且存在后端真实数字ID时上报
+      try{
+        const auth = getAuthLocal && getAuthLocal()
+        const hasToken = Boolean(auth?.token || auth?.access_token)
+        const src = this.currentTrack || {}
+        // 后端真实音频ID优先 metaId，其次 id/audio_id
+        const rawId = src.metaId ?? src.id ?? src.audio_id ?? src.audioId ?? null
+        const hasValidId = rawId !== null && rawId !== undefined && String(rawId).trim() !== ''
+        if (hasToken && hasValidId){
+          apiHistory.addPlayHistory({ audio_id: rawId, play_duration: 0 }).catch(()=>{})
+        }
+      }catch(e){ /* ignore */ }
     },
     pause() { this.isPlaying = false },
     setLoopMode(mode){ this.loopMode = mode },

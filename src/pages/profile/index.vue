@@ -49,6 +49,7 @@ import SettingsList from '@/components/SettingsList.vue'
 import { useGlobalTheme } from '@/composables/useGlobalTheme'
 import { getAuthLocal } from '@/store/auth'
 import { ref } from 'vue'
+import { getPlayHistory } from '@/api/history'
 const { bgStyle } = useGlobalTheme()
 
 const userStore = useUserStore()
@@ -71,25 +72,9 @@ function formatDate(v){ if(!v) return ''
 }
 
 async function loadHistory(){
-  const _fetchFallback = async (u, h) => {
-    if (typeof fetch === 'function') { return fetch(u, { headers: h }); }
-    // fallback using uni.request
-    return new Promise((resolve, reject) => {
-      uni.request({ url: u, header: h, success: (res) => resolve({ ok: res.statusCode >= 200 && res.statusCode < 300, json: () => res.data }), fail: (err)=> reject(err) });
-    });
-  }
   loading.value = true
   try{
-    const auth = getAuthLocal()
-    const base = import.meta.env.VITE_API_BASE || 'http://192.168.236.92:3003'
-    const userId = '11111111-1111-1111-1111-111111111111'
-    const url = `${base}/api/users/${userId}/play-history`
-    const headers = {}
-    if(auth?.token) headers.Authorization = `Bearer ${auth.token}`
-    const resp = await fetch(url, { headers })
-    if(!resp.ok) throw new Error(`请求失败: ${resp.status}`)
-    const j = await resp.json()
-    const data = Array.isArray(j) ? j : (j.items || j.data || j)
+    const data = await getPlayHistory({ page: 1, limit: 100 })
     list.value = Array.isArray(data) ? data : []
   }catch(e){ error.value = e.message || String(e); console.error(e) }
   finally{ loading.value = false }
@@ -97,14 +82,32 @@ async function loadHistory(){
 
 function openLogin(){ try{ uni.navigateTo({ url:'/pages/auth/Login' }) }catch(e){ location.hash='#/pages/auth/Login' } }
 function openRegister(){ try{ uni.navigateTo({ url:'/pages/auth/Register' }) }catch(e){ location.hash='#/pages/auth/Register' } }
-async function logout(){ try{ const api = await import('@/api/auth'); api.logout(); authUser.value = null; const { useUserStore } = await import('@/stores/user'); useUserStore().applyAuth(null); uni.showToast({ title:'已登出' }) }catch(e){ uni.showToast({ title:'登出失败', icon:'none' }) } }
+async function logout(){
+  uni.showModal({
+    title: '确认登出',
+    content: '确定要退出当前账号吗？',
+    success: async (res) => {
+      if(!res.confirm) return
+      try{
+        const api = await import('@/api/auth')
+        await api.logout()
+        authUser.value = null
+        const { useUserStore } = await import('@/stores/user')
+        useUserStore().applyAuth(null)
+        uni.showToast({ title:'已登出' })
+        setTimeout(()=>{ uni.reLaunch({ url: '/pages/auth/Login' }) }, 300)
+      }catch(e){
+        uni.showToast({ title:'登出失败', icon:'none' })
+      }
+    }
+  })
+}
 
 
 const settings = [
   { key:'favorites', label:'我喜欢的' },
   { key:'history', label:'播放历史' },
   { key:'comments', label:'我的评论' },
-  { key:'creations', label:'我的创作' },
   { key:'account', label:'账号资料' },
   { key:'help', label:'帮助与客服' },
   { key:'about', label:'关于 星眠坞' },
@@ -119,7 +122,6 @@ function onSetting(key){
   if(key==='favorites') go('pages/favorites/index')
   else if(key==='history') { showHistory.value = true; loadHistory() }
   else if(key==='comments') go('pages/comments/index')
-  else if(key==='creations') go('pages/creations/index')
   else if(key==='account') go('pages/account/index')
   else if(key==='help') go('pages/help/index')
   else if(key==='about') go('pages/about/index')

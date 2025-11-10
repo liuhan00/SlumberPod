@@ -63,11 +63,15 @@ const post = ref({})
 onLoad(async (q)=>{
   const id = q?.id
   if(!id){ loading.value=false; error.value='缺少帖子ID'; return }
+  // 仅允许纯数字ID调用后端，避免用前端占位ID触发404
+  const isNumeric = /^\d+$/.test(String(id))
+  if(!isNumeric){ loading.value=false; error.value='无效帖子ID'; return }
+  const numericId = Number(id)
   try{
-    const res = await apiCommunity.getCommunityDetail(id)
+    const res = await apiCommunity.getCommunityDetail(numericId)
     const data = res?.data || res
     post.value = {
-      id: data.id || data.post_id || id,
+      id: data.post_id ?? data.id ?? numericId,
       title: data.title || '',
       content: data.content || data.body || '',
       image: data.image || (data.imageUrls && data.imageUrls[0]) || '',

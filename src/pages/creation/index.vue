@@ -197,6 +197,7 @@ const categories = ref([])
 
 // 使用与听白噪音页面一致的分类
 import * as apiAudios from '@/api/audios'
+import * as apiCommunity from '@/api/community'
 
 async function loadCategories(){
   // 使用听白噪音页面中的分类映射
@@ -272,7 +273,7 @@ function removeTag(i){ creationData.value.tags.splice(i,1) }
 const isValid = computed(() => {
   return creationData.value.name.trim() && 
          creationData.value.category && 
-         (audioUrl.value || creationData.value.file_url)
+         (audioUrl.value || creationData.value.file_url || creationData.value.audio_id || creationData.value.audioId)
 })
 
 // 返回上一页
@@ -296,16 +297,13 @@ function saveCreation() {
       const authModule = await import('@/store/auth')
       const auth = authModule.getAuthLocal ? authModule.getAuthLocal() : (authModule.default && authModule.default.getAuthLocal ? authModule.default.getAuthLocal() : null)
       const author_id = auth?.user?.id || auth?.id || null
-      const payload = {
-        title: creationData.value.name,
-        description: creationData.value.description,
-        category_id: creationData.value.category,
-        duration: duration.value || 0,
-        file_url: creationData.value.file_url || audioUrl.value || '',
-        tags: creationData.value.tags || []
-      }
-      const api = await import('@/api/audios')
-      const res = await api.uploadAudio(Object.assign({}, payload, { author_id }))
+      // 改为使用社区发帖接口，按后端字段发送：title、content、cover image、audio id
+      const res = await apiCommunity.createPost({
+        title: creationData.value.name || '',
+        content: creationData.value.description || '',
+        coverImage: creationData.value.cover_url || '',
+        audioId: creationData.value.audio_id || creationData.value.audioId || undefined
+      })
       uni.hideLoading()
       uni.showToast({ title: '上传成功', icon: 'success' })
       if(creationData.value.shareToCommunity){
@@ -410,22 +408,19 @@ async function uploadSelectedFile(){
     
     uploadProgress.value = 30
     
-    // 获取用户ID
-    const authModule = await import('@/store/auth')
-    const auth = authModule.getAuthLocal ? authModule.getAuthLocal() : (authModule.default && authModule.default.getAuthLocal ? authModule.default.getAuthLocal() : null)
-    const author_id = auth?.user?.id || auth?.id || null
+    // 使用新的两步上传流程：先上传到 /api/audio/upload，然后创建记录
+    // 将 category_id 转换为 categoryIds 数组格式
+    const categoryIds = creationData.value.category ? [creationData.value.category] : []
     
-    const api = await import('@/api/audios')
-    
-    // 添加上传进度监控
-    const uploadPromise = api.uploadAudioMultipart({ 
+    const uploadPromise = apiAudios.uploadAudioToStorage({ 
       file: selectedFile.value, 
       title: creationData.value.name, 
-      description: creationData.value.description || '无描述',
-      category_id: creationData.value.category, 
-      duration: duration.value || 0, 
-      tags: creationData.value.tags || [],
-      author_id: author_id
+      description: creationData.value.description || '',
+      coverUrl: creationData.value.cover_url || '',
+      durationSeconds: duration.value || 0,
+      categoryIds: categoryIds,
+      isPublic: 1,
+      isFree: 0
     })
     
     // 模拟上传进度
@@ -441,32 +436,44 @@ async function uploadSelectedFile(){
     
     console.log('上传响应:', resp)
     
-    // 处理响应数据
-    let fileUrl = ''
-    if(resp.data) {
-      fileUrl = resp.data.audio_url || resp.data.file_url || resp.data.url || ''
-    } else {
-      fileUrl = resp.audio_url || resp.file_url || resp.url || ''
-    }
-    
-    if(fileUrl) {
-      creationData.value.file_url = fileUrl
+    // 优先获取音频ID；兼容不同返回结构
+    const audioIdCandidate = resp?.data?.audioId ?? resp?.data?.id ?? resp?.audioId ?? resp?.id
+    if (audioIdCandidate != null) {
+      creationData.value.audio_id = String(audioIdCandidate)
       uni.hideLoading()
       uni.showToast({ 
-        title:'上传成功', 
+        title:'上传成功，已获取音频ID', 
         icon:'success',
         duration: 2000
       })
-      
-      // 自动设置音频时长（如果后端没有返回）
-      if(!duration.value && (resp.data?.duration || resp.duration)) {
-        duration.value = resp.data?.duration || resp.duration
-      }
-      
       // 清空已选文件
       selectedFile.value = null
     } else {
-      throw new Error('上传成功但未获取到文件URL，响应：' + JSON.stringify(resp))
+      // 兼容仅返回URL的情况：先保存URL以便回显，但提示缺少音频ID
+      let fileUrl = ''
+      if(resp.data) {
+        fileUrl = resp.data.audio_url || resp.data.file_url || resp.data.url || ''
+      } else {
+        fileUrl = resp.audio_url || resp.file_url || resp.url || ''
+      }
+      if(fileUrl) {
+        creationData.value.file_url = fileUrl
+        uni.hideLoading()
+        uni.showToast({ 
+          title:'上传成功，但未返回音频ID', 
+          icon:'none',
+          duration: 2500
+        })
+        // 清空已选文件
+        selectedFile.value = null
+      } else {
+        throw new Error('上传成功但未获取到音频ID或URL，响应：' + JSON.stringify(resp))
+      }
+    }
+    
+    // 自动设置音频时长（如果后端有返回）
+    if(!duration.value && (resp.data?.duration || resp.duration)) {
+      duration.value = resp.data?.duration || resp.duration
     }
     
   }catch(e){ 

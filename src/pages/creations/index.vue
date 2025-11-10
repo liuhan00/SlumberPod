@@ -12,6 +12,9 @@
         <view class="create-btn" @click="goToCreation">
           <text class="create-text">新建</text>
         </view>
+        <view class="create-btn" style="background:#ff3b30;" @click="confirmClearAll">
+          <text class="create-text">清空</text>
+        </view>
       </view>
     </view>
 
@@ -154,7 +157,8 @@ onMounted(() => {
 
 async function fetchMyCreations(){
   try{
-    const res = await apiAudios.getAudios({ category_id:'my_creations', limit:100, offset:0 })
+    // 使用需要 JWT 的后端接口 /api/creations
+    const res = await apiAudios.getMyCreations({ limit:100, offset:0 })
     const raw = res && (res.data || res.items) ? (res.data || res.items) : (Array.isArray(res) ? res : [])
     const arr = Array.isArray(raw) ? raw : []
     creations.value = arr.map(it=>({
@@ -283,19 +287,49 @@ function deleteCreation(creation) {
     content: `确定要删除创作"${creation.name}"吗？此操作不可恢复。`,
     success: (res) => {
       if (res.confirm) {
-        // 从本地存储删除
+        ;(async () => {
+          // 先尝试调用后端删除（若已登录且有服务）
+          try{
+            await apiAudios.deleteMyCreation(creation.id)
+          }catch(e){
+            console.warn('[creations] remote delete failed, fallback to local:', e?.message || e)
+          }
+          // 本地存储删除（兜底）
         const savedCreations = uni.getStorageSync('userCreations') || []
         const updatedCreations = savedCreations.filter(item => item.id !== creation.id)
         uni.setStorageSync('userCreations', updatedCreations)
-        
         // 更新列表
         creations.value = creations.value.filter(item => item.id !== creation.id)
-        
-        uni.showToast({
-          title: '删除成功',
-          icon: 'success'
-        })
+          uni.showToast({ title: '删除成功', icon: 'success' })
+        })()
       }
+    }
+  })
+}
+
+// 清空全部创作
+function confirmClearAll(){
+  if(!creations.value.length){
+    uni.showToast({ title:'无可删除的创作', icon:'none' })
+    return
+  }
+  uni.showModal({
+    title: '确认清空',
+    content: `将删除我的创作中的全部 ${creations.value.length} 个条目，此操作不可恢复。是否继续？`,
+    success: (res) => {
+      if(!res.confirm) return
+      ;(async () => {
+        const ids = creations.value.map(it => it.id)
+        try{
+          await apiAudios.deleteAllMyCreations(ids)
+        }catch(e){
+          console.warn('[creations] remote clear-all failed, fallback to local:', e?.message || e)
+        }
+        // 本地兜底清空
+        uni.setStorageSync('userCreations', [])
+        creations.value = []
+        uni.showToast({ title:'已清空', icon:'success' })
+      })()
     }
   })
 }

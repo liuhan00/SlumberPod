@@ -85,7 +85,7 @@ const showArrow = ref(false)
 // load categories from backend
 async function fetchCategories(){
   try{
-    const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.236.92:3003'
+    const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.43.89:3003'
     // 小程序运行时可能不支持 new URL，因此使用字符串拼接
     // 添加分页参数以获取所有分类
     const url = BASE + '/api/categories?limit=1000'
@@ -197,7 +197,8 @@ async function loadAudiosForCategory(catId){
   if(catId === 'mine' || catId === 'my' || catId === '我的创作') { 
     remoteLoading.value = true
     try{
-      const res = await apiAudios.getAudios({ category_id: 'my_creations', limit: 1000 })
+      // 使用需要 JWT 的后端接口 /api/creations
+      const res = await apiAudios.getMyCreations({ limit: 1000, offset: 0 })
       const raw = res && (res.data || res.items) ? (res.data || res.items) : (Array.isArray(res) ? res : [])
       const arr = Array.isArray(raw) ? raw : []
       const seen = new Set(); const deduped = []
