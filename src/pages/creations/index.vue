@@ -161,19 +161,98 @@ async function fetchMyCreations(){
     const res = await apiAudios.getMyCreations({ limit:100, offset:0 })
     const raw = res && (res.data || res.items) ? (res.data || res.items) : (Array.isArray(res) ? res : [])
     const arr = Array.isArray(raw) ? raw : []
-    creations.value = arr.map(it=>({
-      id: it.id || it._id || it.uuid || String(Date.now()),
-      name: it.title || it.name || it.audioName || '-',
-      description: it.description || it.desc || '',
-      category: it.category || 'my',
-      categoryName: it.category_name || '我的创作',
-      duration: it.duration || it.length || 0,
-      status: (Number(it.is_shared)===1 ? 'shared' : (Number(it.is_published)===1 ? 'published' : 'draft')),
-      createdAt: it.created_at || it.createdAt || new Date().toISOString(),
-      views: it.play_count || 0,
-      likes: it.favorite_count || 0,
-      comments: it.comment_count || 0
-    }))
+    
+    // 调试：打印第一个数据项的所有字段
+    if(arr.length > 0) {
+      console.log('[creations] fetchMyCreations 第一个数据项:', arr[0])
+      console.log('[creations] fetchMyCreations 第一个数据项的所有字段:', Object.keys(arr[0]))
+    }
+    
+    // 辅助函数：判断字符串是否是文件名（包含文件扩展名）
+    function isFilename(str) {
+      if(!str || typeof str !== 'string') return false
+      // 检查是否包含常见的文件扩展名
+      const filenamePattern = /\.(m4a|mp3|wav|aac|ogg|flac|wma|mp4|avi|mov|pdf|doc|docx|txt|jpg|jpeg|png|gif|zip|rar)$/i
+      // 检查是否看起来像文件名（包含随机字符、数字、下划线等）
+      const looksLikeFilename = /^[a-z0-9_-]+\.(m4a|mp3|wav|aac|ogg|flac|wma)$/i.test(str)
+      return filenamePattern.test(str) || looksLikeFilename
+    }
+    
+    // 辅助函数：提取标题，优先使用正确的字段
+    function extractTitle(it) {
+      // 按优先级尝试多个字段
+      const candidates = [
+        it.title,
+        it.name,
+        it.audioName,
+        it['audio name'],
+        it['audio_name']
+      ]
+      
+      // 找到第一个非空且不是文件名的值
+      for(const candidate of candidates) {
+        if(candidate && typeof candidate === 'string' && candidate.trim() && !isFilename(candidate.trim())) {
+          return candidate.trim()
+        }
+      }
+      
+      // 如果所有候选值都是文件名或为空，返回第一个非空值（即使它是文件名）
+      for(const candidate of candidates) {
+        if(candidate && typeof candidate === 'string' && candidate.trim()) {
+          return candidate.trim()
+        }
+      }
+      
+      return '-'
+    }
+    
+    // 先过滤掉明显是重复或错误的记录
+    // 规则：如果 title 是文件名，且存在另一条记录的 title 是正常文本，则过滤掉文件名那条
+    const filtered = arr.filter((it, idx) => {
+      const title = extractTitle(it)
+      // 如果标题是文件名，检查是否有其他记录使用相同的音频URL但标题正常
+      if(isFilename(title)) {
+        const audioUrl = it['audio url'] || it.audio_url || it.audioUrl || it.url || ''
+        // 查找是否有其他记录使用相同的音频URL但标题不是文件名
+        const hasBetterRecord = arr.some((other, otherIdx) => {
+          if(otherIdx === idx) return false
+          const otherUrl = other['audio url'] || other.audio_url || other.audioUrl || other.url || ''
+          const otherTitle = extractTitle(other)
+          return otherUrl === audioUrl && audioUrl && !isFilename(otherTitle)
+        })
+        // 如果存在更好的记录，过滤掉这条
+        if(hasBetterRecord) {
+          console.log('[creations] fetchMyCreations 过滤掉重复记录（文件名标题）:', title, 'ID:', it.id || it._id)
+          return false
+        }
+      }
+      return true
+    })
+    
+    creations.value = filtered.map(it=>{
+      const title = extractTitle(it)
+      
+      // 调试：如果标题异常，打印详细信息
+      if(isFilename(title)) {
+        console.warn('[creations] fetchMyCreations 警告：标题看起来像文件名:', title, '原始数据:', it)
+      }
+      
+      return {
+        id: it.id || it._id || it.uuid || String(Date.now()),
+        name: title,
+        description: it.description || it.desc || '',
+        category: it.category || 'my',
+        categoryName: it.category_name || '我的创作',
+        duration: it.duration || it.length || it['duration seconds'] || 0,
+        status: (Number(it.is_shared)===1 ? 'shared' : (Number(it.is_published)===1 ? 'published' : 'draft')),
+        createdAt: it.created_at || it.createdAt || new Date().toISOString(),
+        views: it.play_count || 0,
+        likes: it.favorite_count || 0,
+        comments: it.comment_count || 0
+      }
+    })
+    
+    console.log('[creations] fetchMyCreations 过滤前:', arr.length, '条，过滤后:', creations.value.length, '条')
   }catch(e){ console.warn('[creations] fetch my creations failed', e) }
 }
 
