@@ -1,7 +1,7 @@
 // Unified auth API with platform-specific branches
 import { saveAuthLocal, clearAuthLocal, applySession } from '@/store/auth'
 
-const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.149.92:3003'
+const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.236.92:3003'
 
 async function httpFetch(path, opts = {}){
   const url = BASE + path
@@ -57,7 +57,18 @@ export async function wxLogin(){
         const j = await res.json()
         console.log('后端响应数据:', j)
         if(!res.ok) return reject(new Error(j.message || j.error || '微信登录失败'))
-        if(j.token) applySession({ user: j.user, access_token: j.token })
+        
+        // 处理后端返回的数据结构 {success: true, data: {token, user, ...}}
+        const loginData = j.data || j
+        console.log('处理登录数据:', loginData)
+        
+        if(loginData.token) {
+          applySession({ user: loginData.user, access_token: loginData.token })
+          console.log('登录状态已保存')
+        } else {
+          console.warn('登录响应中缺少token:', loginData)
+        }
+        
         resolve(j)
       }catch(e){ reject(e) }
     }, fail: reject })

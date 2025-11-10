@@ -209,7 +209,7 @@ async function loadCategories(){
   
   try {
     // 直接从分类 API 获取数据
-    const BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3003'
+    const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.236.92:3003'
     const url = BASE + '/api/categories?limit=1000'
     console.log('[creation] loading categories from', url)
     
@@ -339,32 +339,41 @@ function toggleRecording() {
   }
 }
 
-// 选择音频文件
+// 选择音频文件（兼容小程序/H5）
 async function selectAudioFile() {
   try {
-    // 使用uni-app的文件选择API
-    const res = await uni.chooseFile({
-      count: 1,
-      type: 'file',
-      extension: ['mp3', 'wav', 'm4a', 'aac'],
-      sourceType: ['album', 'camera']
-    })
-    
-    if (res.tempFiles && res.tempFiles.length > 0) {
-      selectedFile.value = res.tempFiles[0]
-      uni.showToast({
-        title: '文件选择成功',
-        icon: 'success',
-        duration: 1500
+    let res = null
+    // 微信/小程序环境优先使用 chooseMessageFile
+    if (typeof uni.chooseMessageFile === 'function') {
+      res = await uni.chooseMessageFile({
+        count: 1,
+        type: 'file',
+        extension: ['mp3','wav','m4a','aac','ogg','flac']
       })
+    } else if (typeof uni.chooseFile === 'function') {
+      // H5/APP 环境
+      res = await uni.chooseFile({
+        count: 1,
+        type: 'file',
+        extension: ['mp3','wav','m4a','aac','ogg','flac']
+      })
+    } else {
+      // 不支持本地文件选择的平台（如部分小程序），提示使用录制或在H5端上传
+      uni.showModal({
+        title: '暂不支持本地文件选择',
+        content: '当前平台不支持选择本地音频文件，请使用录制功能或在网页端上传。',
+        showCancel: false
+      })
+      return
+    }
+
+    if (res && res.tempFiles && res.tempFiles.length > 0) {
+      selectedFile.value = res.tempFiles[0]
+      uni.showToast({ title: '文件选择成功', icon: 'success', duration: 1500 })
     }
   } catch (error) {
     console.error('选择文件失败:', error)
-    uni.showToast({
-      title: '选择文件失败',
-      icon: 'none',
-      duration: 2000
-    })
+    uni.showToast({ title: '选择文件失败', icon: 'none', duration: 2000 })
   }
 }
 

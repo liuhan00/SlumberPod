@@ -43,17 +43,17 @@
         </button>
       </view>
       <view class="mini-center">
-        <view v-for="(n, idx) in randomNoises" :key="n?.id || n?._id || n?.uuid || idx" class="mini-box">
-          <button class="mini-thumb" :class="{ on: isMiniPlaying(n?.id) }" @click="toggleMini(n)">
+        <view v-for="(n, idx) in randomNoises" :key="idx" class="mini-box">
+          <button class="mini-thumb" :class="{ on: isMiniPlayingItem(n) }" @click="toggleMini(n)">
             <text class="icon">♪</text>
+            <view v-if="isMiniPlayingItem(n)" class="mini-dot"></view>
           </button>
-          <text class="mini-name">{{ n?.title || n?.name || n?.audioName || '—' }}</text>
+          <text class="mini-name" :class="{ on: isMiniPlayingItem(n) }" @click="toggleMini(n)">{{ n?.title || n?.name || n?.audioName || '—' }}</text>
         </view>
       </view>
       <view class="mini-right">
         <button class="mini-play" @click="goToPlayer">
-          <text v-if="anyPlaying">⮝</text>
-          <text v-else>▶</text>
+          <image :src="anyPlaying ? '/static/arrow_active.png' : '/static/arrow.png'" mode="widthFix" style="width:22px;height:22px" />
         </button>
       </view>
     </view>
@@ -85,7 +85,7 @@ const showArrow = ref(false)
 // load categories from backend
 async function fetchCategories(){
   try{
-    const BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3003'
+    const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.236.92:3003'
     // 小程序运行时可能不支持 new URL，因此使用字符串拼接
     // 添加分页参数以获取所有分类
     const url = BASE + '/api/categories?limit=1000'
@@ -168,6 +168,8 @@ watch(remoteList, (val)=>{
 const filteredNoises = computed(()=>{
   // 我的创作仍优先使用本地创作
   if(activeCat.value==='我的创作'){
+    // 优先使用远端“我的创作”列表，若为空再回退本地存储
+    if(Array.isArray(remoteList.value) && remoteList.value.length) return remoteList.value
     const userCreations = uni.getStorageSync('userCreations') || []
     return userCreations.map(c=>({ id:c.id, title:c.name, audio_url:c.audioUrl || '', duration:c.duration || 0 }))
   }
@@ -192,13 +194,26 @@ const remoteError = ref('')
 // helper: load audios for a given category id (or all)
 async function loadAudiosForCategory(catId){
   remoteError.value = ''
-  if(catId === 'mine' || catId === 'my' || catId === '我的创作') { remoteList.value = []; return }
+  if(catId === 'mine' || catId === 'my' || catId === '我的创作') { 
+    remoteLoading.value = true
+    try{
+      const res = await apiAudios.getAudios({ category_id: 'my_creations', limit: 1000 })
+      const raw = res && (res.data || res.items) ? (res.data || res.items) : (Array.isArray(res) ? res : [])
+      const arr = Array.isArray(raw) ? raw : []
+      const seen = new Set(); const deduped = []
+      for(const it of arr){ const key = it?.id || it?._id || it?.uuid || null; const uid = key ? String(key) : null; if(uid && seen.has(uid)) continue; if(uid) seen.add(uid); deduped.push(it) }
+      remoteList.value = deduped.map(it => ({ id: it.id || it._id || it.uuid || String(Date.now()), backend_id: (it.id ?? it._id ?? it.uuid ?? it.audio_id ?? null), title: it.title || it.name || it.audioName || '', audio_url: it.file_url || it.audio_url || it.audioUrl || it.url || it.src || '', duration: it.duration || it.period || it.length || 0, category_id: it.category_id || it.categoryId || 'my_creations' }))
+    }catch(e){ console.warn('load my creations failed', e); remoteList.value = [] }
+    finally{ remoteLoading.value = false }
+    return 
+  }
   remoteLoading.value = true
   console.log('[Free] loadAudiosForCategory start', catId)
   try{
     const isFree = (catId === 'free')
     const isAllLike = (catId === 'all')
-    const params = isFree ? { is_free: 1, limit: 1000 } : (isAllLike ? { limit: 1000 } : { category_id: catId, limit: 1000 })
+    // 后端新约定：category_id='free' 查询免费；数字为分类；不传为全部
+    const params = isFree ? { category_id: 'free', limit: 1000 } : (isAllLike ? { limit: 1000 } : { category_id: catId, limit: 1000 })
     console.log('[Free] calling apiAudios.getAudios with', params)
     const res = await apiAudios.getAudios(params)
     console.log('[Free] apiAudios.getAudios response', res)
@@ -207,7 +222,7 @@ async function loadAudiosForCategory(catId){
     // preserve original for debugging
     const originalArr = arr.map(it=>({...it}))
     console.log('[Free] raw items length', Array.isArray(originalArr)? originalArr.length : 0)
-    console.log('[Free] raw items sample ids', originalArr.map(i=>({ id:i?.id, _id:i?._id, uuid:i?.uuid, is_free:i?.is_free })))
+    console.log('[Free] raw items sample ids', originalArr.map(i=>({ id:i?.id, _id:i?._id, uuid:i?.uuid, category_id:i?.category_id })))
     // dedupe by id/_id/uuid - keep first occurrence
     const seen = new Set()
     const deduped = []
@@ -219,7 +234,7 @@ async function loadAudiosForCategory(catId){
       deduped.push(it)
     }
     // map to normalized shape
-    remoteList.value = deduped.map(it => ({ id: it.id || it._id || it.uuid || String(Date.now()), title: it.title || it.name || it.audioName || '', audio_url: it.audio_url || it.audioUrl || it.url || it.src || '', duration: it.duration || it.period || it.length || 0, category_id: it.category_id || it.categoryId || null }))
+    remoteList.value = deduped.map(it => ({ id: it.id || it._id || it.uuid || String(Date.now()), backend_id: (it.id ?? it._id ?? it.uuid ?? it.audio_id ?? null), title: it.title || it.name || it.audioName || '', audio_url: it.audio_url || it.audioUrl || it.url || it.src || '', duration: it.duration || it.period || it.length || 0, category_id: it.category_id || it.categoryId || null }))
     console.log('[Free] remoteList length (deduped)', remoteList.value.length)
     console.log('[Free] deduped ids', remoteList.value.map(i=>({id:i.id})))
   }catch(e){ console.warn('load remote audios failed', e); remoteList.value = []; remoteError.value = e?.message || String(e) }
@@ -247,7 +262,22 @@ function toggle(noise){
 }
 
 function isPlaying(id){ return playing.value.has(id) }
-function isMiniPlaying(id){ return miniPlaying.value.has(id) }
+function getStableId(item){
+  if(!item) return ''
+  // 优先使用 URL（通常唯一），避免多个条目共用同一 id 造成联动高亮
+  const url = item.audio_url || item.audioUrl || item.url || item.src || ''
+  if(url) return 'u:' + String(url)
+  // 其次使用后端 id/_id/uuid
+  const id = item.id || item._id || item.uuid
+  if(id) return 'i:' + String(id)
+  // 最后使用名称作为兜底（可能不唯一）
+  const name = item.title || item.name || item.audioName || ''
+  return 'n:' + String(name)
+}
+function isMiniPlayingItem(item){
+  const uid = getStableId(item)
+  return miniPlaying.value.has(uid)
+}
 
 // mini player actions
 function randomizeMini(){
@@ -261,16 +291,16 @@ function randomizeMini(){
 
 function toggleMini(noise){
   if(!noise) return
-  const id = noise.id || noise._id || noise.uuid
+  const id = getStableId(noise)
   if(!id) return
-    if(miniPlaying.value.has(id)){
+  if(miniPlaying.value.has(id)){
     miniPlaying.value.delete(id)
     // stop one source if supported
     player.stopById?.(id)
   } else {
     miniPlaying.value.add(id)
     // add to player playlist if not exists
-    const track = { id, name: noise.title || noise.name || noise.audioName || '未知', src: noise.audio_url || noise.audioUrl || noise.url || noise.src || '' }
+    const track = { id, metaId: (noise.backend_id ?? noise.id ?? noise._id ?? noise.uuid ?? ''), name: noise.title || noise.name || noise.audioName || '未知', src: noise.audio_url || noise.audioUrl || noise.url || noise.src || '' }
     player.addToQueue?.(track)
     player.play?.(track)
     try{ apiAudios.incrementPlay(track.id).catch?.(e=>console.warn('[Free] incrementPlay failed', e)) }catch(e){}
@@ -295,7 +325,7 @@ function openPlayerWithTracks(tracks){
 }
 
 function playRemote(a){
-  const track = { id: a.id || a._id || a.uuid || String(Date.now()), name: a.title || a.name || a.audioName || '', src: a.audio_url || a.audioUrl || a.url || a.src || '' }
+  const track = { id: a.id || a._id || a.uuid || String(Date.now()), metaId: (a.backend_id ?? a.id ?? a._id ?? a.uuid ?? ''), name: a.title || a.name || a.audioName || '', src: a.audio_url || a.audioUrl || a.url || a.src || '' }
   // add to player store and start playing so player page finds currentTrack and src
   try{
     player.addToQueue?.(track)
@@ -315,12 +345,12 @@ function updatePlayerTitleFromMini(){
   const ids = Array.from(miniPlaying.value)
   if(ids.length===0){ playerTitle.value = '' ; return }
   // find names from randomNoises or remoteList or allNoises
-  const names = ids.map(id=>{
-    const fromRandom = randomNoises.value.find(n=> n?.id===id)
+  const names = ids.map(uid=>{
+    const fromRandom = randomNoises.value.find(n=> n && getStableId(n)===uid)
     if(fromRandom) return fromRandom.title || fromRandom.name || fromRandom.audioName || ''
-    const fromRemote = (remoteList.value||[]).find(r=> r.id===id)
+    const fromRemote = (remoteList.value||[]).find(r=> r && getStableId(r)===uid)
     if(fromRemote) return fromRemote.title || fromRemote.name || ''
-    const fromLocal = allNoises.find(l=> l.id===id)
+    const fromLocal = allNoises.find(l=> l && getStableId(l)===uid)
     if(fromLocal) return fromLocal.name || ''
     return ''
   }).filter(Boolean)
@@ -372,12 +402,12 @@ function goToPlayer(){
   const ids = Array.from(miniPlaying.value)
   let title = ''
   if(ids.length){
-    const names = ids.map(id=>{
-      const fromRandom = randomNoises.value.find(n=> n && n.id===id)
+    const names = ids.map(uid=>{
+      const fromRandom = randomNoises.value.find(n=> n && getStableId(n)===uid)
       if(fromRandom) return fromRandom.title || fromRandom.name || fromRandom.audioName || ''
-      const fromRemote = (remoteList.value||[]).find(r=> r.id===id)
+      const fromRemote = (remoteList.value||[]).find(r=> r && getStableId(r)===uid)
       if(fromRemote) return fromRemote.title || fromRemote.name || ''
-      const fromLocal = allNoises.find(l=> l.id===id)
+      const fromLocal = allNoises.find(l=> l && getStableId(l)===uid)
       if(fromLocal) return fromLocal.name || ''
       return ''
     }).filter(Boolean)
@@ -531,8 +561,11 @@ function openAgent(){
 .mini-center{ display:flex; gap:8px; flex:1; justify-content:center }
 .mini-box{ display:flex; flex-direction:column; align-items:center }
 .mini-thumb{ width:44px; height:44px; border-radius:10px; background:transparent; display:flex; align-items:center; justify-content:center; border:none; color:var(--text-contrast); transition: transform .12s ease, box-shadow .12s ease, background-color .12s ease; }
-.mini-thumb.on{ background:transparent; color:var(--text-contrast); box-shadow:none }
+.mini-thumb.on{ background:var(--accent, #2EA56B); color:#ffffff; box-shadow:0 0 0 2px rgba(46,165,107,0.35) inset }
 .mini-name{ font-size:12px; margin-top:6px; color:var(--text-contrast); max-width:120px; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.mini-name.on{ color:#2EA56B; font-weight:700 }
+.mini-thumb{ position:relative }
+.mini-dot{ position:absolute; right:4px; bottom:4px; width:8px; height:8px; border-radius:999px; background:#fff }
 
 /* remote list styles */
 .remote-list{ display:flex; flex-direction:column; gap:8px; padding:8px }

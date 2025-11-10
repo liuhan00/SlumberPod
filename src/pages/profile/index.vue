@@ -81,7 +81,7 @@ async function loadHistory(){
   loading.value = true
   try{
     const auth = getAuthLocal()
-    const base = import.meta.env.VITE_API_BASE || 'http://192.168.149.92:3003'
+    const base = import.meta.env.VITE_API_BASE || 'http://192.168.236.92:3003'
     const userId = '11111111-1111-1111-1111-111111111111'
     const url = `${base}/api/users/${userId}/play-history`
     const headers = {}

@@ -113,6 +113,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useGlobalTheme } from '@/composables/useGlobalTheme'
 import { useThemeStore } from '@/stores/theme'
+import * as apiAudios from '@/api/audios'
 
 const themeStore = useThemeStore(); themeStore.load()
 const { bgStyle } = useGlobalTheme()
@@ -148,7 +149,29 @@ const likesCount = computed(() => {
 
 onMounted(() => {
   loadCreations()
+  fetchMyCreations()
 })
+
+async function fetchMyCreations(){
+  try{
+    const res = await apiAudios.getAudios({ category_id:'my_creations', limit:100, offset:0 })
+    const raw = res && (res.data || res.items) ? (res.data || res.items) : (Array.isArray(res) ? res : [])
+    const arr = Array.isArray(raw) ? raw : []
+    creations.value = arr.map(it=>({
+      id: it.id || it._id || it.uuid || String(Date.now()),
+      name: it.title || it.name || it.audioName || '-',
+      description: it.description || it.desc || '',
+      category: it.category || 'my',
+      categoryName: it.category_name || '我的创作',
+      duration: it.duration || it.length || 0,
+      status: (Number(it.is_shared)===1 ? 'shared' : (Number(it.is_published)===1 ? 'published' : 'draft')),
+      createdAt: it.created_at || it.createdAt || new Date().toISOString(),
+      views: it.play_count || 0,
+      likes: it.favorite_count || 0,
+      comments: it.comment_count || 0
+    }))
+  }catch(e){ console.warn('[creations] fetch my creations failed', e) }
+}
 
 // 加载创作数据
 function loadCreations() {

@@ -70,7 +70,9 @@ const { bgStyle } = useGlobalTheme()
 const tabs = ['关注', '综合', '最新']
 const activeTab = ref('最新') // 默认选中"最新"
 
-// 模拟数据
+import * as apiCommunity from '@/api/community'
+
+// 后端数据
 const posts = ref([
   { 
     id: 'p1', 
@@ -201,26 +203,23 @@ function onComment(id) {
   })
 }
 
-import * as apiPosts from '@/api/posts'
-
 async function createPost(data) {
   try{
-    const auth = getAuthLocal()
-    const token = auth?.token || auth?.access_token || null
-    // 如果鉴权信息缺失，使用后端要求的默认 userId
-    const userId = auth?.id || (auth && auth.user && auth.user.id) || '11111111-1111-1111-1111-111111111111'
-    // support image -> imageUrls conversion
-    const imageUrls = data.image ? [data.image] : []
-    const result = await apiPosts.createPost({ userId, title: data.title || '', content: data.content, imageUrls })
+    // 使用社区API创建帖子
+    const result = await apiCommunity.createPost({ 
+      title: data.title || '', 
+      content: data.content,
+      category: 'general' // 默认分类
+    })
     // prepend returned post if any, fallback to local
     const returned = result.data || result.post || result || {}
     const newPost = {
       id: returned.id || result.id || `p${Date.now()}`,
-      time: returned.time || '刚刚',
+      time: returned.time || returned.created_at || '刚刚',
       title: returned.title || data.title || '',
       content: returned.content || data.content,
       image: (returned.imageUrls && returned.imageUrls[0]) || returned.image || data.image || '',
-      likes: returned.likes || 0,
+      likes: returned.likes || returned.favorite_count || 0,
       comments: returned.comments || [],
       author: returned.author || { name: '我', avatar: 'https://picsum.photos/seed/me/100' }
     }
@@ -243,23 +242,40 @@ async function createPost(data) {
 }
 
 onMounted(async () => {
-  // 初始化操作：加载帖子列表（从后端）
+  // 初始化操作：加载社区帖子列表
   try{
-    const result = await apiPosts.getPosts({ page: 1, limit: 20 })
-    const list = result.data || result.posts || result || []
+    const result = await apiCommunity.getCommunityList({ page: 1, limit: 20 })
+    const list = result.data || result.items || result || []
     // normalize items to expected shape (title, content, image, author...)
     posts.value = list.map(item => ({
       id: item.id || item._id || `p${Date.now()}`,
-      time: item.time || item.createdAt || '刚刚',
+      time: item.time || item.created_at || item.createdAt || '刚刚',
       title: item.title || '',
       content: item.content || item.body || '',
       image: (item.imageUrls && item.imageUrls[0]) || item.image || '',
-      likes: item.likes || 0,
+      likes: item.likes || item.favorite_count || 0,
       comments: item.comments || [],
-      author: item.author || { name: item.userName || item.user || '用户', avatar: (item.author && item.author.avatar) || (item.userAvatar) || 'https://picsum.photos/seed/a1/100' }
+      author: item.author || { name: item.userName || item.user_name || '用户', avatar: (item.author && item.author.avatar) || (item.user_avatar) || 'https://picsum.photos/seed/a1/100' }
     }))
+    
+    // 并发拉取每条帖子的详情以获取真实的点赞和评论数
+    try{
+      const ids = posts.value.map(p=>p.id).filter(Boolean)
+      const detailResults = await Promise.allSettled(ids.map(id=> apiCommunity.getCommunityDetail(id)))
+      detailResults.forEach((res, idx)=> {
+        if(res.status === 'fulfilled') {
+          const data = res.value?.data || res.value || {}
+          const p = posts.value[idx]
+          if(p){
+            p.favorite_count = data.favorite_count ?? data.likes ?? p.favorite_count ?? 0
+            p.comment_count = data.comment_count ?? (Array.isArray(data.comments) ? data.comments.length : p.comments?.length || 0)
+            if(Array.isArray(data.comments)) p.comments = data.comments
+          }
+        }
+      })
+    }catch(enrichErr){ console.warn('enrich community counts failed', enrichErr) }
   }catch(e){
-    console.warn('load posts failed', e)
+    console.warn('load community posts failed', e)
   }
 })
 </script>

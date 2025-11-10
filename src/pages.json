@@ -10,6 +10,7 @@
       "style": { "navigationBarTitleText": "首页" }
     },
     { "path": "pages/community/index", "style": { "navigationBarTitleText": "社区" } },
+    { "path": "pages/community/detail", "style": { "navigationBarTitleText": "帖子详情" } },
     { "path": "pages/sleep/index", "style": { "navigationBarTitleText": "睡觉" } },
     { "path": "pages/sleep/Nap", "style": { "navigationBarTitleText": "小憩" } },
     { "path": "pages/sleep/Alarm", "style": { "navigationBarTitleText": "闹钟与提醒" } },

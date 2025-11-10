@@ -49,12 +49,12 @@
           @click="handleLike"
         >
           <text class="action-icon">{{ isLiked ? '❤️' : '🤍' }}</text>
-          <text class="action-count">{{ post.likes }}</text>
+          <text class="action-count">{{ post.favorite_count ?? post.likes ?? 0 }}</text>
         </button>
         
         <button class="action-btn" @click="handleComment">
           <text class="action-icon">💬</text>
-          <text class="action-count">{{ post.comments.length }}</text>
+          <text class="action-count">{{ post.comment_count ?? (post.comments?.length || 0) }}</text>
         </button>
         
         <button class="action-btn" @click="handleShare">
@@ -64,9 +64,9 @@
       </view>
       
       <view class="stats">
-        <text class="stat-text">{{ post.comments.length }}条评论</text>
+        <text class="stat-text">{{ post.comment_count ?? (post.comments?.length || 0) }}条评论</text>
         <text class="stat-text">·</text>
-        <text class="stat-text">{{ post.likes }}个赞</text>
+        <text class="stat-text">{{ post.favorite_count ?? post.likes ?? 0 }}个赞</text>
       </view>
     </view>
     

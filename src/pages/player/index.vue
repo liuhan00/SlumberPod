@@ -31,7 +31,7 @@
             <text v-if="isFav">❤️</text>
             <text v-else>🤍</text>
           </button>
-          <button class="meta-btn" @click="openMetaPopup(store.currentTrack?.id)">⋯</button>
+          <button class="meta-btn" @click="openMetaPopup()">⋯</button>
         </view>
       </view>
       <text class="author text-contrast">{{ displayNames }}</text>
@@ -176,10 +176,32 @@
           <text>加载中...</text>
         </view>
         <view v-else>
-          <text class="meta-row">名称：{{ metaData?.title || metaData?.name || '-' }}</text>
-          <text class="meta-row">点赞：{{ metaData?.favorite_count ?? metaData?.favoriteCount ?? 0 }}</text>
-          <text class="meta-row">评论：{{ metaData?.comment_count ?? metaData?.commentCount ?? 0 }}</text>
-          <text class="meta-row">时长：{{ fmtSeconds(metaData?.duration_seconds ?? metaData?.durationSeconds) }}</text>
+          <view v-if="metaMulti && metaMulti.length > 1" class="meta-grid">
+            <view v-for="(m, i) in metaMulti" :key="i" class="meta-card">
+              <view class="meta-title-row">
+                <text class="meta-title">{{ m?.title || m?.name || '-' }}</text>
+                <text class="meta-duration">{{ fmtSeconds(m?.duration_seconds ?? m?.durationSeconds) }}</text>
+              </view>
+              <view class="meta-chips">
+                <view class="meta-chip"><text class="chip-icon">▶</text><text class="chip-text">{{ m?.play_count ?? m?.playCount ?? 0 }}</text></view>
+                <view class="meta-chip"><text class="chip-icon">❤</text><text class="chip-text">{{ m?.favorite_count ?? m?.favoriteCount ?? 0 }}</text></view>
+                <view class="meta-chip"><text class="chip-icon">💬</text><text class="chip-text">{{ m?.comment_count ?? m?.commentCount ?? 0 }}</text></view>
+              </view>
+            </view>
+          </view>
+          <view v-else class="meta-grid">
+            <view class="meta-card">
+              <view class="meta-title-row">
+                <text class="meta-title">{{ metaData?.title || metaData?.name || '-' }}</text>
+                <text class="meta-duration">{{ fmtSeconds(metaData?.duration_seconds ?? metaData?.durationSeconds) }}</text>
+              </view>
+              <view class="meta-chips">
+                <view class="meta-chip"><text class="chip-icon">▶</text><text class="chip-text">{{ metaData?.play_count ?? metaData?.playCount ?? 0 }}</text></view>
+                <view class="meta-chip"><text class="chip-icon">❤</text><text class="chip-text">{{ metaData?.favorite_count ?? metaData?.favoriteCount ?? 0 }}</text></view>
+                <view class="meta-chip"><text class="chip-icon">💬</text><text class="chip-text">{{ metaData?.comment_count ?? metaData?.commentCount ?? 0 }}</text></view>
+              </view>
+            </view>
+          </view>
         </view>
       </view>
     </view>
@@ -311,12 +333,19 @@ const customTimerMinutes = ref('')
 // meta popup state
 const showMeta = ref(false)
 const metaData = ref(null)
+const metaMulti = ref([])
 const metaLoading = ref(false)
 
 // 下滑返回相关
 const touchStartY = ref(0)
 const touchMoveY = ref(0)
 const isDragging = ref(false)
+// timer state refs (fix ReferenceError: knobAngle is not defined)
+const knobAngle = ref(0)
+const durationMinutes = ref(30)
+const remainingSeconds = ref(durationMinutes.value * 60)
+const timerPercent = computed(()=> (durationMinutes.value % 120) / 120)
+const showTime = ref(false)
 
 function handleTouchStart(e) {
   touchStartY.value = e.touches[0].clientY
@@ -382,44 +411,43 @@ function setCustomTimer() {
 }
 
 async function openMetaPopup(id){
-  if(!id) return uni.showToast({ title: '无音频 id', icon:'none' })
-  showMeta.value = true; metaLoading.value = true; metaData.value = null
-  const BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3003'
-  const url = `${BASE}/api/audios/${id}`
-  console.log('[openMetaPopup] fetching meta', url)
+  showMeta.value = true; metaLoading.value = true; metaData.value = null; metaMulti.value = []
+  const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.236.92:3003'
+  // 构建ID列表：优先参数id；否则从当前播放或混合列表取 metaId/id（最多3个）
+  let ids = []
+  if(id){ ids = [id] }
+  else {
+    // 仅使用后端提供的 metaId，避免用本地/临时 id 造成 404
+    if(store.currentTrack?.metaId){ ids.push(store.currentTrack.metaId) }
+    if((playlistTitleOverride.value && playlistTitleOverride.value.includes('|')) || (store.playlist?.length > 1)){
+      const extra = (store.playlist||[]).map(t=> t.metaId).filter(Boolean)
+      const seen = new Set(ids.map(x=> String(x)))
+      for(const x of extra){ const sx = String(x); if(!seen.has(sx)){ ids.push(x); seen.add(sx) } if(ids.length>=3) break }
+    }
+  }
+  // 仅保留纯数字的有效后端 ID
+  ids = ids.filter(x=> { const s = String(x); return /^[0-9]+$/.test(s) && s.length <= 10 })
+  if(ids.length===0){ metaLoading.value=false; metaData.value={ _error: '无有效音频ID' }; return }
+  
+  const urls = ids.map(x=> `${BASE}/api/audios/${x}`)
+  console.log('[openMetaPopup] fetching meta urls', urls)
   try{
     // try fetch first (browser/node). In some miniapp runtimes fetch may be unavailable or blocked — fallback to uni.request below.
     if (typeof fetch === 'function'){
-      const res = await fetch(url, { method: 'GET' })
-      console.log('[openMetaPopup] fetch status', res.status)
-      if(!res.ok) throw new Error(`HTTP ${res.status}`)
-      let j = null
-      try{ j = await res.json() }catch(e){
-        console.warn('[openMetaPopup] parse json failed, using text', e)
-        const txt = await res.text()
-        try{ j = JSON.parse(txt) }catch(_){ j = txt }
-      }
-      metaData.value = (j && (j.data || j)) ? (j.data || j) : j
-      console.log('[openMetaPopup] metaData', metaData.value)
+      const results = await Promise.all(urls.map(u=> fetch(u, { method:'GET' }).then(async res=>{ if(!res.ok) throw new Error(`HTTP ${res.status}`); try{ const j = await res.json(); return (j && (j.data||j)) ? (j.data||j) : j } catch(e){ const txt = await res.text(); try{ const j = JSON.parse(txt); return (j && (j.data||j)) ? (j.data||j) : j } catch(_){ return { _raw: txt } } } }).catch(err=>({ _error:String(err), _url:u }))))
+      metaMulti.value = results
+      metaData.value = results[0] || null
+      console.log('[openMetaPopup] metaMulti', metaMulti.value)
     } else {
       // uni.request fallback for miniapp environments
-      await new Promise((resolve, reject)=>{
+      // miniapp并发请求多个详情
+      metaMulti.value = []
+      await Promise.all(urls.map(u=> new Promise((resolve)=>{
         try{
-          uni.request({
-            url,
-            method: 'GET',
-            success(r){
-              try{
-                const payload = r?.data
-                metaData.value = (payload && (payload.data || payload)) ? (payload.data || payload) : payload
-                console.log('[openMetaPopup] uni.request success', metaData.value)
-                resolve()
-              }catch(err){ reject(err) }
-            },
-            fail(err){ reject(err) }
-          })
-        }catch(e){ reject(e) }
-      })
+          uni.request({ url: u, method:'GET', success(r){ try{ const payload = r?.data; const data = (payload && (payload.data||payload)) ? (payload.data||payload) : payload; metaMulti.value.push(data); resolve() }catch(err){ metaMulti.value.push({ _error:String(err), _url:u }); resolve() } }, fail(err){ metaMulti.value.push({ _error:String(err), _url:u }); resolve() } })
+        }catch(e){ metaMulti.value.push({ _error:String(e), _url:u }); resolve() }
+      })))
+      metaData.value = metaMulti.value[0] || null
     }
   }catch(e){
     console.warn('openMetaPopup fetch failed', e)
@@ -544,11 +572,11 @@ onLoad((query)=>{
         store.setPlaylist(allNoises)
         store.play(target)
         historyStore.add(target)
-        try{ audioCtx.src = target.src }catch(e){ console.warn('set src failed', e); uni.showToast({ title:'音频地址无效', icon:'none' }) }
+        try{ if(typeof target.src === 'string' && target.src && !/oss\.example\.com/i.test(target.src)){ audioCtx.src = target.src } else { console.warn('skip invalid audio domain', target?.src); uni.showToast({ title:'音频资源不可用', icon:'none' }) } }catch(e){ console.warn('set src failed', e); uni.showToast({ title:'音频地址无效', icon:'none' }) }
         store.durationMs = 180000
       }
     } else if (store.currentTrack) {
-      try{ audioCtx.src = store.currentTrack.src }catch(e){ console.warn('set src failed', e) }
+      try{ const u = store.currentTrack?.src; if(typeof u === 'string' && u && !/oss\.example\.com/i.test(u)){ audioCtx.src = u } else { console.warn('skip invalid audio domain', u); uni.showToast({ title:'音频资源不可用', icon:'none' }) } }catch(e){ console.warn('set src failed', e) }
     }
   }catch(e){ console.warn('audio init failed', e) }
 })
@@ -1191,4 +1219,13 @@ function openCozeChat(){
 .fab-chat{ position:fixed; right:18px; bottom:108px; width:54px; height:54px; border-radius:27px; background: linear-gradient(135deg, #66e6a2, #62c2ff); box-shadow: 0 10px 24px rgba(70,170,220,0.25); display:flex; align-items:center; justify-content:center; font-size:26px; color:#fff; z-index:1200; opacity:0.96 }
 .fab-chat:active{ transform: scale(0.98); opacity:0.9 }
 
+.meta-grid{ display:flex; flex-direction:column; gap:12px }
+.meta-card{ padding:12px; border-radius:12px; background: var(--input-bg, #f1f8ff); box-shadow: 0 8px 18px rgba(0,0,0,0.06) }
+.meta-title-row{ display:flex; justify-content:space-between; align-items:center; margin-bottom:8px }
+.meta-title{ font-weight:800; color: var(--card-fg, #13303f) }
+.meta-duration{ font-size:12px; color:#7d8b99; background:#fff; padding:4px 8px; border-radius:999px }
+.meta-chips{ display:flex; gap:8px; flex-wrap:wrap }
+.meta-chip{ display:flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; background:#fff; color: var(--card-fg, #13303f); box-shadow: 0 6px 14px rgba(0,0,0,0.06) }
+.chip-icon{ font-size:14px }
+.chip-text{ font-size:13px }
 </style>
