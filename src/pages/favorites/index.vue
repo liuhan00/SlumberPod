@@ -12,7 +12,7 @@
       <view v-show="tab==='audio'">
         <view class="list" v-if="audioItems.length">
           <view class="item" v-for="it in audioItems" :key="it.id">
-          <image class="cover" :src="it.cover || it.image || 'https://picsum.photos/seed/fav/200'" mode="aspectFill" />
+          <image class="cover" :src="safeImageUrl(it.cover || it.image, 'noise')" mode="aspectFill" @error="handleImageError" />
           <view class="meta">
               <text class="name">{{ it.name || it.title || it.audio_name || it.audioName || it.audio_title || it.audioTitle || it.filename || ('音频#' + it.id) }}</text>
             <text class="author">{{ it.author || it.category || '' }}</text>
@@ -30,7 +30,7 @@
       <view v-show="tab==='post'">
         <view class="list" v-if="posts.length">
           <view class="item" v-for="p in posts" :key="p.id" @click="openPost(p)">
-            <image class="cover" :src="p.image || 'https://picsum.photos/seed/post/200'" mode="aspectFill" />
+            <image class="cover" :src="safeImageUrl(p.image, 'post')" mode="aspectFill" @error="handleImageError" />
             <view class="meta">
               <text class="name">{{ p.title || '未命名' }}</text>
               <text class="author">{{ p.author || p.user_name || '' }}</text>
@@ -52,6 +52,7 @@ import { useFavoritesStore } from '@/stores/favorites'
 import { usePlayerStore } from '@/stores/player'
 import { listLikedPosts } from '@/api/community'
 import { getAuthLocal } from '@/store/auth'
+import { safeImageUrl, getPlaceholder } from '@/utils/image'
 const { bgStyle } = useGlobalTheme()
 const fav = useFavoritesStore(); fav.load()
 const store = usePlayerStore()
@@ -64,6 +65,9 @@ function openPost(p){
   if(!p?.id) return
   const id = String(p.id).replace(/^p/, '')
   try{ uni.navigateTo({ url:`/pages/community/detail?id=${id}` }) }catch(e){ location.hash = `#/pages/community/detail?id=${id}` }
+}
+function handleImageError(e) {
+  // 图片加载失败时，safeImageUrl 已经处理了，这里不需要额外操作
 }
 
 onMounted(async ()=>{

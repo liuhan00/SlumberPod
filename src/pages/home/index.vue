@@ -11,7 +11,23 @@ import { useGlobalTheme } from '@/composables/useGlobalTheme'
 const { bgStyle } = useGlobalTheme()
 
 onMounted(()=>{
-  try{ uni.reLaunch({ url: '/pages/noise/Free' }) }catch(e){ try{ uni.navigateTo({ url: '/pages/noise/Free' }) }catch(err){ if(typeof location!=='undefined') location.hash='#/pages/noise/Free' } }
+  // 延迟执行，避免在 onMounted 中立即调用 reLaunch 导致超时
+  setTimeout(() => {
+    try{ 
+      // 检查当前页面，避免重复跳转
+      const pages = getCurrentPages()
+      const currentPage = pages[pages.length - 1]
+      if (currentPage && currentPage.route !== 'pages/noise/Free') {
+        uni.reLaunch({ url: '/pages/noise/Free' })
+      }
+    }catch(e){ 
+      try{ 
+        uni.navigateTo({ url: '/pages/noise/Free' })
+      }catch(err){ 
+        if(typeof location!=='undefined') location.hash='#/pages/noise/Free' 
+      } 
+    }
+  }, 100)
 })
 </script>
 

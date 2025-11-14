@@ -2,7 +2,12 @@
   <view class="post">
     <!-- 用户信息区域 -->
     <view class="header">
-      <image class="avatar" :src="post.author.avatar" @click="viewProfile" />
+      <image 
+        class="avatar" 
+        :src="avatarSrc" 
+        @error="handleAvatarError"
+        @click="viewProfile" 
+      />
       <view class="author-info">
         <text class="name">{{ post.author.name }}</text>
         <text class="time">{{ post.time }}</text>
@@ -21,8 +26,9 @@
       <view v-if="post.image" class="image-container">
         <image 
           class="post-image" 
-          :src="post.image" 
+          :src="imageSrc" 
           mode="aspectFill" 
+          @error="handleImageError"
           @click="previewImage"
         />
       </view>
@@ -93,6 +99,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
+import { safeImageUrl, getPlaceholder } from '@/utils/image'
 
 const props = defineProps({ 
   post: { 
@@ -104,6 +111,8 @@ const props = defineProps({
 const emit = defineEmits(['like', 'comment', 'share'])
 
 const isLiked = ref(false)
+const avatarSrc = ref(safeImageUrl(props.post.author?.avatar, 'avatar'))
+const imageSrc = ref(safeImageUrl(props.post.image, 'cover'))
 
 // 计算属性
 const hasTopics = computed(() => {
@@ -174,6 +183,14 @@ function showMoreActions() {
       }
     }
   })
+}
+
+function handleAvatarError(e) {
+  avatarSrc.value = getPlaceholder('avatar')
+}
+
+function handleImageError(e) {
+  imageSrc.value = getPlaceholder('cover')
 }
 </script>
 

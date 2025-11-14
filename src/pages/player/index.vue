@@ -27,14 +27,22 @@
       <view class="title-row">
         <text class="fixed-label text-contrast">白噪音</text>
         <view style="display:flex;align-items:center;gap:8px">
+          <view class="favorite-wrapper">
+            <text v-if="favoriteCount > 0" class="favorite-count">{{ favoriteCount }} 收藏</text>
           <button class="favorite-btn" @click="toggleFav">
             <text v-if="isFav">❤️</text>
             <text v-else>🤍</text>
           </button>
-          <button class="meta-btn" @click="openMetaPopup()">⋯</button>
+          </view>
+          <button class="share-btn" @click="shareAudio">⤴</button>
+          <button class="meta-btn" @click="openSettings">⚙</button>
         </view>
       </view>
       <text class="author text-contrast">{{ displayNames }}</text>
+      <!-- 音频时长显示 -->
+      <view class="time-display">
+        <text class="time-text">{{ formattedCurrentTime }}/{{ formattedDuration }}</text>
+      </view>
     </view>
 
     <!-- small tags -->
@@ -94,16 +102,32 @@
       </view>
     </view>
 
-    <!-- Play Mode Modal -->
-    <view class="modal-overlay" v-if="showPlayModeModal" @click="showPlayModeModal = false">
-      <view class="modal-content" @click.stop>
-        <view class="modal-header">
-          <text class="modal-title">播放设置</text>
-          <button class="modal-close" @click="showPlayModeModal = false">×</button>
+    <!-- 播放设置半屏弹窗 -->
+    <view class="settings-overlay" v-if="showSettingsModal" @click="closeSettings">
+      <view class="settings-content" @click.stop>
+        <view class="settings-header">
+          <text class="settings-title">播放设置</text>
+          <button class="settings-close" @click="closeSettings">×</button>
+        </view>
+        
+        <!-- 音量调节 -->
+        <view class="settings-section">
+          <text class="section-title">音量</text>
+          <slider 
+            class="volume-slider"
+            :value="store.volume * 100" 
+            min="0" 
+            max="100" 
+            step="1"
+            @change="onVolumeChange"
+            activeColor="#7B61FF"
+            backgroundColor="rgba(255,255,255,0.1)"
+          />
+          <text class="volume-value">{{ Math.round(store.volume * 100) }}%</text>
         </view>
         
         <!-- Play Mode Options -->
-        <view class="modal-section">
+        <view class="settings-section">
           <text class="section-title">播放模式</text>
           <view class="mode-options">
             <view class="mode-option" :class="{ active: store.loopMode === 'one' }" @click="setLoopMode('one')">
@@ -122,7 +146,7 @@
         </view>
         
         <!-- Timer Options -->
-        <view class="modal-section">
+        <view class="settings-section">
           <text class="section-title">定时关闭</text>
           <view class="timer-options">
             <view class="timer-option" :class="{ active: timerMinutes === 0 }" @click="setTimer(0)">
@@ -270,13 +294,30 @@ async function toggleFav(){
   }
 
   const wasFav = isFav.value
+  
+  // 如果是收藏，弹出命名输入框
+  if (!wasFav) {
+    uni.showModal({
+      title: '收藏组合',
+      editable: true,
+      placeholderText: '请输入组合名称（1-12字）',
+      success: async (res) => {
+        if (res.confirm) {
+          const combName = res.content?.trim() || '白噪音组合'
+          if (combName.length > 12) {
+            uni.showToast({ title: '名称不能超过12字', icon: 'none' })
+            return
+          }
   try {
     await favStore.toggle(track.value)
+            // TODO: 保存组合名称到后端
     uni.showToast({
-      title: wasFav ? '已取消收藏' : '收藏成功',
+              title: '组合收藏成功',
       icon: 'success',
       duration: 1000
     })
+            // 更新收藏数量
+            updateFavoriteCount()
   } catch (error) {
     console.error('收藏操作失败:', error)
     uni.showToast({
@@ -284,6 +325,39 @@ async function toggleFav(){
       icon: 'none',
       duration: 2000
     })
+          }
+        }
+      }
+    })
+  } else {
+    // 取消收藏
+    try {
+      await favStore.toggle(track.value)
+      uni.showToast({
+        title: '已取消收藏',
+        icon: 'success',
+        duration: 1000
+      })
+      updateFavoriteCount()
+    } catch (error) {
+      console.error('收藏操作失败:', error)
+      uni.showToast({
+        title: '操作失败，请重试',
+        icon: 'none',
+        duration: 2000
+      })
+    }
+  }
+}
+
+// 更新收藏数量
+function updateFavoriteCount() {
+  // TODO: 从后端获取收藏数量
+  // 暂时使用本地收藏数量
+  const metaId = track.value?.metaId
+  if (metaId) {
+    // 这里应该调用API获取收藏数量
+    favoriteCount.value = 0 // 占位，实际应从后端获取
   }
 }
 
@@ -340,10 +414,12 @@ const ringLabels = [ { angle:-90, text:'∞' }, { angle:-30, text:'120' }, { ang
 // minimal runtime flags
 const draggingRef = ref(false)
 
-// Play mode modal
+// Settings modal
+const showSettingsModal = ref(false)
 const showPlayModeModal = ref(false)
 const timerMinutes = ref(0)
 const customTimerMinutes = ref('')
+const favoriteCount = ref(0)
 
 // meta popup state
 const showMeta = ref(false)
@@ -402,6 +478,81 @@ function setLoopMode(mode) {
   store.setLoopMode(mode)
 }
 
+function openSettings() {
+  showSettingsModal.value = true
+}
+
+function closeSettings() {
+  showSettingsModal.value = false
+}
+
+function onVolumeChange(e) {
+  const volume = e.detail.value / 100
+  setVolume(volume)
+}
+
+// 格式化时间
+const formattedCurrentTime = computed(() => {
+  const seconds = Math.floor(store.positionMs / 1000)
+  const mm = String(Math.floor(seconds / 60)).padStart(2, '0')
+  const ss = String(seconds % 60).padStart(2, '0')
+  return `${mm}:${ss}`
+})
+
+const formattedDuration = computed(() => {
+  const seconds = Math.floor(store.durationMs / 1000)
+  const mm = String(Math.floor(seconds / 60)).padStart(2, '0')
+  const ss = String(seconds % 60).padStart(2, '0')
+  return `${mm}:${ss}`
+})
+
+// 分享功能
+function shareAudio() {
+  const track = store.currentTrack
+  if (!track) {
+    uni.showToast({ title: '暂无播放内容', icon: 'none' })
+    return
+  }
+  
+  // 微信小程序分享
+  if (typeof wx !== 'undefined' && wx.showShareMenu) {
+    wx.showShareMenu({
+      withShareTicket: true,
+      menus: ['shareAppMessage', 'shareTimeline']
+    })
+  }
+  
+  // 触发分享
+  uni.showShareMenu({
+    withShareTicket: true,
+    success: () => {
+      console.log('分享菜单显示成功')
+    }
+  })
+}
+
+// 分享给好友
+function onShareAppMessage() {
+  const track = store.currentTrack
+  const title = track ? `推荐 ${track.name} 白噪音` : '推荐白噪音组合'
+  const path = `/pages/player/index?id=${track?.id || ''}`
+  
+  return {
+    title,
+    path,
+    imageUrl: track?.cover || ''
+  }
+}
+
+// 分享到朋友圈
+function onShareTimeline() {
+  const track = store.currentTrack
+  return {
+    title: '星眠坞助眠白噪音，一起来听～',
+    query: `id=${track?.id || ''}`
+  }
+}
+
 // Set timer
 function setTimer(minutes) {
   timerMinutes.value = minutes
@@ -413,7 +564,7 @@ function setTimer(minutes) {
     knobAngle.value = (minutes / 120) * 360
     startTimer()
   }
-  showPlayModeModal.value = false
+  closeSettings()
 }
 
 // Set custom timer
@@ -884,6 +1035,8 @@ onMounted(()=>{
   threeTracks.value = [shuffled[0]||fallback[0], shuffled[1]||fallback[1], shuffled[2]||fallback[2]]
   // 同步服务端收藏，确保进入播放页即可拿到最新收藏状态
   try{ favStore.syncFromServer?.() }catch(e){ /* silent */ }
+  // 更新收藏数量
+  updateFavoriteCount()
 })
 
 function openCozeChat(){
@@ -976,7 +1129,27 @@ function openCozeChat(){
 .fixed-label{ font-size:24px; font-weight:800; color: var(--text-primary); }
 .author{ margin-top:6px; color: var(--text-primary) }
 .name{ font-size:20px; color:#fff; font-weight:700 }
-.favorite-btn{ background: transparent; border: none; font-size: 24px; padding: 8px; margin-left: 12px; }
+.favorite-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.favorite-count {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.favorite-btn{ background: transparent; border: none; font-size: 24px; padding: 8px; }
+.share-btn{ background: transparent; border: none; font-size: 20px; padding: 8px; }
+.time-display {
+  margin-top: 8px;
+}
+.time-text {
+  font-size: 12px;
+  color: var(--muted);
+  font-family: 'Courier New', monospace;
+}
 .author{ margin-top:6px; color: var(--text-primary) }
 .tags{ display:flex; gap:10px; padding:8px 16px }
 .tag{ background:var(--card-bg, rgba(255,255,255,0.9)); color: var(--card-fg, #13303f); padding:6px 8px; border-radius:8px; box-shadow: 0 4px 12px var(--shadow, rgba(0,0,0,0.06)); opacity:0.95 }
@@ -1157,6 +1330,81 @@ function openCozeChat(){
   background: rgba(255, 255, 255, 0.1);
   border-radius: 8px;
   padding: 8px;
+}
+
+/* Settings Modal Styles - 半屏弹窗 */
+.settings-overlay{ 
+  position:fixed; 
+  top:0; 
+  left:0; 
+  right:0; 
+  bottom:0; 
+  background:rgba(0,0,0,0.5); 
+  display:flex; 
+  align-items:flex-end; 
+  justify-content:center; 
+  z-index:1000 
+}
+.settings-content{ 
+  background: rgba(255,255,255,0.9); 
+  backdrop-filter: blur(10px);
+  border-top-left-radius: 32rpx; 
+  border-top-right-radius: 32rpx; 
+  padding:20px; 
+  width:100%; 
+  max-height:50vh; 
+  overflow-y:auto;
+  animation: slideUp 0.3s ease-out;
+}
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+.settings-header{ 
+  position:relative; 
+  display:flex; 
+  justify-content:flex-start; 
+  align-items:center; 
+  margin-bottom:20px; 
+  padding-right: 40px 
+}
+.settings-title{ 
+  font-size:18px; 
+  font-weight:600; 
+  color: var(--card-fg, #13303f) 
+}
+.settings-close{ 
+  position:absolute; 
+  right:8px; 
+  top:6px; 
+  background:none; 
+  border:none; 
+  color: var(--card-fg, #13303f); 
+  font-size:22px; 
+  width:28px; 
+  height:28px; 
+  display:flex; 
+  align-items:center; 
+  justify-content:center; 
+  line-height:1 
+}
+.settings-section {
+  margin-bottom: 24px;
+}
+.volume-slider {
+  width: 100%;
+  margin: 12px 0;
+}
+.volume-value {
+  display: block;
+  text-align: right;
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 4px;
 }
 
 /* Modal Styles */

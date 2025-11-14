@@ -74,7 +74,7 @@
             class="related-item"
             @click="handleRelatedItem(item)"
           >
-            <image class="related-cover" :src="item.cover" mode="aspectFill" />
+            <image class="related-cover" :src="safeImageUrl(item.cover, 'noise')" mode="aspectFill" @error="handleImageError" />
             <view class="related-info">
               <text class="related-name">{{ item.name }}</text>
               <text class="related-desc">{{ item.desc }}</text>
@@ -91,6 +91,7 @@ import { ref, onMounted } from 'vue'
 import { useGlobalTheme } from '@/composables/useGlobalTheme'
 import { useThemeStore } from '@/stores/theme'
 import { onLoad } from '@dcloudio/uni-app'
+import { safeImageUrl, getPlaceholder } from '@/utils/image'
 
 const themeStore = useThemeStore(); themeStore.load()
 const { bgStyle } = useGlobalTheme()
@@ -150,19 +151,19 @@ function getMessageDataById(messageId) {
       related: [
         {
           id: 1,
-          cover: 'https://picsum.photos/seed/rain/80/80',
+          cover: getPlaceholder('noise'),
           name: '雨声白噪音',
           desc: '自然雨滴声，帮助放松入睡'
         },
         {
           id: 2,
-          cover: 'https://picsum.photos/seed/ocean/80/80',
+          cover: getPlaceholder('noise'),
           name: '海浪声',
           desc: '轻柔海浪，营造宁静氛围'
         },
         {
           id: 3,
-          cover: 'https://picsum.photos/seed/fire/80/80',
+          cover: getPlaceholder('noise'),
           name: '壁炉声',
           desc: '温暖火焰声，冬季最佳选择'
         }
@@ -209,13 +210,13 @@ function getMessageDataById(messageId) {
       related: [
         {
           id: 1,
-          cover: 'https://picsum.photos/seed/community/80/80',
+          cover: getPlaceholder('post'),
           name: '睡眠改善讨论',
           desc: '热门话题，参与讨论获得积分'
         },
         {
           id: 2,
-          cover: 'https://picsum.photos/seed/topic/80/80',
+          cover: getPlaceholder('post'),
           name: '健康睡眠指南',
           desc: '专业医生提供的睡眠建议'
         }
@@ -272,6 +273,11 @@ function goBack() {
   } catch(e) {
     if(typeof location !== 'undefined') location.hash = '#/pages/messages/index'
   }
+}
+
+// 处理图片加载错误
+function handleImageError(e) {
+  // 图片加载失败时，safeImageUrl 已经处理了，这里不需要额外操作
 }
 
 // 处理操作按钮

@@ -38,8 +38,9 @@
     <!-- 小色子与小框框播放器（底部浮窗） -->
     <view class="mini-player">
       <view class="mini-left">
-        <button class="mini-dice" @click="randomizeMini">
-          <text>🎲</text>
+        <button class="mini-dice" @click="randomizeMini" :disabled="isRandomizing">
+          <view v-if="isRandomizing" class="cat-animation">🐱</view>
+          <text v-else>🎲</text>
         </button>
       </view>
       <view class="mini-center">
@@ -152,6 +153,7 @@ const playing = ref(new Set())
 // mini player state
 const randomNoises = ref([null,null,null])
 const miniPlaying = ref(new Set())
+const isRandomizing = ref(false)
 
 const remoteList = ref([])
 
@@ -282,12 +284,24 @@ function isMiniPlayingItem(item){
 
 // mini player actions
 function randomizeMini(){
+  if (isRandomizing.value) return
+  
+  isRandomizing.value = true
+  // 触发猫猫头动画（0.5秒，循环3次）
+  setTimeout(() => {
   // pick 3 random noises from filtered list
   const pool = filteredNoises.value
+    if (pool.length === 0) {
+      isRandomizing.value = false
+      uni.showToast({ title: '暂无音频', icon: 'none' })
+      return
+    }
   const shuffled = [...pool].sort(()=>0.5 - Math.random())
   randomNoises.value = [shuffled[0]||null, shuffled[1]||null, shuffled[2]||null]
   // reset mini playing state
   miniPlaying.value.clear()
+    isRandomizing.value = false
+  }, 1500) // 1.5秒后完成（动画循环3次，每次0.5秒）
 }
 
 function toggleMini(noise){
@@ -585,7 +599,17 @@ function openAgent(){
 .detail-actions{ display:flex; gap:12px; justify-content:center; margin-top:18px }
 .btn{ background:rgba(255,255,255,0.06); color:#fff; padding:10px 16px; border-radius:10px; border:none }
 /* 字体与对比度优化 */
-.mini-dice{ font-size:16px; }
+.mini-dice{ font-size:16px; opacity: 1; transition: opacity 0.2s; }
+.mini-dice:disabled{ opacity: 0.5; }
+.cat-animation {
+  animation: catRotate 0.5s ease-in-out 3;
+  display: inline-block;
+}
+@keyframes catRotate {
+  0% { transform: rotate(0deg); }
+  50% { transform: rotate(180deg); }
+  100% { transform: rotate(360deg); }
+}
 .mini-name{ font-size:14px; color:#eef3ff; }
 /* default variable fallback removed - using inline styles for compatibility */
 .mini-name{ color:var(--text-color); font-weight:500; font-size:14px; -webkit-font-smoothing:antialiased }

@@ -78,6 +78,7 @@ import { useUserStore } from '@/stores/user'
 import { storeToRefs } from 'pinia'
 import { useGlobalTheme } from '@/composables/useGlobalTheme'
 import { ref } from 'vue'
+import { getPlaceholder } from '@/utils/image'
 
 let bgStyle = {}
 try{
@@ -111,13 +112,13 @@ if (!user.value || !user.value.userId) {
   user.value = {
     userId: '117820224',
     nickname: '眠友9177',
-    avatar: 'https://picsum.photos/seed/avatar/200',
+    avatar: getPlaceholder('avatar'),
     bio: '',
     gender: '',
     birthday: '',
     location: '',
     phone: '198****9177',
-    background: 'https://picsum.photos/seed/bg/200'
+    background: getPlaceholder('banner')
   }
 }
 

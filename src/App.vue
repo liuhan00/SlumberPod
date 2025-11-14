@@ -23,15 +23,26 @@ export default {
       store.loopMode = s.loopMode || 'all'
     }
     // Auth check: require login before showing homepage
-    try{
-      const auth = uni.getStorageSync('app_auth_user')
-      if(!auth || !auth.token){
-        // redirect to login page
-        uni.reLaunch({ url: '/pages/auth/Login' })
+    // 使用 setTimeout 延迟执行，避免在 onLaunch 中立即调用 reLaunch 导致超时
+    setTimeout(() => {
+      try{
+        const auth = uni.getStorageSync('app_auth_user')
+        if(!auth || !auth.token){
+          // 检查当前页面，避免重复跳转
+          const pages = getCurrentPages()
+          const currentPage = pages[pages.length - 1]
+          if (currentPage && currentPage.route !== 'pages/auth/Login') {
+            uni.reLaunch({ url: '/pages/auth/Login' })
+          }
+        }
+      }catch(e){
+        const pages = getCurrentPages()
+        const currentPage = pages[pages.length - 1]
+        if (currentPage && currentPage.route !== 'pages/auth/Login') {
+          uni.reLaunch({ url: '/pages/auth/Login' })
+        }
       }
-    }catch(e){
-      uni.reLaunch({ url: '/pages/auth/Login' })
-    }
+    }, 100)
   },
   onShow() {
     const h = getHour()

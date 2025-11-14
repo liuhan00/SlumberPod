@@ -62,6 +62,7 @@ import { useGlobalTheme } from '@/composables/useGlobalTheme'
 import { useThemeStore } from '@/stores/theme'
 import { getAuthLocal } from '@/store/auth'
 import * as apiPosts from '@/api/posts'
+import { safeImageUrl, getPlaceholder } from '@/utils/image'
 
 const themeStore = useThemeStore()
 themeStore.load()
@@ -79,12 +80,12 @@ const posts = ref([
     id: 'p1', backendId: null,
     time: '刚刚', 
     content: '昨晚试了雨声+树林组合，很快入睡。推荐给失眠的朋友们！', 
-    image: 'https://picsum.photos/seed/p1/800/400', 
+    image: getPlaceholder('post'), 
     likes: 12, 
     comments: [
-      { id: 'c1', content: '这个组合确实不错！', author: { name: 'Dreamer', avatar: 'https://picsum.photos/seed/d1/100' } }
+      { id: 'c1', content: '这个组合确实不错！', author: { name: 'Dreamer', avatar: getPlaceholder('avatar') } }
     ], 
-    author: { name: 'Sleepy', avatar: 'https://picsum.photos/seed/a1/100' } 
+    author: { name: 'Sleepy', avatar: getPlaceholder('avatar') } 
   },
   { 
     id: 'p2', backendId: null,
@@ -93,19 +94,19 @@ const posts = ref([
     image: '', 
     likes: 7, 
     comments: [], 
-    author: { name: 'Cozy', avatar: 'https://picsum.photos/seed/a2/100' } 
+    author: { name: 'Cozy', avatar: getPlaceholder('avatar') } 
   },
   { 
     id: 'p3', backendId: null,
     time: '3小时前', 
     content: '分享一个助眠技巧：睡前30分钟关闭电子设备，配合海浪声效果更佳', 
-    image: 'https://picsum.photos/seed/p3/800/400', 
+    image: getPlaceholder('post'), 
     likes: 25, 
     comments: [
-      { id: 'c2', content: '学到了！今晚试试', author: { name: 'Relax', avatar: 'https://picsum.photos/seed/r1/100' } },
-      { id: 'c3', content: '确实有效，已经坚持一周了', author: { name: 'Peace', avatar: 'https://picsum.photos/seed/p2/100' } }
+      { id: 'c2', content: '学到了！今晚试试', author: { name: 'Relax', avatar: getPlaceholder('avatar') } },
+      { id: 'c3', content: '确实有效，已经坚持一周了', author: { name: 'Peace', avatar: getPlaceholder('avatar') } }
     ], 
-    author: { name: 'Expert', avatar: 'https://picsum.photos/seed/a3/100' } 
+    author: { name: 'Expert', avatar: getPlaceholder('avatar') } 
   }
 ])
 
@@ -160,20 +161,40 @@ function normalizeList(list){
     comment_count: item.comment_count ?? (Array.isArray(item.comments) ? item.comments.length : 0),
     likes: item.likes || item.favorite_count || 0,
     comments: Array.isArray(item.comments) ? item.comments : [],
-    author: item.author || { name: item.userName || item.user_name || '用户', avatar: (item.author && item.author.avatar) || (item.user_avatar) || 'https://picsum.photos/seed/a1/100' }
+    author: item.author || { name: item.userName || item.user_name || '用户', avatar: safeImageUrl((item.author && item.author.avatar) || item.user_avatar, 'avatar') }
   }))
 }
 
-// 加载“最新”与“热门”
+// 加载"最新"与"热门"
 async function loadLatest(){
-  const r = await apiPosts.getLatest()
-  const list = r.data || r.items || r.list || r || []
-  posts.value = normalizeList(Array.isArray(list) ? list : [])
+  try {
+    const r = await apiPosts.getLatest()
+    const list = r.data || r.items || r.list || r || []
+    posts.value = normalizeList(Array.isArray(list) ? list : [])
+  } catch(e) {
+    console.warn('load latest posts failed', e)
+    // 失败时保持现有数据，不抛出错误
+    // 尝试使用社区列表作为后备
+    try {
+      const result = await apiCommunity.getCommunityList({ page: 1, limit: 20 })
+      const list = result.data || result.items || result || []
+      if (Array.isArray(list) && list.length > 0) {
+        posts.value = normalizeList(list)
+      }
+    } catch(e2) {
+      console.warn('fallback community list failed', e2)
+    }
+  }
 }
 async function loadHot(){
-  const r = await apiPosts.getHot()
-  const list = r.data || r.items || r.list || r || []
-  posts.value = normalizeList(Array.isArray(list) ? list : [])
+  try {
+    const r = await apiPosts.getHot()
+    const list = r.data || r.items || r.list || r || []
+    posts.value = normalizeList(Array.isArray(list) ? list : [])
+  } catch(e) {
+    console.warn('load hot posts failed', e)
+    // 失败时保持现有数据，不抛出错误
+  }
 }
 
 // 方法
@@ -229,7 +250,7 @@ function onComment(id) {
           post.comments.push({
             id: `c${Date.now()}`,
             content: res.content,
-            author: { name: '我', avatar: 'https://picsum.photos/seed/me/100' }
+            author: { name: '我', avatar: getPlaceholder('avatar') }
           })
           uni.showToast({ title: '评论成功', icon: 'success' })
         }
@@ -264,7 +285,7 @@ async function createPost(data) {
       image: (returned.imageUrls && returned.imageUrls[0]) || returned.image || data.image || '',
       likes: returned.likes || returned.favorite_count || 0,
       comments: returned.comments || [],
-      author: returned.author || { name: '我', avatar: 'https://picsum.photos/seed/me/100' }
+      author: returned.author || { name: '我', avatar: getPlaceholder('avatar') }
     }
     posts.value.unshift(newPost)
     uni.showToast({ title: '发布成功', icon: 'success' })

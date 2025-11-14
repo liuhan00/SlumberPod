@@ -1,6 +1,6 @@
 <template>
   <view class="header">
-    <image class="avatar" :src="displayAvatar" />
+    <image class="avatar" :src="avatarSrc" @error="handleAvatarError" />
     <view class="meta">
       <text class="name">{{ displayName }}</text>
       <text class="vip" v-if="isVip">VIP</text>
@@ -8,15 +8,20 @@
   </view>
 </template>
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useUserStore } from '@/stores/user'
+import { safeImageUrl, getPlaceholder } from '@/utils/image'
 
 const props = defineProps({ avatar:String, nickname:String, vip:Boolean })
 const userStore = useUserStore()
 
-const displayAvatar = computed(() => props.avatar || userStore.avatar || 'https://picsum.photos/seed/avatar/200')
 const displayName = computed(() => props.nickname || userStore.nickname || '睡眠爱好者')
 const isVip = computed(() => props.vip ?? userStore.vip)
+const avatarSrc = ref(safeImageUrl(props.avatar || userStore.avatar, 'avatar'))
+
+function handleAvatarError(e) {
+  avatarSrc.value = getPlaceholder('avatar')
+}
 </script>
 <style scoped>
 .header{ display:flex; align-items:center; gap:12px; padding:16px }

@@ -13,9 +13,8 @@
       <view class="item" v-for="t in filtered" :key="t.id" @click="selectOrPlay(t)" :class="{ selected: selectedIds.has(t.id) }">
         <image class="cover" :src="t.cover" mode="aspectFill" />
         <view class="meta">
-          <text class="name">{{ t.name }}</text>
-          <text class="author">{{ t.author }}</text>
-          <text class="time">{{ format(t.ts) }}</text>
+          <text class="name">{{ formatHistoryName(t) }}</text>
+          <text class="time">{{ formatTime(t.ts || t.play_time || t.created_at) }}</text>
         </view>
       </view>
       <view v-if="filtered.length===0" class="empty">暂无历史记录</view>
@@ -53,7 +52,34 @@ function play(t){ uni.navigateTo({ url:`/pages/player/index?id=${t.id}` }) }
 function toggleSelect(){ selecting.value = !selecting.value; selectedIds.value = new Set() }
 function batchRemove(){ historyStore.items = historyStore.items.filter(x=> !selectedIds.value.has(x.id)); selectedIds.value = new Set(); uni.showToast({ title:'已删除所选', icon:'none' }) }
 function clear(){ historyStore.clear(); uni.showToast({ title:'已清空', icon:'none' }) }
-function format(ts){ const d=new Date(ts); const y=d.getFullYear(); const m=String(d.getMonth()+1).padStart(2,'0'); const day=String(d.getDate()).padStart(2,'0'); const hh=String(d.getHours()).padStart(2,'0'); const mm=String(d.getMinutes()).padStart(2,'0'); return `${y}-${m}-${day} ${hh}:${mm}` }
+function formatTime(ts){ 
+  if (!ts) return ''
+  const d = new Date(ts)
+  const y = d.getFullYear()
+  const m = String(d.getMonth()+1).padStart(2,'0')
+  const day = String(d.getDate()).padStart(2,'0')
+  const hh = String(d.getHours()).padStart(2,'0')
+  const mm = String(d.getMinutes()).padStart(2,'0')
+  return `${y}-${m}-${day} ${hh}:${mm}`
+}
+
+// 格式化历史记录名称
+function formatHistoryName(item) {
+  // 如果是混合组合（有 audio_ids 数组）
+  if (item.audio_ids && Array.isArray(item.audio_ids) && item.audio_ids.length > 1) {
+    // 从音频ID列表获取名称
+    const names = item.audio_ids.map(id => {
+      // 这里应该从音频列表中找到对应的名称
+      // 暂时使用ID，实际应从后端获取或从本地缓存获取
+      return `音频${id}`
+    }).filter(Boolean)
+    if (names.length > 0) {
+      return `白噪音：${names.join('，')}`
+    }
+  }
+  // 单个音频或已有名称
+  return item.name || item.title || item.audio_name || '未知音频'
+}
 </script>
 <style scoped>
 .page{ min-height:100vh }
@@ -66,8 +92,7 @@ function format(ts){ const d=new Date(ts); const y=d.getFullYear(); const m=Stri
 .item.selected{ background:#f7f7f8 }
 .cover{ width:60px; height:60px; border-radius:8px }
 .meta{ flex:1; display:flex; flex-direction:column }
-.name{ font-size:16px; color: var(--text-primary) }
-.author{ font-size:12px; color:#666 }
+.name{ font-size:16px; color: var(--text-primary); line-height:1.5; margin-bottom:4px }
 .time{ font-size:12px; color:#999 }
 .btn{ padding:6px 10px; border-radius:6px; background:#f2f3f5 }
 .danger{ background:#ffeded; color:#c62828 }

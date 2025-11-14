@@ -150,7 +150,18 @@ function guestLogin(){
   // create a temporary guest session locally
   const guest = { id: `guest_${Date.now()}`, guest: true }
   try{ uni.setStorageSync('app_auth_user', { token: null, user: guest }) }catch(e){}
-  uni.reLaunch({ url: '/pages/noise/Free' })
+  // 延迟执行，避免导航冲突
+  setTimeout(() => {
+    try {
+      const pages = getCurrentPages()
+      const currentPage = pages[pages.length - 1]
+      if (currentPage && currentPage.route !== 'pages/noise/Free') {
+        uni.reLaunch({ url: '/pages/noise/Free' })
+      }
+    } catch(e) {
+      uni.reLaunch({ url: '/pages/noise/Free' })
+    }
+  }, 100)
 }
 
 function goRegister(){ 

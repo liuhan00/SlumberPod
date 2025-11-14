@@ -2,7 +2,7 @@
   <view class="composer">
     <!-- 用户信息 -->
     <view class="user-info">
-      <image class="avatar" :src="userAvatar" />
+      <image class="avatar" :src="avatarSrc" @error="handleAvatarError" />
       <text class="username">{{ userName }}</text>
     </view>
     
@@ -25,7 +25,7 @@
     
     <!-- 图片预览 -->
     <view v-if="imageUrl" class="image-preview">
-      <image class="preview-image" :src="imageUrl" mode="aspectFill" />
+      <image class="preview-image" :src="imageUrl" mode="aspectFill" @error="handleImageError" />
       <view class="remove-image" @click="removeImage">×</view>
     </view>
     
@@ -61,6 +61,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useUserStore } from '@/stores/user'
+import { safeImageUrl, getPlaceholder } from '@/utils/image'
 
 const userStore = useUserStore()
 const emit = defineEmits(['submit', 'image-upload'])
@@ -71,7 +72,11 @@ const imageUrl = ref('')
 
 // 用户信息
 const userName = computed(() => userStore.user?.nickname || '用户')
-const userAvatar = computed(() => userStore.user?.avatar || 'https://picsum.photos/seed/avatar/100')
+const avatarSrc = ref(safeImageUrl(userStore.user?.avatar, 'avatar'))
+
+function handleAvatarError(e) {
+  avatarSrc.value = getPlaceholder('avatar')
+}
 
 function submit() { 
   emit('submit', { 
@@ -121,6 +126,13 @@ function addTopic() {
       text.value += topics[res.tapIndex] + ' '
     }
   })
+}
+
+function handleImageError(e) {
+  // 图片加载失败时，可以选择移除图片或显示占位图
+  // 这里选择移除图片
+  imageUrl.value = ''
+  uni.showToast({ title: '图片加载失败', icon: 'none' })
 }
 </script>
 

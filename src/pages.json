@@ -11,9 +11,14 @@
     },
     { "path": "pages/community/index", "style": { "navigationBarTitleText": "社区" } },
     { "path": "pages/community/detail", "style": { "navigationBarTitleText": "帖子详情" } },
-    { "path": "pages/sleep/index", "style": { "navigationBarTitleText": "睡觉" } },
+    { "path": "pages/sleep/index", "style": { "navigationBarTitleText": "小屋" } },
     { "path": "pages/sleep/Nap", "style": { "navigationBarTitleText": "小憩" } },
     { "path": "pages/sleep/Alarm", "style": { "navigationBarTitleText": "闹钟与提醒" } },
+    { "path": "pages/sleep/Study", "style": { "navigationBarTitleText": "自习室" } },
+    { "path": "pages/sleep/SleepScene", "style": { "navigationBarTitleText": "睡觉" } },
+    { "path": "pages/sleep/Mailbox", "style": { "navigationBarTitleText": "晚安邮箱" } },
+    { "path": "pages/sleep/Stories", "style": { "navigationBarTitleText": "睡眠故事" } },
+    { "path": "pages/sleep/StoryDetail", "style": { "navigationBarTitleText": "故事详情" } },
 
     { "path": "pages/profile/index", "style": { "navigationBarTitleText": "我的" } },
     { "path": "pages/profile/PlayHistory", "style": { "navigationBarTitleText": "播放历史" } },
@@ -70,7 +75,7 @@
       },
       {
         "pagePath": "pages/sleep/index",
-        "text": "睡觉",
+        "text": "小屋",
         "iconPath": "static/tab_sleep.png",
         "selectedIconPath": "static/tab_sleep_active.png"
       },

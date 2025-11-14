@@ -54,7 +54,9 @@
         "setting" : {
             "urlCheck" : false
         },
-        "usingComponents" : true
+        "usingComponents" : true,
+        "enableShareAppMessage" : true,
+        "enableShareTimeline" : true
     },
     "mp-alipay" : {
         "usingComponents" : true
