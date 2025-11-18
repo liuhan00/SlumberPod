@@ -84,7 +84,7 @@ function goStories() {
 .section-title {
   text-align: center;
   color: #f4f4f7;
-}
+  }
 
 .title {
   font-size: 26px;
@@ -110,58 +110,79 @@ function goStories() {
   align-items: center;
   justify-content: center;
   padding: 32px;
-  border-radius: 24px;
+  border-radius: 26px;
   min-height: 140px;
-  background: rgba(255, 255, 255, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  box-shadow: 0 12px 30px rgba(5, 5, 15, 0.3);
-  backdrop-filter: blur(20px);
-  transition: transform 0.2s, box-shadow 0.2s;
+  background: rgba(22, 23, 38, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 18px 36px rgba(5, 8, 20, 0.35);
+  backdrop-filter: blur(24px);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .function-card:active {
-  transform: scale(0.98);
+  transform: translateY(1px) scale(0.99);
 }
 
 .mailbox-card {
-  border-color: rgba(255, 200, 150, 0.45);
-  background: linear-gradient(135deg, rgba(255, 220, 150, 0.35) 0%, rgba(255, 200, 100, 0.2) 100%);
+  background: linear-gradient(150deg, rgba(79, 63, 81, 0.8), rgba(56, 43, 66, 0.75));
+  border-color: rgba(255, 177, 141, 0.16);
 }
 
 .story-card {
-  border-color: rgba(216, 196, 168, 0.45);
-  background: linear-gradient(135deg, rgba(232, 212, 184, 0.35) 0%, rgba(216, 196, 168, 0.2) 100%);
+  background: linear-gradient(150deg, rgba(55, 63, 92, 0.82), rgba(48, 54, 78, 0.75));
+  border-color: rgba(159, 183, 255, 0.16);
 }
 
 .card-icon {
-  font-size: 48px;
-  margin-bottom: 12px;
-  filter: drop-shadow(0 0 8px rgba(255, 200, 100, 0.4));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 62px;
+  height: 62px;
+  border-radius: 18px;
+  font-size: 36px;
+  margin-bottom: 14px;
+  color: #ffe5dc;
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 0 6px rgba(255,255,255,0.2);
+}
+
+.mailbox-card .card-icon {
+  background: rgba(255, 166, 129, 0.18);
+  color: #ffd8c9;
+}
+
+.story-card .card-icon {
+  background: rgba(166, 182, 255, 0.18);
+  color: #e0e6ff;
 }
 
 .card-title {
   font-size: 20px;
   font-weight: 600;
-  color: #6b5b4f;
-  margin-bottom: 8px;
-  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
+  color: #f6f0ff;
+  margin-bottom: 6px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
 }
 
 .card-desc {
   font-size: 14px;
-  color: #f0f0ff;
+  color: #dcdfee;
   text-align: center;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  line-height: 1.5;
 }
 
 @media (max-width: 750px) {
   .function-card {
-    padding: 24px;
+    padding: 26px;
     min-height: 120px;
   }
   
   .card-icon {
-    font-size: 40px;
+    width: 54px;
+    height: 54px;
+    font-size: 30px;
   }
   
   .card-title {

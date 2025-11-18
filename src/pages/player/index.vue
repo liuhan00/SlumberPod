@@ -26,13 +26,15 @@
     <view class="meta">
       <view class="title-row">
         <text class="fixed-label text-contrast">白噪音</text>
-        <view style="display:flex;align-items:center;gap:8px">
+        <view class="meta-actions">
           <view class="favorite-wrapper">
-            <text v-if="favoriteCount > 0" class="favorite-count">{{ favoriteCount }} 收藏</text>
-          <button class="favorite-btn" @click="toggleFav">
-            <text v-if="isFav">❤️</text>
-            <text v-else>🤍</text>
+            <button class="favorite-btn" :class="{ active: isFav }" @click="toggleFav">
+              <svg class="heart-icon" viewBox="0 0 32 32" aria-hidden="true">
+                <path class="heart-stroke" d="M16 26c-4.2-3.7-10-9.1-10-14.2C6 8 8.7 5.5 12 5.5c1.8 0 3.5.9 4.6 2.2C17.7 6.4 19.4 5.5 21.2 5.5 24.5 5.5 27 8 27 11.8 27 16.9 20.2 22.3 16 26z"/>
+                <path class="heart-arrow" d="M21 5.2c2.4-.9 4.8.5 5.8 2.5M25.5 5.4l1 2.1-2.1 1"/>
+              </svg>
           </button>
+            <text class="favorite-count">{{ formattedFavoriteCount }}</text>
           </view>
           <button class="share-btn" @click="shareAudio">⤴</button>
           <button class="meta-btn" @click="openSettings">⚙</button>
@@ -49,7 +51,6 @@
     <view class="tags">
       <text class="tag">音量</text>
       <text class="tag">标注</text>
-      <text class="tag">音效</text>
     </view>
 
     <!-- controls -->
@@ -419,13 +420,34 @@ const showSettingsModal = ref(false)
 const showPlayModeModal = ref(false)
 const timerMinutes = ref(0)
 const customTimerMinutes = ref('')
-const favoriteCount = ref(0)
 
 // meta popup state
 const showMeta = ref(false)
 const metaData = ref(null)
 const metaMulti = ref([])
 const metaLoading = ref(false)
+
+const favoriteCount = ref(0)
+const liveFavoriteCount = computed(()=>{
+  const meta = metaData.value
+  const metaFav = meta?.favorite_count ?? meta?.favoriteCount
+  if(typeof metaFav === 'number' && !Number.isNaN(metaFav)) return metaFav
+
+  const trackFav = track.value?.favorite_count ?? track.value?.favoriteCount
+  if(typeof trackFav === 'number' && !Number.isNaN(trackFav)) return trackFav
+
+  return favoriteCount.value || 0
+})
+const formattedFavoriteCount = computed(()=> formatFavoriteCount(liveFavoriteCount.value))
+
+function formatFavoriteCount(count){
+  if(!count || Number.isNaN(count)) return '0'
+  if(count >= 10000){
+    const wan = Math.floor(count / 10000)
+    return `${wan}w+`
+  }
+  return String(count)
+}
 
 // 下滑返回相关
 const touchStartY = ref(0)
@@ -1047,6 +1069,7 @@ function openCozeChat(){
 <style scoped>
 .page{ min-height:100vh; padding-bottom: 24px; position:relative; /* use theme background from bgStyle */ }
 .topbar{ display:flex; justify-content:space-between; align-items:center; padding:12px 16px; position:relative }
+.page button::after{ border:none }
 .collapse, .share{ background:transparent; border:none; color:inherit; font-size:18px }
 .collapse{ position:absolute; left:12px; top:12px }
 .share{ position:absolute; right:12px; top:12px }
@@ -1129,18 +1152,66 @@ function openCozeChat(){
 .fixed-label{ font-size:24px; font-weight:800; color: var(--text-primary); }
 .author{ margin-top:6px; color: var(--text-primary) }
 .name{ font-size:20px; color:#fff; font-weight:700 }
+.meta-actions{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
 .favorite-wrapper {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
+  display:flex;
+  align-items:center;
+  gap:6px;
 }
-.favorite-count {
-  font-size: 12px;
-  color: var(--muted);
-  white-space: nowrap;
+.favorite-btn{
+  border:none;
+  padding:0;
+  background:transparent;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:auto;
+  height:auto;
+  color:inherit;
+  transition:opacity 0.15s ease;
 }
-.favorite-btn{ background: transparent; border: none; font-size: 24px; padding: 8px; }
+.favorite-btn:active{
+  opacity:0.8;
+}
+.heart-icon{
+  width:26px;
+  height:26px;
+}
+.heart-stroke,
+.heart-arrow{
+  stroke-linecap:round;
+  stroke-linejoin:round;
+  transition:stroke 0.2s ease, fill 0.2s ease;
+}
+.heart-stroke{
+  fill:none;
+  stroke:rgba(255,255,255,0.7);
+  stroke-width:2.4;
+}
+.heart-arrow{
+  fill: none;
+  stroke:rgba(255,255,255,0.55);
+  stroke-width:1.4;
+}
+.favorite-btn.active .heart-stroke{
+  fill: none;
+  stroke: #ff346c;
+}
+.favorite-btn.active .heart-arrow{
+  stroke: #ff6e94;
+}
+.favorite-count{
+  font-size: 14px;
+  font-weight: 600;
+  color:rgba(255,255,255,0.75);
+}
+.favorite-btn.active ~ .favorite-count{
+  color: #ff6b8a;
+}
 .share-btn{ background: transparent; border: none; font-size: 20px; padding: 8px; }
 .time-display {
   margin-top: 8px;
