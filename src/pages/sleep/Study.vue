@@ -2,6 +2,7 @@
   <view class="page">
     <!-- 学习场景背景 -->
     <view class="scene-bg">
+      <image class="scene-bg-img" :src="learnPng" mode="aspectFill" />
       <view class="scene-content">
         <!-- 可以在这里添加学习场景的装饰元素 -->
       </view>
@@ -54,6 +55,7 @@
 </template>
 
 <script setup>
+import learnPng from '@/static/learn.png'
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useGlobalTheme } from '@/composables/useGlobalTheme'
 import { usePlayerStore } from '@/stores/player'
@@ -190,7 +192,13 @@ onUnmounted(() => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(180deg, #E6E6FA 0%, #B0C4DE 30%, #DDA0DD 60%, #FFE4B5 100%);
+  z-index: 0;
+  overflow: hidden;
+}
+.scene-bg-img{
+  position:absolute;
+  left:0; top:0; right:0; bottom:0;
+  width:100%; height:100%;
   z-index: 0;
 }
 

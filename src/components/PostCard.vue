@@ -200,10 +200,13 @@ function handleImageError(e) {
   background: transparent;
   border-radius: 12px;
   padding: 16px;
-  margin-bottom: 16px;
+  margin: 0 auto 16px;
   border: 1px solid var(--border, rgba(0,0,0,0.06));
   box-shadow: 0 1px 0 rgba(255,255,255,0.03) inset; /* subtle inner highlight */
   transition: transform 0.2s, background 0.2s;
+  width: 100%;
+  max-width: 680px;
+  box-sizing: border-box;
 }
 
 .post:active {

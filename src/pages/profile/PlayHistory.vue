@@ -37,7 +37,7 @@ async function load(){
     let userId = auth?.user?.id || auth?.id || auth?.userId || auth?.uuid
     if(!userId){
       // try fetch /api/auth/me
-      const base = import.meta.env.VITE_API_BASE || 'http://192.168.43.89:3003'
+      const base = import.meta.env.VITE_API_BASE || 'http://192.168.1.139:3003'
       const resp = await fetch(base + '/api/auth/me', { headers: { Authorization: `Bearer ${auth?.token}` } })
       if(resp.ok){ const j = await resp.json(); userId = j?.user?.id }
     }

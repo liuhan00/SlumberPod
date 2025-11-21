@@ -141,8 +141,11 @@ function handleImageError(e) {
   background: #fff; 
   border-radius: 12px; 
   padding: 16px; 
-  margin-bottom: 16px; 
+  margin: 0 auto 16px; 
   box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  width: 100%;
+  max-width: 680px;
+  box-sizing: border-box;
 }
 .title-input{ width:100%; height:44px; padding:8px 12px; border-radius:8px; border:1px solid #e9ecef; margin-bottom:12px; font-size:15px; color: rgba(0,0,0,0.9) }
 

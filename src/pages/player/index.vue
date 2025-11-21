@@ -29,15 +29,14 @@
         <view class="meta-actions">
           <view class="favorite-wrapper">
             <button class="favorite-btn" :class="{ active: isFav }" @click="toggleFav">
-              <svg class="heart-icon" viewBox="0 0 32 32" aria-hidden="true">
-                <path class="heart-stroke" d="M16 26c-4.2-3.7-10-9.1-10-14.2C6 8 8.7 5.5 12 5.5c1.8 0 3.5.9 4.6 2.2C17.7 6.4 19.4 5.5 21.2 5.5 24.5 5.5 27 8 27 11.8 27 16.9 20.2 22.3 16 26z"/>
-                <path class="heart-arrow" d="M21 5.2c2.4-.9 4.8.5 5.8 2.5M25.5 5.4l1 2.1-2.1 1"/>
-              </svg>
-          </button>
-            <text class="favorite-count">{{ formattedFavoriteCount }}</text>
+              <view class="badge-anchor">
+                <text class="heart-text">{{ isFav ? '❤️' : '♡' }}</text>
+                <text class="favorite-badge">{{ formattedFavoriteCount }}</text>
+              </view>
+            </button>
           </view>
           <button class="share-btn" @click="shareAudio">⤴</button>
-          <button class="meta-btn" @click="openSettings">⚙</button>
+
         </view>
       </view>
       <text class="author text-contrast">{{ displayNames }}</text>
@@ -55,7 +54,7 @@
 
     <!-- controls -->
     <view class="controls">
-      <button class="ctrl" @click="showPlayModeModal = true">{{ getLoopIcon() }}</button>
+      <button class="ctrl settings-btn" @click="openSettings">⚙</button>
       <button class="ctrl" @click="prev">◀◀</button>
       <button class="play-btn" @click="toggle">{{ store.isPlaying ? '⏸' : '▶' }}</button>
       <button class="ctrl" @click="next">▶▶</button>
@@ -295,6 +294,18 @@ async function toggleFav(){
   }
 
   const wasFav = isFav.value
+  // 单曲收藏：直接切换收藏与计数；组合(≥3)才弹出命名
+  if(!wasFav){
+    const isCombo = Array.isArray(store.playlist) && store.playlist.length >= 3
+    if(!isCombo){
+      try{
+        await favStore.toggle(track.value)
+        updateFavoriteCount(+1)
+        uni.showToast({ title:'已收藏', icon:'success', duration:800 })
+      }catch(e){ uni.showToast({ title:'收藏失败', icon:'none' }) }
+      return
+    }
+  }
   
   // 如果是收藏，弹出命名输入框
   if (!wasFav) {
@@ -334,12 +345,8 @@ async function toggleFav(){
     // 取消收藏
     try {
       await favStore.toggle(track.value)
-      uni.showToast({
-        title: '已取消收藏',
-        icon: 'success',
-        duration: 1000
-      })
-      updateFavoriteCount()
+      updateFavoriteCount(-1)
+      uni.showToast({ title:'已取消收藏', icon:'success', duration:800 })
     } catch (error) {
       console.error('收藏操作失败:', error)
       uni.showToast({
@@ -352,13 +359,13 @@ async function toggleFav(){
 }
 
 // 更新收藏数量
-function updateFavoriteCount() {
-  // TODO: 从后端获取收藏数量
-  // 暂时使用本地收藏数量
-  const metaId = track.value?.metaId
-  if (metaId) {
-    // 这里应该调用API获取收藏数量
-    favoriteCount.value = 0 // 占位，实际应从后端获取
+function updateFavoriteCount(delta = 0) {
+  // 优先用后端元数据；若没有则在前端做微调，给用户即时反馈
+  const current = Number(liveFavoriteCount.value) || 0
+  const next = Math.max(0, current + Number(delta))
+  // 仅当后端未返回有效计数时，使用本地计数缓存
+  if(Number.isNaN(metaData.value?.favorite_count) && Number.isNaN(track.value?.favorite_count)){
+    favoriteCount.value = next
   }
 }
 
@@ -417,7 +424,6 @@ const draggingRef = ref(false)
 
 // Settings modal
 const showSettingsModal = ref(false)
-const showPlayModeModal = ref(false)
 const timerMinutes = ref(0)
 const customTimerMinutes = ref('')
 
@@ -486,15 +492,6 @@ function handleTouchEnd() {
 const showPlaylistModal = ref(false)
 
 // Get loop mode icon
-function getLoopIcon() {
-  switch(store.loopMode) {
-    case 'one': return '①'
-    case 'all': return '🔁'
-    case 'off': return '→'
-    default: return '①'
-  }
-}
-
 // Set loop mode
 function setLoopMode(mode) {
   store.setLoopMode(mode)
@@ -600,7 +597,7 @@ function setCustomTimer() {
 
 async function openMetaPopup(id){
   showMeta.value = true; metaLoading.value = true; metaData.value = null; metaMulti.value = []
-  const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.43.89:3003'
+  const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.139:3003'
   // 构建ID列表：优先参数id；否则从当前播放或混合列表取 metaId/id（最多3个）
   let ids = []
   if(id){ ids = [id] }
@@ -1157,61 +1154,40 @@ function openCozeChat(){
   align-items:center;
   gap:10px;
 }
-.favorite-wrapper {
-  display:flex;
-  align-items:center;
-  gap:6px;
-}
-.favorite-btn{
+.favorite-wrapper { position:relative; width:28px; height:24px; }
+.favorite-btn{ color:#0f172a; 
+  position:relative;
   border:none;
   padding:0;
   background:transparent;
   display:flex;
   align-items:center;
   justify-content:center;
-  width:auto;
-  height:auto;
+  width:32px;
+  height:32px;
   color:inherit;
   transition:opacity 0.15s ease;
 }
-.favorite-btn:active{
-  opacity:0.8;
+.favorite-btn:active{ opacity:0.8; }
+.heart-shape{ position:relative; width:28px; height:26px; color:#0f172a; }
+.heart-shape .heart-l, .heart-shape .heart-r{ position:absolute; width:14px; height:14px; background: currentColor; border-radius: 50%; top:0 }
+.heart-shape .heart-l{ left:0 }
+.heart-shape .heart-r{ right:0 }
+.heart-shape .heart-c{ position:absolute; width:18px; height:18px; background: currentColor; left:5px; top:7px; transform: rotate(45deg) }
+.favorite-btn.active .heart-shape{ color:#ff346c }
+.favorite-btn.active{ color:#ff346c; }
+.badge-anchor{ position:relative; width:24px; height:24px; display:flex; align-items:center; justify-content:center }
+.favorite-badge{
+  position:absolute;
+  right:0;
+  top:0;
+  transform: translate(60%,-40%);
+  font-size:12px;
+  font-weight:700;
+  color:#111111;
+  z-index:6;
 }
-.heart-icon{
-  width:26px;
-  height:26px;
-}
-.heart-stroke,
-.heart-arrow{
-  stroke-linecap:round;
-  stroke-linejoin:round;
-  transition:stroke 0.2s ease, fill 0.2s ease;
-}
-.heart-stroke{
-  fill:none;
-  stroke:rgba(255,255,255,0.7);
-  stroke-width:2.4;
-}
-.heart-arrow{
-  fill: none;
-  stroke:rgba(255,255,255,0.55);
-  stroke-width:1.4;
-}
-.favorite-btn.active .heart-stroke{
-  fill: none;
-  stroke: #ff346c;
-}
-.favorite-btn.active .heart-arrow{
-  stroke: #ff6e94;
-}
-.favorite-count{
-  font-size: 14px;
-  font-weight: 600;
-  color:rgba(255,255,255,0.75);
-}
-.favorite-btn.active ~ .favorite-count{
-  color: #ff6b8a;
-}
+.favorite-btn.active .favorite-badge{ color:#ff3b6a; }
 .share-btn{ background: transparent; border: none; font-size: 20px; padding: 8px; }
 .time-display {
   margin-top: 8px;
@@ -1227,6 +1203,7 @@ function openCozeChat(){
 .controls{ display:flex; align-items:center; justify-content:space-around; padding:18px 36px }
 .play-btn{ width:72px; height:72px; border-radius:36px; background:#fff; color: var(--text-primary); display:flex; align-items:center; justify-content:center; font-size:26px }
 .ctrl{ background:transparent; border:none; color:#fff }
+.settings-btn{ background: var(--input-bg, #f1f8ff); color: var(--card-fg, #13303f); border-radius:8px; padding:8px; }
 
 /* Playlist Modal */
 .playlist-modal {

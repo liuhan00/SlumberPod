@@ -86,7 +86,7 @@ const showArrow = ref(false)
 // load categories from backend
 async function fetchCategories(){
   try{
-    const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.43.89:3003'
+    const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.139:3003'
     // 小程序运行时可能不支持 new URL，因此使用字符串拼接
     // 添加分页参数以获取所有分类
     const url = BASE + '/api/categories?limit=1000'
@@ -612,4 +612,7 @@ function openAgent(){
   100% { transform: rotate(360deg); }
 }
 .mini-name{ font-size:14px; -webkit-font-smoothing:antialiased }
+/* override: mini-player names should be light on dark background */
+.mini-player .mini-name{ color: rgba(255,255,255,0.86) !important }
+.mini-player .mini-name.on{ color: #D8FFE7 !important; font-weight:700 }
 </style>
