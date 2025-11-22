@@ -198,6 +198,25 @@ function handleImageLoad(e) {
   }
 }
 
+/* 禁用点击高亮（去除点击时的蓝色闪烁） */
+/* '*' 选择器在 WXSS 中不被支持，改为直接作用于按钮本身 */
+.scene-buttons .interactive-button {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.scene-buttons .interactive-button:active {
+  transform: translateY(8px) scale(0.99); /* 只保留轻微下沉，不改颜色 */
+  background: transparent !important;
+}
+
+/* 有些平台会在按下时给元素背景色，统一覆盖 */
+.scene-buttons .interactive-button,
+.scene-buttons .interactive-button:active {
+  background-color: transparent !important;
+}
+
 @keyframes fireflySwarm {
   0% {
     opacity: 0;
