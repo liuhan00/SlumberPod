@@ -536,15 +536,23 @@ function handleImageLoad(e) {
 }
 
 .sleep-button {
-  left: 32vw;
-  bottom: -2vh;
-  width: clamp(78px, 11vw, 120px);
+  left: 36vw; /* 向右移动 */
+  bottom: -1vh; /* 微微上移以避免遮挡 */
+  width: clamp(72px, 10.5vw, 110px); /* 略微缩小整体按钮 */
 }
 
 .study-button {
   right: 3vw;
-  bottom: 55vh;
+  bottom: 60vh; /* 向上移动一些 */
   width: clamp(52px, 8vw, 88px);
+}
+
+@media (max-width: 750px) {
+  .study-button {
+    right: 6vw;
+    bottom: 46vh; /* 移动上方，原 42vh */
+    width: clamp(52px, 24vw, 88px);
+  }
 }
 
 .pillow-shell {
@@ -554,14 +562,14 @@ function handleImageLoad(e) {
   border-radius: 40% 40% 35% 35% / 50% 50% 45% 45%;
   background: radial-gradient(ellipse at 30% 30%, rgba(255, 248, 240, 0.7) 0%, rgba(255, 231, 200, 0.7) 30%, rgba(249, 186, 108, 0.7) 70%, rgba(229, 133, 61, 0.7) 100%);
   box-shadow: 
-    0 20px 40px rgba(229, 133, 61, 0.3),
-    0 10px 20px rgba(0, 0, 0, 0.15),
-    inset 0 -5px 15px rgba(140, 70, 20, 0.1),
-    inset 0 5px 10px rgba(255, 255, 255, 0.2);
+    0 18px 34px rgba(229, 133, 61, 0.28),
+    0 8px 16px rgba(0, 0, 0, 0.12),
+    inset 0 -4px 12px rgba(140, 70, 20, 0.09),
+    inset 0 4px 8px rgba(255, 255, 255, 0.18);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 25% 20%;
+  padding: 18% 14%; /* 缩小抱枕尺寸 */
   overflow: hidden;
   transform: perspective(100px) rotateX(3deg);
 }
@@ -644,9 +652,9 @@ function handleImageLoad(e) {
   width: 100%;
   aspect-ratio: 3 / 4.4;
   border-radius: 4px 8px 8px 4px;
-  box-shadow: 0 15px 25px rgba(58, 36, 14, 0.4), 0 8px 15px rgba(0, 0, 0, 0.25), inset -2px 0 3px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 12px 20px rgba(58, 36, 14, 0.32), 0 6px 12px rgba(0, 0, 0, 0.2), inset -2px 0 3px rgba(0, 0, 0, 0.08);
   overflow: visible;
-  transform: perspective(1000px) rotateY(-8deg);
+  transform: perspective(1000px) rotateY(-8deg) scale(0.92); /* 略微缩小整本书 */
 }
 
 .book-structure::after {
@@ -665,30 +673,43 @@ function handleImageLoad(e) {
   top: 0;
   bottom: 0;
   left: 0;
-  width: 20%;
+  width: 16%; /* 缩小书脊宽度，避免遮挡文字 */
   border-radius: 4px 0 0 4px;
   background: linear-gradient(90deg, #4a3228 0%, #6b4530 45%, #8b5a3c 100%);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 12px 6px;
+  gap: 4px;
+  padding: 8px 4px; /* 减少内边距 */
   color: rgba(248, 232, 202, 1);
   text-shadow: 0 2px 4px rgba(35, 18, 5, 0.6);
   box-shadow: inset 2px 0 5px rgba(0, 0, 0, 0.3);
 }
 
 .book-spine-icon {
-  font-size: clamp(14px, 1.8vw, 20px);
+  display: none; /* 隐藏原书脊图标，改放到书封面内 */
 }
 
 .book-spine-text {
-  writing-mode: vertical-rl;
-  font-size: clamp(11px, 1.4vw, 14px);
-  letter-spacing: 1.6px;
+  display: none; /* 隐藏原书脊文字 */
 }
 
+/* 在书封面顶部显示“学习”文字（去掉图标） */
+.book-cover::before { content: '' }
+
+.book-cover::after {
+  content: '学习';
+  position: absolute;
+  top: 14%; /* 放在书的上方 */
+  left: 50%;
+  transform: translate(-50%, 0%);
+  font-size: clamp(14px, 2vw, 16px);
+  color: rgba(248, 232, 202, 0.98);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.45);
+  pointer-events: none;
+  font-weight: 600;
+}
 .book-cover {
   position: absolute;
   top: 8%;

@@ -229,29 +229,56 @@ function getStarStyle(index) {
   }
 }
 
-function sendMessage() {
+import { getMyMails, sendMail, pickMail } from '@/api/mailbox'
+import { getMe } from '@/api/auth'
+
+async function sendMessage() {
   if (!messageContent.value.trim()) {
     uni.showToast({ title: '请输入消息内容', icon: 'none' })
     return
   }
-  
+
   sending.value = true
-  // TODO: 调用云函数 throwBottle
-  // 模拟发送
-  setTimeout(() => {
+  try {
+    // 获取 token
+    const raw = uni.getStorageSync('app_auth_user')
+    const auth = raw ? (typeof raw === 'string' ? JSON.parse(raw) : raw) : null
+    const token = auth?.token
+    await sendMail({ content: messageContent.value.trim(), token })
     sending.value = false
     uni.showToast({ title: '晚安已出发～', icon: 'success' })
     messageContent.value = ''
-  }, 1000)
+    // 刷新我的已投递列表
+    loadMyMessages('sent')
+  } catch (e) {
+    sending.value = false
+    console.error(e)
+    uni.showToast({ title: '投递失败，请重试', icon: 'none' })
+  }
 }
 
-function receiveMessage() {
-  // TODO: 调用云函数 pickBottle
-  // 模拟接收
-  receivedMessage.value = {
-    id: 1,
-    content: '晚安，好梦～',
-    time: Date.now()
+async function receiveMessage() {
+  // 防多次点击
+  if (sending.value) return
+  sending.value = true
+  try {
+    const raw = uni.getStorageSync('app_auth_user')
+    const auth = raw ? (typeof raw === 'string' ? JSON.parse(raw) : raw) : null
+    const token = auth?.token
+    const res = await pickMail({ token })
+    sending.value = false
+    const data = res?.data || res
+    if (!data) {
+      uni.showToast({ title: '暂无可领取的晚安', icon: 'none' })
+      return
+    }
+    receivedMessage.value = data
+    // 刷新我的收到列表
+    loadMyMessages('received')
+  } catch (e) {
+    sending.value = false
+    console.error(e)
+    uni.showToast({ title: '领取失败，请重试', icon: 'none' })
   }
 }
 
@@ -271,14 +298,14 @@ function closeReply() {
   currentMessageId.value = null
 }
 
-function sendReply() {
+async function sendReply() {
   if (!replyContent.value.trim()) {
     uni.showToast({ title: '请输入回信内容', icon: 'none' })
     return
   }
-  
+
   replying.value = true
-  // TODO: 调用云函数保存回信
+  // TODO: 如果需要后端回信接口可在此调用
   setTimeout(() => {
     replying.value = false
     uni.showToast({ title: '回信成功', icon: 'success' })
@@ -288,7 +315,7 @@ function sendReply() {
 }
 
 function viewMessageDetail(msg) {
-  // TODO: 跳转到详情页
+  // 跳转到详情页或显示 modal
   console.log('View message:', msg)
 }
 
@@ -302,8 +329,22 @@ function formatTime(timestamp) {
   return `${y}-${m}-${d} ${h}:${min}`
 }
 
+async function loadMyMessages(type = 'sent') {
+  try {
+    const raw = uni.getStorageSync('app_auth_user')
+    const auth = raw ? (typeof raw === 'string' ? JSON.parse(raw) : raw) : null
+    const token = auth?.token
+    const res = await getMyMails({ token, type })
+    const data = res?.data || res
+    if (type === 'sent') myMessages.value = data || []
+    if (type === 'received') myMessages.value = data || []
+  } catch (e) {
+    console.error('loadMyMessages error', e)
+  }
+}
+
 onMounted(() => {
-  // TODO: 加载我的信箱消息
+  loadMyMessages('sent')
 })
 </script>
 

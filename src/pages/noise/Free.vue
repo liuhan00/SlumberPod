@@ -573,7 +573,10 @@ function openAgent(){
 
 /* mini player - floating style */
 .mini-player{ position:fixed; left:50%; transform:translateX(-50%); bottom:12px; display:flex; align-items:center; gap:8px; background:rgba(58,61,69,0.65); padding:10px 12px; border-radius:14px; box-shadow:0 10px 16px rgba(8,12,16,0.35); backdrop-filter: blur(12px); border:1px solid rgba(255,255,255,0.08); max-width:520px; width: min(520px, calc(100% - 64px)); z-index:1200 }
-.mini-dice{ width:38px; height:38px; display:flex; align-items:center; justify-content:center; border-radius:10px; background:rgba(255,255,255,0.18); border:1px solid rgba(255,255,255,0.12); color:#ffffff; box-shadow:0 8px 18px rgba(0,0,0,0.32) }
+.mini-dice{ width:56px; height:56px; display:flex; align-items:center; justify-content:center; border-radius:8px; background: rgba(255,255,255,0.06); border:none; color:#ffffff; box-shadow:none; font-size:32px; line-height:56px }
+.mini-dice text, .mini-dice .cat-animation { font-size:32px; line-height:56px }
+.mini-dice { opacity: 0.95 }
+.mini-dice:hover { opacity: 1 }
 .mini-center{ display:flex; gap:10px; flex:1; justify-content:center }
 .mini-box{ display:flex; flex-direction:column; align-items:center }
 .mini-thumb{ width:46px; height:46px; border-radius:12px; background:rgba(255,255,255,0.08); display:flex; align-items:center; justify-content:center; border:1px solid rgba(255,255,255,0.1); color:rgba(255,255,255,0.85); transition: transform .14s ease, box-shadow .14s ease, background-color .14s ease; }
