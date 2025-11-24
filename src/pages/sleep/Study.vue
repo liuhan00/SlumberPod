@@ -36,20 +36,43 @@
       </view>
     </view>
 
-    <!-- 底部控制栏 -->
+    <!-- 底部控制栏（去掉屏幕设置按钮） -->
     <view class="bottom-controls">
       <button class="control-btn" @click="toggleMusic">
-        <text class="icon">🎵</text>
+        <view class="icon-svg">
+          <image src="/static/icons/music.svg" mode="aspectFit" />
+        </view>
       </button>
       <button class="control-btn" @click="toggleTimer">
-        <text class="icon">⏱</text>
-      </button>
-      <button class="control-btn" @click="toggleScreen">
-        <text class="icon">🖥</text>
+        <view class="icon-svg">
+          <image src="/static/icons/timer.svg" mode="aspectFit" />
+        </view>
       </button>
       <button class="control-btn" @click="togglePause">
-        <text class="icon">{{ isTimerRunning ? '⏸' : '▶' }}</text>
+        <view class="icon-svg">
+          <image src="/src/static/icons/pause.svg" v-if="isTimerRunning" mode="aspectFit" />
+          <image src="/src/static/icons/play.svg" v-else mode="aspectFit" />
+        </view>
       </button>
+    </view>
+
+    <!-- 计时器设置弹窗：选择退出后是否继续计时 -->
+    <view v-if="showTimerSettings" class="timer-settings-overlay" @click="closeTimerSettings">
+      <view class="timer-settings" @click.stop>
+        <text class="ts-title">退出后下一次计时</text>
+        <view class="ts-option" @click="setResumePolicy(true)">
+          <text class="ts-label">继续计时（下次打开接着本次时间）</text>
+          <text class="ts-check">{{ resumePolicy ? '●' : '○' }}</text>
+        </view>
+        <view class="ts-option" @click="setResumePolicy(false)">
+          <text class="ts-label">重新计时（下次打开从 00:00 开始）</text>
+          <text class="ts-check">{{ !resumePolicy ? '●' : '○' }}</text>
+        </view>
+        <view class="ts-actions">
+          <button class="ts-cancel" @click="closeTimerSettings">取消</button>
+          <button class="ts-save" @click="saveTimerSettings">保存</button>
+        </view>
+      </view>
     </view>
   </view>
 </template>
@@ -70,6 +93,8 @@ const currentAudio = ref(null)
 const showMusicSelector = ref(false)
 let timerInterval = null
 let timeInterval = null
+const showTimerSettings = ref(false)
+const resumePolicy = ref(true) // true: resume next time; false: reset next time
 
 // 当前时间显示
 const currentTime = ref('')
@@ -131,13 +156,20 @@ function toggleMusic() {
 }
 
 function toggleTimer() {
-  // 可以添加计时器设置功能
-  uni.showToast({ title: '计时器设置', icon: 'none' })
+  showTimerSettings.value = true
+}
+
+function closeTimerSettings(){ showTimerSettings.value = false }
+function setResumePolicy(val){ resumePolicy.value = !!val }
+function saveTimerSettings(){
+  // 保存设置到本地
+  uni.setStorageSync('studyTimerResumePolicy', { resume: resumePolicy.value })
+  showTimerSettings.value = false
+  uni.showToast({ title: '保存成功', icon: 'success' })
 }
 
 function toggleScreen() {
-  // 可以添加屏幕相关功能
-  uni.showToast({ title: '屏幕设置', icon: 'none' })
+  // 屏幕设置已删除，功能不再需要
 }
 
 function selectAudio(audio) {
@@ -154,11 +186,20 @@ onMounted(() => {
   
   // 恢复上次状态
   const savedState = uni.getStorageSync('studyTimerState')
+  const cfg = uni.getStorageSync('studyTimerResumePolicy')
+  if(typeof cfg === 'object' && cfg !== null){ resumePolicy.value = !!cfg.resume }
   if (savedState) {
-    elapsedSeconds.value = savedState.elapsedSeconds || 0
-    isTimerRunning.value = savedState.isTimerRunning || false
-    if (isTimerRunning.value) {
-      startTimer()
+    // 根据用户选择的策略决定是否恢复计时
+    if(resumePolicy.value){
+      elapsedSeconds.value = savedState.elapsedSeconds || 0
+      isTimerRunning.value = savedState.isTimerRunning || false
+      if (isTimerRunning.value) {
+        startTimer()
+      }
+    } else {
+      // 不恢复计时，只恢复状态为未运行
+      elapsedSeconds.value = 0
+      isTimerRunning.value = false
     }
   }
 })
@@ -336,7 +377,39 @@ onUnmounted(() => {
 .control-btn .icon {
   font-size: 24px;
   line-height: 1;
+  color: #111; /* 统一黑色图标（开始/暂停均为黑色） */
+  display: none; /* 隐藏原始文本符号，使用 SVG */
 }
+.control-btn .icon-svg{ width:44px; height:44px; display:flex; align-items:center; justify-content:center }
+.control-btn .icon-svg image{ width:28px; height:28px; display:block }
+.control-btn .icon-svg svg{ width:28px; height:28px; display:block }
+
+/* 计时器设置弹窗样式：固定居中，不影响页面高度 */
+.timer-settings-overlay{
+  position: fixed;
+  left: 0; right: 0; top: 0; bottom: 0;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+.timer-settings{
+  width: calc(100vw - 48px);
+  max-width: 420px;
+  background: rgba(255,255,255,0.98);
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.28);
+}
+.timer-settings .ts-title{ font-size:16px; font-weight:700; margin-bottom:12px; color:#111 }
+.timer-settings .ts-option{ display:flex; justify-content:space-between; align-items:center; padding:12px; border-radius:8px; cursor:pointer }
+.timer-settings .ts-option:hover{ background: rgba(0,0,0,0.03) }
+.timer-settings .ts-label{ color:#222 }
+.timer-settings .ts-check{ color:#7B61FF; font-size:18px }
+.timer-settings .ts-actions{ display:flex; gap:10px; justify-content:flex-end; margin-top:12px }
+.timer-settings .ts-cancel{ background:transparent; border:1px solid rgba(0,0,0,0.06); padding:8px 12px; border-radius:8px }
+.timer-settings .ts-save{ background:#111; color:#fff; border:none; padding:8px 12px; border-radius:8px }
 
 /* 响应式调整 */
 @media (max-width: 750px) {

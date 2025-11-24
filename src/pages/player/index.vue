@@ -56,7 +56,12 @@
     <view class="controls">
       <button class="ctrl settings-btn" @click="openSettings">⚙</button>
       <button class="ctrl" @click="prev">◀◀</button>
-      <button class="play-btn" @click="toggle">{{ store.isPlaying ? '⏸' : '▶' }}</button>
+      <button class="play-btn" @click="toggle">
+        <view class="icon-svg">
+          <image src="/static/icons/pause.svg" v-if="store.isPlaying" mode="aspectFit" />
+          <image src="/static/icons/play.svg" v-else mode="aspectFit" />
+        </view>
+      </button>
       <button class="ctrl" @click="next">▶▶</button>
       <button class="ctrl playlist-btn" @click="showPlaylist" style="pointer-events: auto;">≡</button>
     </view>
@@ -1122,7 +1127,9 @@ function openCozeChat(){
 .timer-wrap{ height:420px; position:relative; display:flex; align-items:center; justify-content:center }
 .triangle-icons{ position:absolute; left:0; top:0; right:0; bottom:0; pointer-events:none }
 .tri-icon{ position:absolute; display:flex; flex-direction:column; align-items:center; pointer-events:auto }
-.tri-btn{ width:44px; height:44px; border-radius:22px; background:#fff; display:flex; align-items:center; justify-content:center; border:none }
+.tri-btn{ width:44px; height:44px; border-radius:0; background: transparent; display:flex; align-items:center; justify-content:center; border:none; box-shadow: none }
+.icon-svg{ width:56px; height:56px; display:flex; align-items:center; justify-content:center }
+.icon-svg image{ width:36px; height:36px; display:block }
 .tri-label{ margin-top:6px; color:#fff; font-size:12px }
 .tri-icon{ position:absolute }
 .triangle-icons{ position:relative }
@@ -1511,7 +1518,7 @@ function openCozeChat(){
 .modal-section, .mode-option, .timer-option, .custom-input{ background: rgba(0,0,0,0.03) }
 
 /* make icons in controls clearer */
-.actions .icon, .ctrl, .playlist-btn{ background: var(--input-bg, #f1f8ff); color: var(--card-fg, #13303f) }
+.actions .icon, .ctrl, .playlist-btn{ background: transparent; color: var(--card-fg, #13303f); box-shadow: none }
 
 
 /* Vinyl turntable styles */

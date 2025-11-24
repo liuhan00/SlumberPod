@@ -36,7 +36,7 @@
       </view>
     </view>
 
-    <!-- 场景交互按钮 -->
+    <!-- 场景交互按钮（仅包含睡觉按钮，学习按钮已移至根节点，避免被父容器动画影响） -->
     <view class="scene-buttons" :class="{ 'play-animation': animationStarted }">
       <view class="sleep-button interactive-button" @click="goSleepScene">
         <view class="pillow-shell">
@@ -48,16 +48,13 @@
         </view>
         <text class="button-label">睡觉</text>
       </view>
-      <view class="study-button interactive-button" @click="goStudy">
-        <view class="book-structure">
-          <view class="book-spine">
-            <text class="book-spine-icon">📚</text>
-            <text class="book-spine-text">学习</text>
-          </view>
-          <view class="book-cover"></view>
-          <view class="book-pages"></view>
-        </view>
-      </view>
+    </view>
+
+    <!-- 学习按钮放在根级，避免被 .scene-buttons 的动画/transform/overflow 影响 -->
+    <view class="study-button interactive-button" @click="goStudy">
+      <!-- 使用静态图片作为学习按钮（位于 src/static/book.png） -->
+      <image class="study-img" src="/static/book.png" mode="aspectFit" aria-hidden="true" />
+      <text class="study-label">学习</text>
     </view>
   </view>
 </template>
@@ -296,22 +293,23 @@ function handleImageLoad(e) {
 }
 
 @keyframes bookReveal {
+  /* 不改变元素定位（避免从页面顶部错位），只做缩放/旋转/模糊过渡 */
   0% {
     opacity: 0;
-    transform: translate(80px, 60px) scale(0.6) rotate(-10deg);
+    transform: scale(0.6) rotate(-8deg);
     filter: blur(3px);
   }
   40% {
     opacity: 1;
-    transform: translate(-16px, -10px) scale(1.05) rotate(6deg);
+    transform: scale(1.06) rotate(6deg);
     filter: blur(0);
   }
   70% {
-    transform: translate(6px, 6px) scale(0.98) rotate(-2deg);
+    transform: scale(0.99) rotate(-2deg);
   }
   100% {
     opacity: 1;
-    transform: translate(0, 0) scale(1) rotate(0deg);
+    transform: scale(1) rotate(0deg);
   }
 }
 
@@ -536,23 +534,103 @@ function handleImageLoad(e) {
 }
 
 .sleep-button {
-  left: 36vw; /* 向右移动 */
-  bottom: -1vh; /* 微微上移以避免遮挡 */
-  width: clamp(72px, 10.5vw, 110px); /* 略微缩小整体按钮 */
+  /* 更大幅度向右且略向上，确保落在床面而非床脚 */
+  position: absolute !important;
+  left: 68vw; /* 明显向右 */
+  top: 56vh; /* 向上，落在床面 */
+  width: clamp(100px, 18vw, 140px);
+  height: auto;
+  transform: translate(-50%, -50%);
+  z-index: 1200;
+}
+
+.sleep-button .button-label {
+  /* 字体保持不变 */
+  font-size: clamp(16px, 2.2vw, 18px);
+  font-weight: 700;
+  color: rgba(255, 245, 220, 0.98);
+  text-shadow: 0 2px 8px rgba(0,0,0,0.6);
+  letter-spacing: 1.6px;
+}
+
+.sleep-button .pillow-shell {
+  /* 更强调抱枕形状，放置在床上 */
+  border-radius: 48% 48% 44% 44% / 60% 60% 50% 50%;
+  padding: 12% 10%;
+  background: linear-gradient(135deg, rgba(255,255,255,0.14), rgba(255,255,255,0.04));
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: 0 18px 36px rgba(0,0,0,0.22), inset 0 6px 12px rgba(255,255,255,0.06);
+  transform: translateY(6px) rotate(-4deg) perspective(100px);
 }
 
 .study-button {
-  right: 3vw;
-  bottom: 60vh; /* 向上移动一些 */
-  width: clamp(52px, 8vw, 88px);
+  /* 固定到视口并放置到左上（书桌位置） */
+  position: fixed !important;
+  left: 14vw !important; /* 放到大画框左侧 */
+  top: -26vh !important; /* 再上移两个书的高度（相对上次再上移约 -10vh，总计 -26vh） */
+  width: 110px !important;
+  height: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  opacity: 1 !important;
+  pointer-events: auto;
+  z-index: 2147483000 !important;
+  overflow: visible !important;
+  transform: none !important;
+}
+
+/* 确保图片可见且没有背景 */
+.study-img { width: 110px; height: 86px; object-fit: cover; border-radius: 6px; box-shadow: none; opacity: 0.78; backdrop-filter: blur(2px) saturate(0.9); mix-blend-mode: normal; }
+
+/* 移除旧的 book-structure 影响 */
+.book-structure { display: none !important; }
+
+.study-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 120px;
+  height: 96px;
+  font-size: 30px;
+  line-height: 1;
+  background: linear-gradient(180deg,#fffaf0,#fff1d8);
+  color: #6b4a2a;
+  border: 1px solid rgba(107,74,42,0.18);
+  padding: 6px 8px;
+  border-radius: 12px;
+  box-shadow: 0 18px 42px rgba(0,0,0,0.30);
+  z-index: 11000;
+  overflow: visible; /* 允许 svg 溢出以显示书脊阴影 */
+}
+
+/* 强制 svg 具有明显描边和透明背景 */
+.study-icon svg { display: block !important; width: 96px; height: auto; background: transparent; }
+.study-icon svg path, .study-icon svg rect, .study-icon svg polygon { stroke: rgba(59,53,45,0.9); stroke-width: 0.9; }
+
+
+.study-label {
+  position: absolute;
+  left: calc(110px - 28px); /* 更靠近书按钮 */
+  top: 50%;
+  transform: translateY(-50%);
+  writing-mode: vertical-rl; /* 竖排文字 */
+  text-orientation: mixed;
+  font-size: 16px; /* 加大字体 */
+  font-weight: 700; /* 加粗 */
+  color: rgba(255,250,230,1); /* 更亮 */
+  text-shadow: 0 2px 6px rgba(0,0,0,0.45); /* 提升可读性 */
+  pointer-events: none;
+  letter-spacing: 1px;
+  opacity: 0.98;
 }
 
 @media (max-width: 750px) {
-  .study-button {
-    right: 6vw;
-    bottom: 46vh; /* 移动上方，原 42vh */
-    width: clamp(52px, 24vw, 88px);
-  }
+  .sleep-button { left: 10vw; bottom: 10vh; width: clamp(90px, 28vw, 140px) }
+  .study-button { right: 12vw; bottom: 46vh; width: clamp(100px, 36vw, 160px) }
 }
 
 .pillow-shell {
@@ -560,16 +638,15 @@ function handleImageLoad(e) {
   width: 100%;
   aspect-ratio: 1.3 / 0.9;
   border-radius: 40% 40% 35% 35% / 50% 50% 45% 45%;
-  background: radial-gradient(ellipse at 30% 30%, rgba(255, 248, 240, 0.7) 0%, rgba(255, 231, 200, 0.7) 30%, rgba(249, 186, 108, 0.7) 70%, rgba(229, 133, 61, 0.7) 100%);
-  box-shadow: 
-    0 18px 34px rgba(229, 133, 61, 0.28),
-    0 8px 16px rgba(0, 0, 0, 0.12),
-    inset 0 -4px 12px rgba(140, 70, 20, 0.09),
-    inset 0 4px 8px rgba(255, 255, 255, 0.18);
+  /* 半透明 + 模糊，跟随背景更柔和 */
+  background: linear-gradient(135deg, rgba(255,255,255,0.18), rgba(255,255,255,0.06));
+  border: 1px solid rgba(255,255,255,0.12);
+  backdrop-filter: blur(6px) saturate(120%);
+  box-shadow: 0 14px 30px rgba(0,0,0,0.18), inset 0 4px 8px rgba(255,255,255,0.08);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 18% 14%; /* 缩小抱枕尺寸 */
+  padding: 16% 12%; /* 稍微减少内边距 */
   overflow: hidden;
   transform: perspective(100px) rotateX(3deg);
 }
@@ -651,21 +728,89 @@ function handleImageLoad(e) {
   position: relative;
   width: 100%;
   aspect-ratio: 3 / 4.4;
-  border-radius: 4px 8px 8px 4px;
-  box-shadow: 0 12px 20px rgba(58, 36, 14, 0.32), 0 6px 12px rgba(0, 0, 0, 0.2), inset -2px 0 3px rgba(0, 0, 0, 0.08);
   overflow: visible;
-  transform: perspective(1000px) rotateY(-8deg) scale(0.92); /* 略微缩小整本书 */
+  transform: translateZ(0);
+  /* 制作翻开的书：两页并列，中间有褶皱和投影 */
 }
 
-.book-structure::after {
+/* 移除翻书的样式，改为仅使用 📖 图标作为学习按钮 */
+.book-left,
+.book-right,
+.book-seam,
+.book-cover,
+.book-pages,
+.book-spine,
+.book-structure {
+  display: none !important;
+}
+
+.study-icon {
+  /* 书本样式：去掉纯白圆底，使用卡片式书本容器 */
+  position: relative;
+  width: 110px;
+  height: 88px;
+  padding: 8px 10px;
+  background: linear-gradient(180deg, #fffaf0 0%, #fff1d8 100%);
+  border-radius: 10px;
+  box-shadow: 0 18px 40px rgba(0,0,0,0.28);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(107,74,42,0.12);
+}
+
+/* 确保内联 SVG 可见并适配容器 */
+.study-icon svg { width: 88px; height: 66px; display: block; }
+
+/* 使用 📖 图标作为学习按钮标识，放在书中央上方 */
+.book-structure .study-icon {
+  position: absolute;
+  top: 4%;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: clamp(20px, 3.6vw, 28px);
+  pointer-events: none;
+  filter: drop-shadow(0 6px 10px rgba(0,0,0,0.24));
+}
+
+/* 中缝（书脊/折痕） */
+.book-seam {
+  position: absolute;
+  left: 50%;
+  top: 6%;
+  bottom: 10%;
+  width: 2%;
+  transform: translateX(-50%);
+  background: linear-gradient(90deg, rgba(40,35,30,0.12), rgba(255,255,255,0.02));
+  box-shadow: inset 0 0 6px rgba(0,0,0,0.12);
+  border-radius: 2px;
+}
+
+/* 翻页纸边效果 */
+.book-left::after,
+.book-right::after {
   content: '';
   position: absolute;
-  inset: 6% 8% 8% 22%;
-  border-radius: 14px;
-  background: radial-gradient(circle at 20% 25%, rgba(255, 255, 255, 0.4), rgba(255, 232, 196, 0.12), rgba(60, 32, 12, 0.25));
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.4s ease;
+  height: 100%;
+  width: 12px;
+  top: 0;
+  background: linear-gradient(90deg, rgba(0,0,0,0.06), rgba(255,255,255,0));
+}
+.book-left::after { right: -12px; }
+.book-right::after { left: -12px; }
+
+/* 文字占位（可改为 img or inner content） */
+
+/* 书封面保持淡色边 */
+.book-cover {
+  display: none; /* 不显示原来的封面，使用翻页样式 */
+}
+
+/* 小屏微调 */
+@media (max-width: 750px) {
+  .book-left, .book-right { top: 8%; bottom: 12% }
+  .book-left { transform: perspective(500px) rotateY(10deg) translateX(-2%) }
+  .book-right { transform: perspective(500px) rotateY(-10deg) translateX(2%) }
 }
 
 .book-spine {
@@ -716,13 +861,25 @@ function handleImageLoad(e) {
   bottom: 10%;
   left: 20%;
   right: 8%;
-  border-radius: 4px;
-  background: linear-gradient(135deg, #d5b27b 0%, #b78845 50%, #8f5c27 100%);
-  box-shadow: inset 0 8px 14px rgba(255, 255, 255, 0.3), inset 0 -12px 16px rgba(110, 57, 18, 0.35), inset -1px 0 3px rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+  /* 使用半透明卡片风格，自动适配背景色调 */
+  background: linear-gradient(135deg, rgba(255,255,255,0.14), rgba(255,255,255,0.06));
+  border: 1px solid rgba(255,255,255,0.08);
+  backdrop-filter: blur(4px) saturate(110%);
+  box-shadow: 0 10px 22px rgba(0,0,0,0.14), inset 0 6px 10px rgba(255,255,255,0.06);
   transform-origin: left center;
-  transform: perspective(600px) rotateY(-2deg);
+  transform: perspective(600px) rotateY(-2deg) scale(0.98);
 }
 
+.book-cover::after {
+  content: '';
+  position: absolute;
+  inset: 12%;
+  border-radius: 10px;
+  background: linear-gradient(140deg, rgba(255, 247, 226, 0.12), rgba(255, 247, 226, 0));
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
 .book-cover::after {
   content: '';
   position: absolute;

@@ -8,7 +8,12 @@
     </view>
     <view class="actions">
       <button class="icon" @click="prev">⏮</button>
-      <button class="icon" @click="toggle">{{ playing ? '⏸' : '▶️' }}</button>
+      <button class="icon" @click="toggle">
+        <view class="icon-svg">
+          <image src="/static/icons/pause.svg" v-if="playing" mode="aspectFit" />
+          <image src="/static/icons/play.svg" v-else mode="aspectFit" />
+        </view>
+      </button>
       <button class="icon" @click="next">⏭</button>
       <button class="icon" @click="close">✕</button>
     </view>
@@ -50,5 +55,8 @@ onMounted(()=>{ setBottomSafe(!!track.value) })
 .progress{ margin-top:6px; width:100%; height:4px; border-radius:999px; background: var(--input-bg); overflow:hidden }
 .inner{ height:100%; background: var(--accent) }
 .actions{ display:flex; align-items:center; gap:6px }
-.icon{ padding:6px 10px; border-radius:10px; background: var(--input-bg); color: var(--text-contrast) }
+.icon{ padding:6px 10px; border-radius:0; background: transparent; color: var(--text-contrast); box-shadow: none; display:flex; align-items:center; justify-content:center }
+.icon-svg{ width:44px; height:44px; display:flex; align-items:center; justify-content:center }
+.icon-svg image{ width:20px; height:20px; display:block }
+.icon-svg svg{ display:block }
 </style>
