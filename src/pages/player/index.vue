@@ -3,7 +3,9 @@
     <!-- Top small bar -->
     <view class="topbar">
       <button class="collapse" @click="uni.navigateBack()">˅</button>
-      <button class="share">⤴</button>
+      <button class="share" @click="shareToCommunity">⤴</button>
+      <!-- hit area fallback: 防止顶部系统遮挡或元素被覆盖时无响应，额外放置高优先级透明捕获层 -->
+      <button class="share-hit" @click.stop.prevent="shareToCommunity" aria-hidden="true"></button>
     </view>
 
     <!-- Vinyl turntable visual -->
@@ -35,7 +37,7 @@
               </view>
             </button>
           </view>
-          <button class="share-btn" @click="shareAudio">⤴</button>
+          
 
         </view>
       </view>
@@ -48,8 +50,38 @@
 
     <!-- small tags -->
     <view class="tags">
-      <text class="tag">音量</text>
+      <button class="tag" @click.stop="openVolumeModal">音量</button>
       <text class="tag">标注</text>
+    </view>
+
+    <!-- 音量/倍速弹窗（播放详情页） -->
+    <view v-if="showVolumeModal" class="volume-modal-overlay" @click="closeVolumeModal">
+      <view class="volume-modal" @click.stop>
+        <view class="vm-header">
+          <text>播放器 & 声幕音量</text>
+          <button class="vm-reset" @click="resetVolumes">重置</button>
+        </view>
+
+        <scroll-view class="vm-list" style="max-height:260px">
+          <view v-for="(track, idx) in audioTracks" :key="track.id" class="vm-item">
+            <view class="vm-item-row">
+              <text class="vm-name">{{ track.icon ? track.icon : '' }} {{ track.name }}</text>
+              <text class="vm-value">{{ Math.round(track.volume * 100) }}%</text>
+            </view>
+            <slider :value="track.volume * 100" @change="onVolumeChange($event, idx)" show-value disabled-value="false"></slider>
+            <view class="vm-speed-row">
+              <text>倍速</text>
+              <picker mode="selector" :range="speedOptions" :value="track.speedIndex" @change="onSpeedChange($event, idx)">
+                <view class="picker">{{ speedOptions[track.speedIndex] }}x</view>
+              </picker>
+            </view>
+          </view>
+        </scroll-view>
+
+        <view class="vm-actions">
+          <button class="vm-close" @click="closeVolumeModal">关闭</button>
+        </view>
+      </view>
     </view>
 
     <!-- controls -->
@@ -432,6 +464,13 @@ const showSettingsModal = ref(false)
 const timerMinutes = ref(0)
 const customTimerMinutes = ref('')
 
+// 音量弹窗（播放详情）
+const showVolumeModal = ref(false)
+const audioTracks = ref([
+  { id: 't1', name: store.currentTrack?.name || '主音轨', icon: '', volume: store.volume || 0.5, speedIndex: 2 }
+])
+const speedOptions = ['0.5','0.75','1.0','1.25','1.5']
+
 // meta popup state
 const showMeta = ref(false)
 const metaData = ref(null)
@@ -510,7 +549,40 @@ function closeSettings() {
   showSettingsModal.value = false
 }
 
-function onVolumeChange(e) {
+function openVolumeModal(){
+  // 构造音轨列表：若当前播放为组合，使用 store.playlist，否则单项
+  const playlist = store.playlist && store.playlist.length > 1 ? store.playlist : [store.currentTrack].filter(Boolean)
+  audioTracks.value = playlist.map((t, i)=> ({ id: t?.id || `t${i}`, name: t?.name || t?.title || `音轨 ${i+1}`, icon: '', volume: t?.volume ?? store.volume ?? 0.5, speedIndex: 2 }))
+  showVolumeModal.value = true
+}
+function closeVolumeModal(){ showVolumeModal.value = false }
+
+function onVolumeChange(e, idx){
+  const val = Number(e.detail.value) / 100
+  audioTracks.value[idx].volume = val
+  // 如果是单音频，直接调整主 player 音量
+  if(audioTracks.value.length === 1){ setVolume(val) }
+  // TODO: 若组合音频由多个播放器实例管理，这里应调用对应实例设置音量
+}
+
+function onSpeedChange(e, idx){
+  const newIndex = Number(e.detail.value)
+  audioTracks.value[idx].speedIndex = newIndex
+  const speed = Number(speedOptions[newIndex])
+  // 如果单音轨，尝试设置 audioCtx.playbackRate（部分小程序平台不支持）
+  if(audioTracks.value.length === 1 && audioCtx){
+    try{ audioCtx.playbackRate = speed }catch(e){ console.warn('playbackRate not supported', e) }
+  }
+}
+
+function resetVolumes(){
+  audioTracks.value.forEach((t, i)=>{ t.volume = i===0 ? (store.volume || 0.5) : (t.volume || 0.5); t.speedIndex = 2 })
+}
+
+// 将 store.volume 同步到 audioTracks（如果只存在单音轨）
+watch(()=>store.volume, v => { if(audioTracks.value.length===1){ audioTracks.value[0].volume = v } })
+
+function onVolumeChangeSetting(e){
   const volume = e.detail.value / 100
   setVolume(volume)
 }
@@ -553,6 +625,38 @@ function shareAudio() {
       console.log('分享菜单显示成功')
     }
   })
+}
+
+// 分享到社区页跳转
+function shareToCommunity(){
+  let t = store.currentTrack
+  console.log('[shareToCommunity] clicked, track:', t)
+  // 如果没有正在播放的 track，尝试用播放列表的第一个项作为候选
+  if(!t || Object.keys(t).length===0){
+    const fallback = (Array.isArray(store.playlist) && store.playlist.length>0) ? store.playlist[0] : null
+    if(fallback){
+      console.log('[shareToCommunity] no currentTrack, using playlist[0] as fallback', fallback)
+      t = fallback
+    }
+  }
+  // 如果仍然没有任何候选，允许用户进入分享页并手动选择/填写（空字段）
+  if(!t){
+    console.log('[shareToCommunity] no track available, opening share page with empty params')
+    try{ uni.showToast({ title: '打开分享页面', icon: 'none', duration: 600 }) }catch(e){}
+    uni.navigateTo({ url: '/pages/player/share' })
+    return
+  }
+
+  // quickly provide visual feedback to ensure click works during debugging
+  try{ uni.showToast({ title: '正在跳转...', icon: 'none', duration: 700 }) }catch(e){}
+  const params = [
+    `audioId=${encodeURIComponent(t.id||'')}`,
+    `title=${encodeURIComponent(t.name||t.title||'')}`,
+    `subtitle=${encodeURIComponent(t.author||t.subtitle||'')}`,
+    `cover=${encodeURIComponent(t.cover||'')}`
+  ].join('&')
+  console.log('[shareToCommunity] navigating to /pages/player/share?', params)
+  uni.navigateTo({ url: `/pages/player/share?${params}` })
 }
 
 // 分享给好友
@@ -602,7 +706,7 @@ function setCustomTimer() {
 
 async function openMetaPopup(id){
   showMeta.value = true; metaLoading.value = true; metaData.value = null; metaMulti.value = []
-  const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.139:3003'
+  const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.150:3003'
   // 构建ID列表：优先参数id；否则从当前播放或混合列表取 metaId/id（最多3个）
   let ids = []
   if(id){ ids = [id] }
@@ -1075,6 +1179,7 @@ function openCozeChat(){
 .collapse, .share{ background:transparent; border:none; color:inherit; font-size:18px }
 .collapse{ position:absolute; left:12px; top:12px }
 .share{ position:absolute; right:12px; top:12px }
+.share-hit{ position:absolute; right:8px; top:8px; width:48px; height:48px; z-index:1600; background:transparent; border:none; padding:0; margin:0; border-radius:999px }
 
 .nav{ display:flex; justify-content:space-between; align-items:center; padding: 0 16px }
 .btn{ padding:6px 10px; border-radius:6px; background:#f2f3f5 }
@@ -1159,7 +1264,8 @@ function openCozeChat(){
 .meta-actions{
   display:flex;
   align-items:center;
-  gap:10px;
+  gap:12px;
+  margin-right: 4px;
 }
 .favorite-wrapper { position:relative; width:28px; height:24px; }
 .favorite-btn{ color:#0f172a; 
@@ -1193,8 +1299,12 @@ function openCozeChat(){
   font-weight:700;
   color:#111111;
   z-index:6;
+  background: #fff;
+  padding: 2px 6px;
+  border-radius: 10px;
+  box-shadow: 0 6px 14px rgba(0,0,0,0.06);
 }
-.favorite-btn.active .favorite-badge{ color:#ff3b6a; }
+.favorite-btn.active .favorite-badge{ color:#ff3b6a; background: #fff0f2 }
 .share-btn{ background: transparent; border: none; font-size: 20px; padding: 8px; }
 .time-display {
   margin-top: 8px;
@@ -1205,11 +1315,11 @@ function openCozeChat(){
   font-family: 'Courier New', monospace;
 }
 .author{ margin-top:6px; color: var(--text-primary) }
-.tags{ display:flex; gap:10px; padding:8px 16px }
-.tag{ background:var(--card-bg, rgba(255,255,255,0.9)); color: var(--card-fg, #13303f); padding:6px 8px; border-radius:8px; box-shadow: 0 4px 12px var(--shadow, rgba(0,0,0,0.06)); opacity:0.95 }
+.tags{ display:flex; gap:12px; padding:8px 16px; align-items:center }
+.tag{ background:var(--card-bg, #ffffff); color: var(--card-fg, #13303f); padding:8px 12px; border-radius:12px; box-shadow: 0 6px 18px rgba(0,0,0,0.06); opacity:1; font-size:14px; min-width:72px; text-align:center; display:inline-flex; align-items:center; justify-content:center; border:1px solid rgba(19,48,63,0.06) }
 .controls{ display:flex; align-items:center; justify-content:space-around; padding:18px 36px }
-.play-btn{ width:72px; height:72px; border-radius:36px; background:#fff; color: var(--text-primary); display:flex; align-items:center; justify-content:center; font-size:26px }
-.ctrl{ background:transparent; border:none; color:#fff }
+.play-btn{ width:64px; height:64px; border-radius:32px; background:#fff; color: var(--text-primary); display:flex; align-items:center; justify-content:center; font-size:22px; box-shadow: 0 8px 24px rgba(0,0,0,0.10) }
+.ctrl{ background:transparent; border:none; color:#fff; font-size:18px }
 .settings-btn{ background: var(--input-bg, #f1f8ff); color: var(--card-fg, #13303f); border-radius:8px; padding:8px; }
 
 /* Playlist Modal */
@@ -1388,6 +1498,19 @@ function openCozeChat(){
 }
 
 /* Settings Modal Styles - 半屏弹窗 */
+/* Volume modal: compact centered card (different from settings half-sheet) */
+.volume-modal-overlay{ position:fixed; inset:0; background: rgba(0,0,0,0.45); display:flex; align-items:center; justify-content:center; z-index:1100 }
+.volume-modal{ width:88vw; max-width:360px; background: var(--card-bg, #ffffff); border-radius:12px; padding:14px; box-shadow: 0 12px 30px rgba(0,0,0,0.18); z-index:1110 }
+.volume-modal .vm-header{ display:flex; justify-content:space-between; align-items:center; margin-bottom:8px }
+.volume-modal .vm-header text{ font-weight:700; color: var(--card-fg,#13303f) }
+.volume-modal .vm-reset{ background:transparent; border:none; color:var(--muted); font-size:13px }
+.volume-modal .vm-item{ padding:8px 0; border-bottom:1px solid rgba(0,0,0,0.04) }
+.volume-modal .vm-item-row{ display:flex; justify-content:space-between; align-items:center; margin-bottom:6px }
+.volume-modal .vm-name{ font-size:14px; color:var(--card-fg,#13303f) }
+.volume-modal .vm-value{ font-size:13px; color:var(--muted) }
+.volume-modal .vm-actions{ display:flex; justify-content:flex-end; margin-top:12px }
+.volume-modal .vm-close{ background:#fff; border-radius:8px; border:1px solid rgba(0,0,0,0.06); padding:8px 12px; box-shadow: 0 6px 18px rgba(0,0,0,0.06) }
+
 .settings-overlay{ 
   position:fixed; 
   top:0; 

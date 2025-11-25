@@ -86,7 +86,7 @@ const showArrow = ref(false)
 // load categories from backend
 async function fetchCategories(){
   try{
-    const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.139:3003'
+    const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.150:3003'
     // 小程序运行时可能不支持 new URL，因此使用字符串拼接
     // 添加分页参数以获取所有分类
     const url = BASE + '/api/categories?limit=1000'

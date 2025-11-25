@@ -38,11 +38,13 @@
 
     <!-- 底部控制栏（去掉屏幕设置按钮） -->
     <view class="bottom-controls">
-      <button class="control-btn" @click="toggleMusic">
-        <view class="icon-svg">
-          <image src="/static/icons/music.svg" mode="aspectFit" />
+      <view class="control-btn sleep-btn pillow-btn" @click="toggleMusic" aria-label="睡觉" role="button">
+        <view class="pillow-inner">
+          <view class="pillow-highlight"></view>
+          <image src="/static/icons/music.svg" mode="aspectFit" class="pillow-icon" />
         </view>
-      </button>
+        <text class="pillow-label">睡觉</text>
+      </view>
       <button class="control-btn" @click="toggleTimer">
         <view class="icon-svg">
           <image src="/static/icons/timer.svg" mode="aspectFit" />
@@ -344,7 +346,8 @@ onUnmounted(() => {
 /* 底部控制栏 */
 .bottom-controls {
   position: fixed;
-  bottom: 0;
+  /* 抬高底部，以避免被 tabBar 覆盖（与全局 tab 高度兼容） */
+  bottom: 56px;
   left: 0;
   right: 0;
   display: flex;
@@ -354,7 +357,7 @@ onUnmounted(() => {
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(10px);
   border-top: 1px solid rgba(0, 0, 0, 0.1);
-  z-index: 100;
+  z-index: 1200; /* 提升 z-index 确保在 tabBar 之上 */
   box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
 }
 
@@ -383,6 +386,19 @@ onUnmounted(() => {
 .control-btn .icon-svg{ width:44px; height:44px; display:flex; align-items:center; justify-content:center }
 .control-btn .icon-svg image{ width:28px; height:28px; display:block }
 .control-btn .icon-svg svg{ width:28px; height:28px; display:block }
+
+/* 睡觉按钮样式 - 抱枕风格 */
+.pillow-btn{ position: fixed; bottom: calc(56px + 48px); left: 28px; display:flex; flex-direction:column; align-items:center; gap:6px; background:transparent; border:none; padding:0; z-index: 1300 }
+.pillow-inner{ width:84px; height:60px; border-radius:30px; background: linear-gradient(180deg, #fff 0%, #f3eef6 60%, #efe8fb 100%); box-shadow: 0 18px 36px rgba(20,16,40,0.35), inset 0 -8px 18px rgba(0,0,0,0.06); display:flex; align-items:center; justify-content:center; transition: transform 180ms ease, box-shadow 180ms ease; border: 1px solid rgba(255,255,255,0.6); position: relative; background-color: rgba(200,80,80,0.12) }
+.pillow-inner::after{ content: ''; position: absolute; width:72px; height:44px; border-radius:24px; filter: blur(10px); left: 50%; top: -8px; transform: translateX(-50%); opacity: 0.06 }
+.pillow-highlight{ position:absolute; width:72px; height:44px; left:50%; top:-8px; transform:translateX(-50%); border-radius:24px; background: rgba(255,255,255,0.12); filter: blur(6px); pointer-events:none }
+.pillow-icon{ width:36px; height:36px }
+.pillow-label{ font-size:13px; color:#f7f3fb; text-shadow: 0 2px 6px rgba(0,0,0,0.45); margin-top:6px }
+.pillow-btn:hover .pillow-inner{ transform: translateY(-4px); box-shadow: 0 26px 48px rgba(20,16,40,0.45) }
+.pillow-btn:active .pillow-inner{ transform: translateY(2px) scale(0.98) }
+/* 抱枕所在位置的调整 */
+.sleep-btn{ position: fixed !important; left: 18px !important; bottom: calc(56px + 44px) !important }
+.bottom-controls > .sleep-btn{ left: auto !important }
 
 /* 计时器设置弹窗样式：固定居中，不影响页面高度 */
 .timer-settings-overlay{

@@ -30,6 +30,7 @@
     { "path": "pages/profile/pages/help/index", "style": { "navigationBarTitleText": "帮助与客服" } },
     { "path": "pages/profile/pages/about/index", "style": { "navigationBarTitleText": "关于 星眠坞" } },
     { "path": "pages/player/index", "style": { "navigationBarTitleText": "播放" } },
+    { "path": "pages/player/share", "style": { "navigationBarTitleText": "分享到社区" } },
     { "path": "pages/queue/index", "style": { "navigationBarTitleText": "队列" } },
     { "path": "pages/history/index", "style": { "navigationBarTitleText": "历史" } },
     { "path": "pages/favorites/index", "style": { "navigationBarTitleText": "我喜欢的" } },

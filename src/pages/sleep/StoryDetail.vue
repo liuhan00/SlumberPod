@@ -20,6 +20,40 @@
         <view class="progress-info">
           <text class="time-text">{{ formattedCurrentTime }}/{{ formattedDuration }}</text>
         </view>
+        <!-- 音量弹窗按钮 -->
+        <button class="control-btn" @click.stop="openVolumeModal">
+          音量
+        </button>
+      </view>
+
+      <!-- 音量/倍速弹窗 -->
+      <view v-if="showVolumeModal" class="volume-modal-overlay" @click="closeVolumeModal">
+        <view class="volume-modal" @click.stop>
+          <view class="vm-header">
+            <text>播放器&声幕音量</text>
+            <button class="vm-reset" @click="resetVolumes">重置</button>
+          </view>
+
+          <scroll-view class="vm-list" style="max-height:260px">
+            <view v-for="(track, idx) in audioTracks" :key="track.id" class="vm-item">
+              <view class="vm-item-row">
+                <text class="vm-name">{{ track.name }}</text>
+                <text class="vm-value">{{ Math.round(track.volume * 100) }}%</text>
+              </view>
+              <slider :value="track.volume * 100" @change="onVolumeChange($event, idx)" show-value disabled-value="false"></slider>
+              <view class="vm-speed-row">
+                <text>倍速</text>
+                <picker mode="selector" :range="speedOptions" :value="track.speedIndex" @change="onSpeedChange($event, idx)">
+                  <view class="picker">{{ speedOptions[track.speedIndex] }}x</view>
+                </picker>
+              </view>
+            </view>
+          </scroll-view>
+
+          <view class="vm-actions">
+            <button class="vm-close" @click="closeVolumeModal">关闭</button>
+          </view>
+        </view>
       </view>
     </view>
 
@@ -46,7 +80,20 @@ const duration = ref(0)
 const hasAudio = ref(false)
 const showPlayerBar = ref(false)
 
+const showVolumeModal = ref(false)
+
 let audioCtx = null
+
+// 支持的音轨：单音频或组合音频（示例）
+const audioTracks = ref([
+  // 如果是单音频：只包含一个 track
+  { id: 't1', name: '主音轨', volume: 0.5, speedIndex: 1 },
+  // 组合时可有更多 track
+  { id: 't2', name: '背景音', volume: 0.3, speedIndex: 1 },
+  { id: 't3', name: '环绕', volume: 0.25, speedIndex: 1 }
+])
+
+const speedOptions = ['0.5', '0.75', '1.0', '1.25', '1.5']
 
 const formattedCurrentTime = computed(() => {
   const mm = String(Math.floor(currentTime.value / 60)).padStart(2, '0')
@@ -111,6 +158,30 @@ async function generateAndPlay() {
 
 function togglePlayerBar() {
   showPlayerBar.value = !showPlayerBar.value
+}
+
+function openVolumeModal(){
+  showVolumeModal.value = true
+}
+function closeVolumeModal(){
+  showVolumeModal.value = false
+}
+
+function onVolumeChange(e, idx){
+  const val = Number(e.detail.value) / 100
+  audioTracks.value[idx].volume = val
+  // TODO: 将音量应用到对应音轨的播放器实例
+}
+
+function onSpeedChange(e, idx){
+  const newIndex = Number(e.detail.value)
+  audioTracks.value[idx].speedIndex = newIndex
+  const speed = Number(speedOptions[newIndex])
+  // TODO: 应用倍速到对应音轨
+}
+
+function resetVolumes(){
+  audioTracks.value.forEach(t => { t.volume = 0.5; t.speedIndex = 2 })
 }
 
 onLoad((query) => {
@@ -323,6 +394,21 @@ onMounted(() => {
   box-shadow: 0 8px 20px rgba(91, 65, 200, 0.35);
   border: none;
 }
+
+
+/* 音量弹窗样式 */
+.volume-modal-overlay{ position: fixed; left:0; right:0; top:0; bottom:0; background: rgba(0,0,0,0.45); display:flex; align-items:center; justify-content:center; z-index:2000 }
+.volume-modal{ width: calc(100vw - 48px); max-width:720px; background: var(--card-bg); border-radius:12px; padding:16px; box-shadow:0 12px 40px rgba(0,0,0,0.28) }
+.vm-header{ display:flex; justify-content:space-between; align-items:center; margin-bottom:8px }
+.vm-reset{ background:transparent; border:none; color:var(--muted) }
+.vm-list{ margin-top:8px }
+.vm-item{ padding:10px; border-radius:10px; background: rgba(0,0,0,0.02); margin-bottom:8px }
+.vm-item-row{ display:flex; justify-content:space-between; align-items:center; margin-bottom:6px }
+.vm-name{ font-size:14px; color:var(--fg) }
+.vm-value{ font-size:12px; color:var(--muted) }
+.vm-speed-row{ display:flex; align-items:center; gap:8px; margin-top:8px }
+.vm-actions{ display:flex; justify-content:center; margin-top:12px }
+.vm-close{ padding:8px 12px; border-radius:8px; background:#111; color:#fff; border:none }
 
 </style>
 
