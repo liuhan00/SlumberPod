@@ -1676,4 +1676,9 @@ function openCozeChat(){
 .meta-chip{ display:flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; background:#fff; color: var(--card-fg, #13303f); box-shadow: 0 6px 14px rgba(0,0,0,0.06) }
 .chip-icon{ font-size:14px }
 .chip-text{ font-size:13px }
+
+/* Hide top center title and top play/share controls per design request */
+.topbar .title, .topbar .center-title { display: none !important }
+/* hide the top play/share buttons */
+.topbar .share, .topbar .play { display: none !important }
 </style>

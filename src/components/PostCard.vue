@@ -10,7 +10,7 @@
       />
       <view class="author-info">
         <text class="name">{{ post.author.name }}</text>
-        <text class="time">{{ post.time }}</text>
+        <text class="time">{{ displayTime }}</text>
       </view>
       <view class="more-actions">
         <button class="more-btn" @click="showMoreActions">⋯</button>
@@ -117,6 +117,22 @@ const imageSrc = ref(safeImageUrl(props.post.image, 'cover'))
 // 计算属性
 const hasTopics = computed(() => {
   return extractTopics(props.post.content).length > 0
+})
+
+// 友好时间显示
+const displayTime = computed(() => {
+  const raw = props.post.time
+  if (!raw) return ''
+  const t = new Date(raw)
+  if (isNaN(t)) return String(raw)
+  const now = new Date()
+  const diff = Math.floor((now - t) / 1000) // seconds
+  if (diff < 60) return `${diff}秒前`
+  if (diff < 3600) return `${Math.floor(diff / 60)}分钟前`
+  if (diff < 86400) return `${Math.floor(diff / 3600)}小时前`
+  if (diff < 2592000) return `${Math.floor(diff / 86400)}天前`
+  if (diff < 31536000) return `${Math.floor(diff / 2592000)}个月前`
+  return `${Math.floor(diff / 31536000)}年前`
 })
 
 // 方法
@@ -249,9 +265,15 @@ function handleImageError(e) {
 .more-btn {
   background: none;
   border: none;
+  outline: none;
   font-size: 18px;
   color: var(--muted-contrast, #999);
   padding: 4px;
+}
+
+/* 微信小程序去边框 */
+.more-btn::after {
+  border: none;
 }
 
 /* 内容区域 */
@@ -313,9 +335,15 @@ function handleImageError(e) {
   gap: 6px;
   background: none;
   border: none;
+  outline: none;
   padding: 8px 16px;
   border-radius: 6px;
   transition: background 0.2s;
+}
+
+/* 微信小程序去边框 */
+.action-btn::after {
+  border: none;
 }
 
 .action-btn:active {

@@ -1,17 +1,16 @@
 <template>
-  <view class="page" :style="bgStyle">
+    <view class="page" :style="bgStyle" @touchstart="onTouchStart" @touchmove="onTouchMove" @touchend="onTouchEnd">
     <view v-if="!hideTopbar" class="topbar">
       <button class="back" @click="goCreation">🎨</button>
-      <text class="title" :style="{ color: textColor }">首页</text>
+
+      <!-- center icon + text like design -->
+      <view class="top-center">
+        <image :style="{ opacity: iconOpacity, transform: iconTranslate }" src="/static/cloud_rain.png" class="top-icon" mode="aspectFit" />
+        <text :style="{ transform: titleTranslate }" class="top-title">白噪音</text>
+      </view>
+
       <view class="actions">
         <button class="icon" @click="openSearch">🔍</button>
-        <view v-if="player.currentTrack" class="playing-icon" @click="openPlayerQuick">
-          <image class="cover" :src="player.currentTrack.cover" mode="aspectFill" />
-          <view v-if="player.isPlaying" class="playing-indicator"></view>
-        </view>
-        <view v-else class="player-icon" @click="openPlayerQuick">
-          <text class="icon">▶</text>
-        </view>
       </view>
     </view>
 
@@ -24,7 +23,7 @@
       <button class="tabs-arrow" v-if="showArrow" @click="scrollTabsRight">›</button>
     </view>
 
-    <scroll-view class="grid" scroll-y enable-flex>
+    <scroll-view class="grid" scroll-y :enable-flex="false" scroll-with-animation="false" @scroll.passive="onScroll">
       <view class="item" v-for="(n, idx) in filteredNoises" :key="`${n?.id||n?._id||n?.uuid||'item'}-${idx}`" @click="playRemote(n)">
         <!-- 卡片：可扩展成带封面 -->
         <text class="name">{{ n.title || n.name || '未命名' }}</text>
@@ -76,6 +75,27 @@ const { bgStyle } = useGlobalTheme()
 const { colorMode } = useColorMode()
 const player = usePlayerStore()
 const textColor = computed(()=> colorMode.value === 'dark' ? '#ffffff' : '#222222')
+
+// scroll-driven header animation
+const scrollTop = ref(0)
+let _prevScroll = 0
+let _touchStartY = null
+function onScroll(e){
+  try{
+    const st = (e && e.detail && typeof e.detail.scrollTop === 'number') ? e.detail.scrollTop : (e && e.target && e.target.scrollTop) || 0
+    scrollTop.value = st
+    _prevScroll = st
+  }catch(err){ console.warn('onScroll parse failed', err) }
+}
+// Touch fallback: track vertical touch moves to approximate scroll when page-level APIs fail
+function onTouchStart(e){ try{ const t = e.touches && e.touches[0]; if(t) _touchStartY = t.clientY }catch(err){} }
+function onTouchMove(e){ try{ const t = e.touches && e.touches[0]; if(!t || _touchStartY === null) return; const dy = _touchStartY - t.clientY; const estimated = Math.max(0, Math.round(_prevScroll + dy)); scrollTop.value = estimated; }catch(err){} }
+function onTouchEnd(e){ try{ // commit estimated to prev
+    _prevScroll = scrollTop.value; _touchStartY = null }catch(err){} }
+const ICON_FADE_RANGE = 80 // px scrolled to fully hide icon
+const iconOpacity = computed(()=> Math.max(0, 1 - (scrollTop.value / ICON_FADE_RANGE)))
+const iconTranslate = computed(()=> `translateY(${Math.min(0, - (scrollTop.value/ICON_FADE_RANGE)*12)}px)`)
+const titleTranslate = computed(()=> `translateY(${Math.min(0, - (scrollTop.value/ICON_FADE_RANGE)*6)}px)`)
 
 const categories = ref([{ id: 'all', name: '全部' }])
 const activeCat = ref('all')
@@ -148,6 +168,26 @@ function scrollTabsRight(){
 onMounted(()=>{ fetchCategories(); randomizeMini(); // 组件加载时立即根据当前分类请求音频，避免用户未切换时不发起请求
   try{ loadAudiosForCategory(activeCat.value) }catch(e){ console.warn('initial loadAudiosForCategory failed', e) }
 })
+
+// uni-app page scroll (works in 微信开发者工具 / 小程序)
+try{
+  // prefer uni.onPageScroll listener which works across HBuilder compiled app + WeChat devtools
+  if(typeof uni !== 'undefined' && typeof uni.onPageScroll === 'function'){
+    console.log('[Free] attaching uni.onPageScroll')
+    uni.onPageScroll((e)=>{ try{ scrollTop.value = e.scrollTop || 0; console.log('[Free] uni.onPageScroll', e.scrollTop) }catch(err){} })
+  } else {
+    console.log('[Free] uni.onPageScroll not available - will export onPageScroll lifecycle')
+  }
+} catch(err) { console.warn('onPageScroll attach failed', err) }
+
+// Fallback: attach a global onPageScroll so HBuilder/uni runtime can call it (avoid ES export inside <script setup>)
+try{
+  if(typeof globalThis !== 'undefined'){
+    globalThis.onPageScroll = (e)=>{
+      try{ scrollTop.value = e && (e.scrollTop || (e.detail && e.detail.scrollTop)) || 0; console.log('[Free] global onPageScroll', scrollTop.value, e) }catch(err){ console.warn('global onPageScroll failed', err) }
+    }
+  }
+} catch(err) { console.warn('attach global onPageScroll failed', err) }
 const playing = ref(new Set())
 
 // mini player state
@@ -170,7 +210,7 @@ watch(remoteList, (val)=>{
 const filteredNoises = computed(()=>{
   // 我的创作仍优先使用本地创作
   if(activeCat.value==='我的创作'){
-    // 优先使用远端“我的创作”列表，若为空再回退本地存储
+    // 优先使用远端"我的创作"列表，若为空再回退本地存储
     if(Array.isArray(remoteList.value) && remoteList.value.length) return remoteList.value
     const userCreations = uni.getStorageSync('userCreations') || []
     return userCreations.map(c=>({ id:c.id, title:c.name, audio_url:c.audioUrl || '', duration:c.duration || 0 }))
@@ -537,14 +577,21 @@ function openAgent(){
 </script>
 
 <style scoped>
-.page{ padding:12px 16px; min-height:100vh }
-.topbar{ display:flex; align-items:center; justify-content:space-between; padding:8px 6px }
-.back{ background:transparent; border:none; font-size:22px; position:relative; left:0 }
+.page{ padding:12px 16px; padding-top:84px; min-height:100vh; -webkit-overflow-scrolling: touch }
+.topbar{ position:fixed; left:0; right:0; top:0; height:64px; display:flex; align-items:center; justify-content:center; padding:8px 6px; background: transparent; z-index:1400 }
+.back{ background:transparent; border:none; font-size:22px; position:absolute; left:12px; top:8px; z-index:1300 }
 .title{ font-size:18px; font-weight:700; text-align:center; flex:1 }
 .name, .title, .remote-name, .mini-name{ color: var(--text-color) !important }
-.actions{ display:flex; gap:8px; min-width:110px; justify-content:flex-end }
+.actions{ position:absolute; right:12px; top:8px; z-index:1300; display:flex; gap:8px }
 .icon{ background:transparent; border:none; font-size:18px }
 .topbar button::after{ border:none }
+
+/* top center icon + text */
+.top-center{ position:absolute; left:50%; top:12px; transform:translateX(-50%); display:flex; flex-direction:column; align-items:center; pointer-events:none }
+.top-icon{ width:56px; height:56px; margin-bottom:6px; transition: opacity 220ms ease, transform 220ms ease }
+.top-title{ font-size:15px; color:var(--text-color); font-weight:700; transition: transform 220ms ease }
+
+
 
 /* reuse home header player styles */
 .playing-icon{ width:36px; height:36px; border-radius:6px; overflow:hidden; position:relative }
@@ -553,6 +600,8 @@ function openAgent(){
 .player-icon{ width:36px; height:36px; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.06); border-radius:6px }
 
 .tabs-wrap{ display:flex; align-items:center; gap:8px; margin:12px 0; position:relative }
+/* keep tabs visible below fixed topbar when scrolling */
+.tabs-wrap{ position: -webkit-sticky; position: sticky; top:64px; z-index:120; background: transparent; padding-top:6px }
 .tabs-scroll{ display:flex; gap:8px; overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:4px }
 .tabs-scroll::-webkit-scrollbar{ display:none }
 .tab{ display:inline-flex; align-items:center; justify-content:center; white-space:nowrap; padding:6px 10px; background:rgba(0,0,0,0.04); border-radius:14px; min-width:52px; font-size:13px }
@@ -562,6 +611,11 @@ function openAgent(){
 .grid{ display:flex !important; flex-wrap:wrap; gap:12px 14px; padding:12px 8px }
 .grid .item{ box-sizing:border-box; width:50%; padding:10px 14px; border-radius:12px; background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.02)); transition: background 0.18s, transform 0.12s }
 @media (min-width:900px){ .grid .item{ width:25% } }
+
+/* page scrolling area to replace scroll-view */
+.page-scroll-area{ min-height: calc(100vh - 220px); /* ensure page taller than viewport so page scrolls */ padding-bottom: 120px }
+.page-scroll-area .item{ margin-bottom:12px }
+
 
 /* removed conflicting grid rules for responsive fixed-column layouts */
 .item{ display:flex; align-items:flex-start; padding:10px 14px; border-radius:12px; background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.02)); transition: background 0.18s, transform 0.12s }

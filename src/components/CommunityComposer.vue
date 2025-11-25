@@ -147,7 +147,7 @@ function handleImageError(e) {
   max-width: 680px;
   box-sizing: border-box;
 }
-.title-input{ width:100%; height:44px; padding:8px 12px; border-radius:8px; border:1px solid #e9ecef; margin-bottom:12px; font-size:15px; color: rgba(0,0,0,0.9) }
+.title-input{ width:100%; box-sizing:border-box; height:44px; padding:8px 12px; border-radius:8px; border:1px solid #e9ecef; margin-bottom:12px; font-size:15px; color: rgba(0,0,0,0.9) }
 
 .user-info {
   display: flex;
@@ -170,6 +170,7 @@ function handleImageError(e) {
 
 .input { 
   width: 100%; 
+  box-sizing: border-box;
   min-height: 100px; 
   background: #f8f9fa; 
   color: rgba(0,0,0,0.85); /* 提高对比度，深色文字 */
@@ -212,13 +213,15 @@ function handleImageError(e) {
   right: 8px;
   width: 24px;
   height: 24px;
-  background: rgba(0,0,0,0.7);
+  background: transparent;
   color: var(--text-color);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 16px;
+  border: none;
+  outline: none;
 }
 
 .toolbar {
@@ -238,9 +241,10 @@ function handleImageError(e) {
   align-items: center;
   gap: 4px;
   padding: 6px 12px;
-  background: #f8f9fa;
+  background: transparent;
   border-radius: 6px;
   border: none;
+  outline: none;
 }
 
 .tool-icon {
@@ -252,12 +256,18 @@ function handleImageError(e) {
   color: #666;
 }
 
+/* 微信小程序去按钮默认边框 */
+.tool-btn::after {
+  border: none;
+}
+
 .publish-btn {
   padding: 8px 20px;
   background: #007aff;
   color: var(--text-color);
   border-radius: 20px;
   border: none;
+  outline: none;
   font-weight: 600;
 }
 

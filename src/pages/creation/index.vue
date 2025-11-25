@@ -26,6 +26,7 @@
             <input 
               v-model="creationData.name" 
               class="input" 
+              data-role="title"
               placeholder="请输入作品名称"
               maxlength="20"
             />
@@ -564,7 +565,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.page { min-height: 100vh; background: var(--bg-color); background-image: var(--bg-gradient); padding-top: constant(safe-area-inset-top); padding-top: env(safe-area-inset-top); }
+.page { min-height: 100vh; background: var(--bg-color); background-image: var(--bg-gradient); padding-top: constant(safe-area-inset-top); padding-top: env(safe-area-inset-top); box-sizing: border-box; padding-left: 12px; padding-right: 12px; }
 
 /* 顶部导航栏 */
 .header {
@@ -648,7 +649,7 @@ onMounted(() => {
 /* 创作内容 */
 .creation-content {
   flex: 1;
-  padding: 16px;
+  padding: 0; /* 使用 page 的左右内边距 */
 }
 
 .creation-form {
@@ -660,7 +661,7 @@ onMounted(() => {
 .form-section {
   background: var(--card-bg, #ffffff);
   border-radius: 16px;
-  padding: 20px;
+  padding: 16px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
 }
 
@@ -686,16 +687,22 @@ onMounted(() => {
 
 .input, .textarea {
   width: 100%;
+  box-sizing: border-box;
   background: var(--input-bg, #f8f9fa);
   border: 2px solid var(--border, #f0f0f0);
   border-radius: 12px;
   padding: 12px 16px;
-  font-size: 14px;
+  font-size: 16px; /* 增大输入文字 */
   color: var(--fg, #333);
   outline: none;
   transition: all 0.2s;
 }
 
+/* 单独调整作品名称输入高度 */
+.input[name="name"], .input[data-role="title"] {
+  height: 48px;
+  line-height: 24px;
+}
 .input:focus, .textarea:focus {
   border-color: var(--uni-color-primary, #007aff);
 }
@@ -724,10 +731,10 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 12px;
+  padding: 8px 10px;
   background: var(--input-bg, #f8f9fa);
   border: 2px solid transparent;
-  border-radius: 20px;
+  border-radius: 18px;
   cursor: pointer;
   transition: all 0.2s;
 }

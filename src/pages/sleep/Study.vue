@@ -23,7 +23,10 @@
       <!-- 音乐选择区域（右上角或中间） -->
       <view class="music-selector" v-if="showMusicSelector">
         <scroll-view class="music-list" scroll-y>
+          <view v-if="loadingAudios">加载中...</view>
+          <view v-else-if="loadAudiosError">获取音频失败：{{ loadAudiosError }}</view>
           <view 
+            v-else
             v-for="audio in focusAudios" 
             :key="audio.id"
             :class="['music-item', { active: currentAudio?.id === audio.id }]"
@@ -36,15 +39,13 @@
       </view>
     </view>
 
-    <!-- 底部控制栏（去掉屏幕设置按钮） -->
+    <!-- 底部控制栏（固定底部，顺序：音乐 按钮 | 计时器 | 播放/暂停） -->
     <view class="bottom-controls">
-      <view class="control-btn sleep-btn pillow-btn" @click="toggleMusic" aria-label="睡觉" role="button">
-        <view class="pillow-inner">
-          <view class="pillow-highlight"></view>
-          <image src="/static/icons/music.svg" mode="aspectFit" class="pillow-icon" />
+      <button class="control-btn" @click="toggleMusic" aria-label="音乐">
+        <view class="icon-svg">
+          <image src="/static/icons/music.svg" mode="aspectFit" />
         </view>
-        <text class="pillow-label">睡觉</text>
-      </view>
+      </button>
       <button class="control-btn" @click="toggleTimer">
         <view class="icon-svg">
           <image src="/static/icons/timer.svg" mode="aspectFit" />
@@ -84,6 +85,7 @@ import learnPng from '@/static/learn.png'
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useGlobalTheme } from '@/composables/useGlobalTheme'
 import { usePlayerStore } from '@/stores/player'
+import * as apiAudios from '@/api/audios'
 
 const { bgStyle } = useGlobalTheme()
 const player = usePlayerStore()
@@ -102,12 +104,19 @@ const resumePolicy = ref(true) // true: resume next time; false: reset next time
 const currentTime = ref('')
 
 // 专注类白噪音列表（示例数据，实际应从后端获取）
-const focusAudios = ref([
-  { id: 1, name: '雨声', src: '' },
-  { id: 2, name: '咖啡厅', src: '' },
-  { id: 3, name: '图书馆', src: '' },
-  { id: 4, name: '森林', src: '' }
-])
+// 全部可选音频（示例），包含 category 字段以便筛选
+const allAudios = [
+  { id: 1, name: '雨声轻柔', src: '', category: '雨声' },
+  { id: 2, name: '雨声深沉', src: '', category: '雨声' },
+  { id: 3, name: '咖啡厅雨声', src: '', category: '咖啡' },
+  { id: 4, name: '咖啡轻响', src: '', category: '咖啡' },
+  { id: 5, name: '图书馆低语', src: '', category: '图书馆' },
+  { id: 6, name: '森林鸟鸣', src: '', category: '森林' }
+]
+
+const focusAudios = ref(allAudios.slice(0,4)) // 初始显示部分列表
+const loadingAudios = ref(false)
+const loadAudiosError = ref('')
 
 // 格式化计时器时间（正向计时）
 const formattedTime = computed(() => {
@@ -153,8 +162,89 @@ function resetTimer() {
   elapsedSeconds.value = 0
 }
 
+async function loadCoffeeRainAudios(){
+  console.log('[Study] loadCoffeeRainAudios start')
+  // 先尝试从后端查分类拿到对应的 category_id，再分别请求两类音频
+  try{
+    const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.150:3003'
+    const url = BASE + '/api/categories?limit=1000'
+    console.log('[Study] fetch categories url', url)
+    let resp
+    if(typeof fetch === 'function'){
+      const r = await fetch(url)
+      resp = await r.json()
+      console.log('[Study] fetch categories response', resp)
+    } else {
+      resp = await new Promise((resolve,reject)=>{
+        uni.request({ url, method:'GET', success(res){ console.log('[Study] uni.request categories success', res); resolve(res.data) }, fail(err){ console.warn('[Study] uni.request categories fail', err); reject(err) } })
+      })
+    }
+    const items = Array.isArray(resp) ? resp : (resp.data || resp.items || [])
+    // find ids for names '咖啡' 和 '雨声'（后端可能使用不同命名，尝试多种匹配）
+    const findIdByName = name => {
+      const lower = String(name).toLowerCase()
+      const found = items.find(it => String(it.name || '').toLowerCase() === lower || String(it.slug || '').toLowerCase() === lower)
+      if(found) return found.id || found.category_id || found._id || found.uuid
+      // try includes
+      const includes = items.find(it => String(it.name || '').toLowerCase().includes(lower))
+      return includes ? (includes.id || includes.category_id || includes._id || includes.uuid) : null
+    }
+    const rainId = findIdByName('雨声')
+    const coffeeId = findIdByName('咖啡')
+    console.log('[Study] found category ids', { rainId, coffeeId })
+
+    const results = []
+    // 确保 apiAudios 可用（某些构建/运行环境下 import 可能失败）
+    let api = typeof apiAudios !== 'undefined' ? apiAudios : null
+    if(!api){
+      try{ api = (await import('@/api/audios')) }
+      catch(e){ console.warn('[Study] dynamic import @/api/audios failed', e) }
+    }
+
+    loadingAudios.value = true
+    try{
+      if(rainId && api && api.getAudios) {
+        console.log('[Study] fetching rain audios with id', rainId)
+        const r = await api.getAudios({ category_id: rainId, limit: 50 })
+        console.log('[Study] rain audios response', r)
+        const arr = Array.isArray(r) ? r : (r.data || r.items || [])
+        results.push(...arr.map(it=>({ name: it.title || it.name || it.audioName || '', category: '雨声' })))
+      }
+      if(coffeeId && api && api.getAudios) {
+        console.log('[Study] fetching coffee audios with id', coffeeId)
+        const r2 = await api.getAudios({ category_id: coffeeId, limit: 50 })
+        console.log('[Study] coffee audios response', r2)
+        const arr2 = Array.isArray(r2) ? r2 : (r2.data || r2.items || [])
+        results.push(...arr2.map(it=>({ name: it.title || it.name || it.audioName || '', category: '咖啡' })))
+      }
+    }catch(e){
+      console.warn('[Study] fetch audios failed', e)
+      loadAudiosError.value = String(e.message || e)
+    }finally{
+      loadingAudios.value = false
+    }
+
+    // 如果都没有结果，回退到本地示例数据
+    if(results.length === 0) {
+      console.log('[Study] no remote results, fallback to local')
+      focusAudios.value = allAudios.filter(a => a.category === '咖啡' || a.category === '雨声')
+    } else {
+      // normalize to shape used by UI
+      focusAudios.value = results.map((it, idx) => ({ id: 'r:'+idx, name: it.name, src: '', category: it.category }))
+      console.log('[Study] focusAudios set from remote', focusAudios.value)
+    }
+  }catch(e){
+    console.warn('[Study] loadCoffeeRainAudios failed, fallback to local', e)
+    focusAudios.value = allAudios.filter(a => a.category === '咖啡' || a.category === '雨声')
+  }
+}
+
 function toggleMusic() {
   showMusicSelector.value = !showMusicSelector.value
+  if (showMusicSelector.value) {
+    // 打开时请求后端音频分类（优先获取真实数据）
+    loadCoffeeRainAudios()
+  }
 }
 
 function toggleTimer() {
@@ -256,7 +346,7 @@ onUnmounted(() => {
   position: relative;
   z-index: 1;
   min-height: 100vh;
-  padding: 0;
+  padding: 56px 12px 0 12px; /* 顶部留出导航/状态高度，左右内边距避免内容贴边 */
   display: flex;
   flex-direction: column;
 }
@@ -346,19 +436,19 @@ onUnmounted(() => {
 /* 底部控制栏 */
 .bottom-controls {
   position: fixed;
-  /* 抬高底部，以避免被 tabBar 覆盖（与全局 tab 高度兼容） */
-  bottom: 56px;
+  bottom: 0; /* 固定在最底端 */
   left: 0;
   right: 0;
   display: flex;
   justify-content: space-around;
   align-items: center;
-  padding: 16px;
+  padding: 8px 12px;
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(10px);
-  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
   z-index: 1200; /* 提升 z-index 确保在 tabBar 之上 */
   box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
+  height: 56px;
 }
 
 .control-btn {
@@ -387,18 +477,14 @@ onUnmounted(() => {
 .control-btn .icon-svg image{ width:28px; height:28px; display:block }
 .control-btn .icon-svg svg{ width:28px; height:28px; display:block }
 
+/* 确保三个底部按钮没有文字标签并垂直居中 */
+.control-btn .pillow-label, .control-btn .pillow-text { display: none }
+.control-btn { height: 44px; width: 44px; border-radius: 8px }
+
+
 /* 睡觉按钮样式 - 抱枕风格 */
-.pillow-btn{ position: fixed; bottom: calc(56px + 48px); left: 28px; display:flex; flex-direction:column; align-items:center; gap:6px; background:transparent; border:none; padding:0; z-index: 1300 }
-.pillow-inner{ width:84px; height:60px; border-radius:30px; background: linear-gradient(180deg, #fff 0%, #f3eef6 60%, #efe8fb 100%); box-shadow: 0 18px 36px rgba(20,16,40,0.35), inset 0 -8px 18px rgba(0,0,0,0.06); display:flex; align-items:center; justify-content:center; transition: transform 180ms ease, box-shadow 180ms ease; border: 1px solid rgba(255,255,255,0.6); position: relative; background-color: rgba(200,80,80,0.12) }
-.pillow-inner::after{ content: ''; position: absolute; width:72px; height:44px; border-radius:24px; filter: blur(10px); left: 50%; top: -8px; transform: translateX(-50%); opacity: 0.06 }
-.pillow-highlight{ position:absolute; width:72px; height:44px; left:50%; top:-8px; transform:translateX(-50%); border-radius:24px; background: rgba(255,255,255,0.12); filter: blur(6px); pointer-events:none }
-.pillow-icon{ width:36px; height:36px }
-.pillow-label{ font-size:13px; color:#f7f3fb; text-shadow: 0 2px 6px rgba(0,0,0,0.45); margin-top:6px }
-.pillow-btn:hover .pillow-inner{ transform: translateY(-4px); box-shadow: 0 26px 48px rgba(20,16,40,0.45) }
-.pillow-btn:active .pillow-inner{ transform: translateY(2px) scale(0.98) }
-/* 抱枕所在位置的调整 */
-.sleep-btn{ position: fixed !important; left: 18px !important; bottom: calc(56px + 44px) !important }
-.bottom-controls > .sleep-btn{ left: auto !important }
+/* 删除抱枕样式（使用统一底部三个按钮） */
+.pillow-btn, .pillow-inner, .pillow-highlight, .pillow-label, .sleep-btn { display: none !important }
 
 /* 计时器设置弹窗样式：固定居中，不影响页面高度 */
 .timer-settings-overlay{

@@ -11,6 +11,7 @@
     </view>
 
     <textarea class="content" v-model="contentText" placeholder="发布50字以上，更容易获赞哦~" auto-height="true" maxlength="500" />
+    <view class="divider"></view>
 
     <view class="tags-row">
       <scroll-view scroll-x class="tag-scroll">
@@ -92,18 +93,19 @@ export default {
 <style scoped>
 .container{ padding:16px; background:var(--page-bg,#f6f6f6); min-height:100vh }
 .close{ position:fixed; left:12px; top:12px; color:#111; font-size:20px }
-.audio-card{ margin-top:36px; background: #fff; border-radius:12px; padding:12px; display:flex; align-items:center; box-shadow:0 2px 12px rgba(0,0,0,0.06) }
+.audio-card{ margin-top:36px; background: transparent; padding:12px; display:flex; align-items:center }
 .cover{ width:56px; height:56px; border-radius:8px }
 .meta{ margin-left:12px; flex:1 }
 .title{ color:#111; font-size:16px; font-weight:700 }
 .subtitle{ color:#888; font-size:12px; margin-top:6px }
-.play-mini{ background:transparent; color:#333; border:none }
-.content{ margin-top:16px; min-height:200px; color:#111; background:#fff; border:1px solid rgba(0,0,0,0.06); border-radius:8px; padding:12px; font-size:14px }
+.play-mini{ background:transparent; color:#333; border:none; outline:none }
+.content{ margin-top:16px; min-height:200px; color:#111; background:transparent; padding:12px; font-size:14px }
 .tags-row{ margin-top:16px; display:flex; align-items:center }
 .tag-scroll{ flex:1 }
-.tag{ background:#f0f0f0; color:#333; padding:6px 10px; border-radius:8px; margin-right:8px; display:inline-block }
-.choose{ background:transparent; color:#555; border:1px solid #ddd; padding:8px 12px; border-radius:8px }
+.tag{ background:transparent; color:#555; padding:6px 10px; margin-right:8px; display:inline-block }
+.choose{ background:transparent; color:#555; padding:8px 12px; border:none; outline:none }
 .bottom{ position:fixed; left:16px; right:16px; bottom:20px }
-.publish{ width:100%; background:#2fb670; color:#fff; padding:12px; border-radius:10px; font-size:16px; border:none }
+.publish{ width:100%; background:transparent; color:#2fb670; padding:12px; font-size:16px; border:none; outline:none }
 .publish:disabled{ opacity:0.6 }
+.divider{ height:1px; background:#e0e0e0; margin:16px 0 }
 </style>
