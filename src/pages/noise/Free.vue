@@ -1,6 +1,6 @@
 <template>
-    <view class="page" :style="bgStyle" @touchstart="onTouchStart" @touchmove="onTouchMove" @touchend="onTouchEnd">
-    <view v-if="!hideTopbar" class="topbar">
+    <view class="page" :style="[bgStyle, { paddingTop: topbarHeight }]"> <!-- use scrolling (scroll-view) for slide-driven header; touch handlers removed to avoid drag-style behavior -->
+    <view v-if="!hideTopbar" class="topbar" :style="topbarStyle">
       <button class="back" @click="goCreation">🎨</button>
 
       <!-- center icon + text like design -->
@@ -23,10 +23,12 @@
       <button class="tabs-arrow" v-if="showArrow" @click="scrollTabsRight">›</button>
     </view>
 
-    <scroll-view class="grid" scroll-y :enable-flex="false" scroll-with-animation="false" @scroll.passive="onScroll">
-      <view class="item" v-for="(n, idx) in filteredNoises" :key="`${n?.id||n?._id||n?.uuid||'item'}-${idx}`" @click="playRemote(n)">
-        <!-- 卡片：可扩展成带封面 -->
-        <text class="name">{{ n.title || n.name || '未命名' }}</text>
+    <scroll-view class="list-scroll" :style="{ height: listHeight }" scroll-y enable-flex="false" scroll-with-animation="false" @scroll="onScroll">
+      <view class="grid">
+        <view class="item" v-for="(n, idx) in filteredNoises" :key="`${n?.id||n?._id||n?.uuid||'item'}-${idx}`" @click="playRemote(n)">
+          <!-- 卡片：可扩展成带封面 -->
+          <text class="name">{{ n.title || n.name || '未命名' }}</text>
+        </view>
       </view>
     </scroll-view>
 
@@ -80,22 +82,73 @@ const textColor = computed(()=> colorMode.value === 'dark' ? '#ffffff' : '#22222
 const scrollTop = ref(0)
 let _prevScroll = 0
 let _touchStartY = null
+const listHeight = ref('auto')
 function onScroll(e){
   try{
-    const st = (e && e.detail && typeof e.detail.scrollTop === 'number') ? e.detail.scrollTop : (e && e.target && e.target.scrollTop) || 0
+    // 微信小程序 scroll-view 触发的事件细节放在 e.detail.scrollTop
+    const st = (e && e.detail && typeof e.detail.scrollTop === 'number') ? e.detail.scrollTop : 0
     scrollTop.value = st
     _prevScroll = st
   }catch(err){ console.warn('onScroll parse failed', err) }
 }
-// Touch fallback: track vertical touch moves to approximate scroll when page-level APIs fail
-function onTouchStart(e){ try{ const t = e.touches && e.touches[0]; if(t) _touchStartY = t.clientY }catch(err){} }
-function onTouchMove(e){ try{ const t = e.touches && e.touches[0]; if(!t || _touchStartY === null) return; const dy = _touchStartY - t.clientY; const estimated = Math.max(0, Math.round(_prevScroll + dy)); scrollTop.value = estimated; }catch(err){} }
-function onTouchEnd(e){ try{ // commit estimated to prev
-    _prevScroll = scrollTop.value; _touchStartY = null }catch(err){} }
+// set list height to viewport minus topbar area so scroll-view actually scrolls inside small screen
+onMounted(()=>{
+  try{
+    if(typeof uni !== 'undefined' && uni.getSystemInfoSync){
+      const info = uni.getSystemInfoSync()
+      const vh = info.windowHeight || 0
+      // reserve space for mini player and padding
+      const reserved = 220
+      listHeight.value = (vh - reserved) + 'px'
+    }
+  }catch(e){ /* ignore */ }
+})
+// Removed touch fallback — header is now driven by scroll-view @scroll events
+function onTouchStart(e){}
+function onTouchMove(e){}
+function onTouchEnd(e){}
 const ICON_FADE_RANGE = 80 // px scrolled to fully hide icon
+const topbarMaxHeight = 84
+const topbarMinHeight = 48
+const topbarStyle = computed(()=>{
+  const ratio = Math.min(1, Math.max(0, 1 - (scrollTop.value / ICON_FADE_RANGE)))
+  const height = Math.round(topbarMinHeight + (topbarMaxHeight - topbarMinHeight) * ratio)
+  // prefer theme bg from bgStyle if available (works in uni-app), fallback to CSS var or white
+  let bg = 'transparent'
+  try{
+    if(bgStyle && typeof bgStyle === 'object' && bgStyle.background) bg = bgStyle.background
+    else if(typeof document !== 'undefined' && document.documentElement) bg = getComputedStyle(document.documentElement).getPropertyValue('--bg') || bg
+  }catch(e){ /* ignore */ }
+  // prefer exact page bg when available (so topbar blends into page)
+  if(bgStyle && typeof bgStyle === 'object' && bgStyle.background) bg = bgStyle.background
+  // ensure solid fill and full opacity so topbar always matches page background
+  const bgColor = bg || '#ffffff'
+  const out = { height: height + 'px', background: bgColor, backgroundColor: bgColor, opacity: 1, backdropFilter: 'blur(8px)' }
+  return out
+})
+
+// expose topbar height to layout and small-screen bindings
+const topbarHeight = ref((topbarMaxHeight) + 'px')
+// sync CSS var for environments that support document
+watch(topbarStyle, (v)=>{
+  try{
+    const h = (v && v.height) ? v.height : (topbarMaxHeight + 'px')
+    topbarHeight.value = h
+    if(typeof document !== 'undefined' && document.documentElement && document.documentElement.style){
+      document.documentElement.style.setProperty('--topbar-height', h)
+    }
+  }catch(e){ console.warn('sync topbarHeight failed', e) }
+}, { immediate: true })
 const iconOpacity = computed(()=> Math.max(0, 1 - (scrollTop.value / ICON_FADE_RANGE)))
-const iconTranslate = computed(()=> `translateY(${Math.min(0, - (scrollTop.value/ICON_FADE_RANGE)*12)}px)`)
-const titleTranslate = computed(()=> `translateY(${Math.min(0, - (scrollTop.value/ICON_FADE_RANGE)*6)}px)`)
+const iconTranslate = computed(()=> `translateY(${Math.min(0, - (scrollTop.value/ICON_FADE_RANGE)*24)}px)`)
+// keep title stable (don't translate up) so the "白噪音" label stays visible when scrolling
+// title should translate up with icon until it reaches the control row height
+const TOP_CONTROLS_Y = 36 // desired final Y offset (px) for title when collapsed
+const titleTranslate = computed(()=>{
+  const progress = Math.min(1, Math.max(0, scrollTop.value / ICON_FADE_RANGE))
+  const dy = Math.round(progress * TOP_CONTROLS_Y)
+  return `translateY(${ -dy }px)`
+})
 
 const categories = ref([{ id: 'all', name: '全部' }])
 const activeCat = ref('all')
@@ -577,9 +630,10 @@ function openAgent(){
 </script>
 
 <style scoped>
-.page{ padding:12px 16px; padding-top:84px; min-height:100vh; -webkit-overflow-scrolling: touch }
-.topbar{ position:fixed; left:0; right:0; top:0; height:64px; display:flex; align-items:center; justify-content:center; padding:8px 6px; background: transparent; z-index:1400 }
-.back{ background:transparent; border:none; font-size:22px; position:absolute; left:12px; top:8px; z-index:1300 }
+.page{ padding:12px 16px; min-height:100vh; -webkit-overflow-scrolling: touch }
+.topbar{ position:fixed; left:0; right:0; top:0; height:64px; display:flex; align-items:center; justify-content:center; padding:8px 6px; background: var(--bg, #ffffff); z-index:1400; transition: height 200ms ease, background 200ms ease }
+.topbar .top-center{ pointer-events:none }
+.topbar .back, .topbar .actions{ z-index:1410 }.back{ background:transparent; border:none; font-size:22px; position:absolute; left:12px; top:8px; z-index:1300 }
 .title{ font-size:18px; font-weight:700; text-align:center; flex:1 }
 .name, .title, .remote-name, .mini-name{ color: var(--text-color) !important }
 .actions{ position:absolute; right:12px; top:8px; z-index:1300; display:flex; gap:8px }
@@ -587,9 +641,12 @@ function openAgent(){
 .topbar button::after{ border:none }
 
 /* top center icon + text */
-.top-center{ position:absolute; left:50%; top:12px; transform:translateX(-50%); display:flex; flex-direction:column; align-items:center; pointer-events:none }
-.top-icon{ width:56px; height:56px; margin-bottom:6px; transition: opacity 220ms ease, transform 220ms ease }
-.top-title{ font-size:15px; color:var(--text-color); font-weight:700; transition: transform 220ms ease }
+.top-center{ position:absolute; left:50%; top:8px; transform:translateX(-50%); display:flex; flex-direction:column; align-items:center; pointer-events:none }
+.top-icon{ width:56px; height:56px; margin-bottom:4px; transition: opacity 220ms ease, transform 220ms ease }
+.top-title{ font-size:18px; color:var(--text-color); font-weight:800; transition: transform 220ms ease }
+/* compact left/back and right/action buttons */
+.back{ left:8px; top:10px }
+.actions{ right:8px; top:10px }
 
 
 
@@ -601,16 +658,22 @@ function openAgent(){
 
 .tabs-wrap{ display:flex; align-items:center; gap:8px; margin:12px 0; position:relative }
 /* keep tabs visible below fixed topbar when scrolling */
-.tabs-wrap{ position: -webkit-sticky; position: sticky; top:64px; z-index:120; background: transparent; padding-top:6px }
+.tabs-wrap{ position: -webkit-sticky; position: sticky; top:calc(var(--topbar-height,64px)); z-index:120; background: transparent; padding-top:6px }
 .tabs-scroll{ display:flex; gap:8px; overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:4px }
 .tabs-scroll::-webkit-scrollbar{ display:none }
 .tab{ display:inline-flex; align-items:center; justify-content:center; white-space:nowrap; padding:6px 10px; background:rgba(0,0,0,0.04); border-radius:14px; min-width:52px; font-size:13px }
 .tab.active{ background:var(--accent, #2EA56B); color:#fff; box-shadow:0 6px 14px rgba(46,165,107,0.10) }
 .tabs-arrow{ position:absolute; right:6px; top:50%; transform:translateY(-50%); background:rgba(255,255,255,0.95); border-radius:50%; width:30px; height:30px; display:flex; align-items:center; justify-content:center; border:none; box-shadow:0 6px 12px rgba(0,0,0,0.10) }
 
-.grid{ display:flex !important; flex-wrap:wrap; gap:12px 14px; padding:12px 8px }
-.grid .item{ box-sizing:border-box; width:50%; padding:10px 14px; border-radius:12px; background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.02)); transition: background 0.18s, transform 0.12s }
-@media (min-width:900px){ .grid .item{ width:25% } }
+.grid{ display:flex !important; flex-wrap:wrap; gap:8px 10px; padding:8px 6px }
+/* two-column responsive cards */
+.grid .item{ box-sizing:border-box; flex: 0 0 calc(50% - 6px); max-width: calc(50% - 6px); padding:8px; border-radius:10px; background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.02)); transition: background 0.14s, transform 0.12s; position: relative; z-index: 1 }
+@media (min-width:900px){ .grid .item{ flex: 0 0 calc(25% - 12px); max-width: calc(25% - 12px) } }
+
+/* ensure scroll-view children are positioned normally */
+.list-scroll{ min-height: calc(100vh - 160px); padding-bottom: 140px }
+.list-scroll .grid{ margin-top: 6px }
+
 
 /* page scrolling area to replace scroll-view */
 .page-scroll-area{ min-height: calc(100vh - 220px); /* ensure page taller than viewport so page scrolls */ padding-bottom: 120px }

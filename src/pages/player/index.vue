@@ -55,32 +55,51 @@
     </view>
 
     <!-- 音量/倍速弹窗（播放详情页） -->
-    <view v-if="showVolumeModal" class="volume-modal-overlay" @click="closeVolumeModal">
-      <view class="volume-modal" @click.stop>
+    <view v-if="showVolumeModal" class="volume-modal-overlay" data-debug="v2" @click="closeVolumeModal">
+      <view class="volume-modal" data-debug="v2" @click.stop>
         <view class="vm-header">
-          <text>播放器 & 声幕音量</text>
+          <text class="vm-title">播放器 & 声幕音量</text>
           <button class="vm-reset" @click="resetVolumes">重置</button>
         </view>
 
-        <scroll-view class="vm-list" style="max-height:260px">
-          <view v-for="(track, idx) in audioTracks" :key="track.id" class="vm-item">
-            <view class="vm-item-row">
-              <text class="vm-name">{{ track.icon ? track.icon : '' }} {{ track.name }}</text>
-              <text class="vm-value">{{ Math.round(track.volume * 100) }}%</text>
+        <scroll-view class="vm-list" :style="{ height: listHeight + 'px' }" scroll-y>
+
+          <view v-for="(track, idx) in audioTracks" :key="track.id" class="vm-item compact">
+            <view class="vm-row">
+              <button :class="['vm-name', { disabled: !track.enabled }]" @click="toggleTrackEnabled(idx)">{{ track.name }}</button>
+              <view class="vm-right">
+                <text class="vm-percent">{{ Math.round(track.volume * 100) }}%</text>
+              </view>
             </view>
-            <slider :value="track.volume * 100" @change="onVolumeChange($event, idx)" show-value disabled-value="false"></slider>
-            <view class="vm-speed-row">
-              <text>倍速</text>
-              <picker mode="selector" :range="speedOptions" :value="track.speedIndex" @change="onSpeedChange($event, idx)">
-                <view class="picker">{{ speedOptions[track.speedIndex] }}x</view>
-              </picker>
+
+            <view class="vm-row slider-row">
+              <slider class="vm-slider" :value="track.volume * 100" @change="onVolumeChange($event, idx)" activeColor="#7bd38a" backgroundColor="#eef4fb"></slider>
+              <view class="vm-actions-inline mini">
+                <button class="small-btn" @click="onVolumeChange({ detail: { value: Math.max(0, Math.round((track.volume*100)-5)) } }, idx)">-</button>
+                <button class="small-btn" @click="onVolumeChange({ detail: { value: Math.min(100, Math.round((track.volume*100)+5)) } }, idx)">+</button>
+              </view>
+            </view>
+          </view>
+
+          <view class="vm-divider"></view>
+
+          <view class="vm-subtitle">倍速</view>
+          <view v-for="(track, idx) in audioTracks" :key="track.id + '-speed'" class="vm-item compact speed-block">
+            <view class="vm-row">
+              <button :class="['vm-name', { disabled: !track.enabled }]" @click="toggleTrackEnabled(idx)">{{ track.name }}</button>
+              <view class="vm-right">
+                <text class="vm-percent">{{ speedOptions[track.speedIndex] }}x</text>
+              </view>
+            </view>
+            <view class="vm-row speed-row">
+              <view class="vm-actions-inline mini">
+                <button class="small-btn" @click="(function(){ const ni = Math.max(0, track.speedIndex-1); onSpeedChange({ detail: { value: ni } }, idx) })()">-</button>
+                <button class="small-btn" @click="(function(){ const ni = Math.min(speedOptions.length-1, track.speedIndex+1); onSpeedChange({ detail: { value: ni } }, idx) })()">+</button>
+              </view>
             </view>
           </view>
         </scroll-view>
 
-        <view class="vm-actions">
-          <button class="vm-close" @click="closeVolumeModal">关闭</button>
-        </view>
       </view>
     </view>
 
@@ -466,10 +485,30 @@ const customTimerMinutes = ref('')
 
 // 音量弹窗（播放详情）
 const showVolumeModal = ref(false)
+// audioTracks: each track controls an individual source in the "声幕" mix
+// fields: id, name, volume (0-1), enabled (bool), speedIndex
+const listHeight = ref(260)
+
 const audioTracks = ref([
-  { id: 't1', name: store.currentTrack?.name || '主音轨', icon: '', volume: store.volume || 0.5, speedIndex: 2 }
+  { id: 't1', name: store.currentTrack?.name || '主音轨', volume: store.volume || 0.5, enabled: true, speedIndex: 2 },
+  { id: 't2', name: store.playlist[1]?.name || store.playlist[1]?.title || '音轨2', volume: 0.8, enabled: true, speedIndex: 2 },
+  { id: 't3', name: store.playlist[2]?.name || store.playlist[2]?.title || '音轨3', volume: 0.8, enabled: true, speedIndex: 2 }
 ])
 const speedOptions = ['0.5','0.75','1.0','1.25','1.5']
+
+// toggle a track on/off (enabled -> playing); when disabled we set volume to 0 visually
+function toggleTrackEnabled(idx){
+  const t = audioTracks.value[idx]
+  console.log('[player] toggleTrackEnabled', idx, t)
+  if(!t) return
+  const next = !t.enabled
+  t.enabled = next
+  console.log('[player] track enabled state ->', t.enabled)
+  // map to actual audio context if exists
+  try{ setTrackEnabled(idx, next) }catch(e){ console.warn('toggleTrackEnabled -> setTrackEnabled failed', e) }
+  // if single track, also sync store volume
+  if(audioTracks.value.length === 1){ setVolume(t.enabled ? (t.volume || 0.5) : 0) }
+}
 
 // meta popup state
 const showMeta = ref(false)
@@ -550,9 +589,16 @@ function closeSettings() {
 }
 
 function openVolumeModal(){
+  console.log('[player] openVolumeModal called, store.playlist.length=', Array.isArray(store.playlist)?store.playlist.length:0, 'currentTrack=', store.currentTrack)
   // 构造音轨列表：若当前播放为组合，使用 store.playlist，否则单项
-  const playlist = store.playlist && store.playlist.length > 1 ? store.playlist : [store.currentTrack].filter(Boolean)
-  audioTracks.value = playlist.map((t, i)=> ({ id: t?.id || `t${i}`, name: t?.name || t?.title || `音轨 ${i+1}`, icon: '', volume: t?.volume ?? store.volume ?? 0.5, speedIndex: 2 }))
+  let playlist = store.playlist && store.playlist.length > 1 ? store.playlist : [store.currentTrack].filter(Boolean)
+  // 如果 store 数据为空（dev/初始化问题），回退到内置 sample 列表，避免弹窗空内容
+  if(!playlist || playlist.length === 0){
+    console.warn('[player] playlist and currentTrack empty — falling back to sample noises')
+    playlist = allNoises.slice(0,3).map((n,i)=> ({ id: n.id || `sample${i}`, name: n.name || n.title || `示例 ${i+1}`, volume: 0.8 }))
+  }
+  audioTracks.value = playlist.map((t, i)=> ({ id: t?.id || `t${i}`, name: t?.name || t?.title || `音轨 ${i+1}`, icon: '', volume: (typeof t?.volume === 'number' ? t.volume : (store.volume ?? 0.5)), enabled: true, speedIndex: 2 }))
+  console.log('[player] audioTracks constructed', audioTracks.value)
   showVolumeModal.value = true
 }
 function closeVolumeModal(){ showVolumeModal.value = false }
@@ -560,9 +606,10 @@ function closeVolumeModal(){ showVolumeModal.value = false }
 function onVolumeChange(e, idx){
   const val = Number(e.detail.value) / 100
   audioTracks.value[idx].volume = val
+  // set volume on audioCtx if exists
+  try{ const ctx = audioCtxs[idx]; if(ctx){ ctx.volume = val } }catch(e){ console.warn('set volume on ctx failed', e) }
   // 如果是单音频，直接调整主 player 音量
   if(audioTracks.value.length === 1){ setVolume(val) }
-  // TODO: 若组合音频由多个播放器实例管理，这里应调用对应实例设置音量
 }
 
 function onSpeedChange(e, idx){
@@ -576,7 +623,7 @@ function onSpeedChange(e, idx){
 }
 
 function resetVolumes(){
-  audioTracks.value.forEach((t, i)=>{ t.volume = i===0 ? (store.volume || 0.5) : (t.volume || 0.5); t.speedIndex = 2 })
+  audioTracks.value.forEach((t, i)=>{ t.volume = i===0 ? (store.volume || 0.5) : 0.8; t.speedIndex = 2; t.enabled = true; try{ const ctx = audioCtxs[i]; if(ctx){ ctx.volume = t.volume; if(!ctx.src){} } }catch(e){} })
 }
 
 // 将 store.volume 同步到 audioTracks（如果只存在单音轨）
@@ -828,7 +875,23 @@ function startTimer(){ if(timerId) clearInterval(timerId); remainingSeconds.valu
     } }, 1000) }
 function cancelTimer(){ if(timerId){ clearInterval(timerId); timerId=null } }
 
-let audioCtx
+let audioCtxs = [] // array of InnerAudioContext for multi-track
+
+function createAudioCtxForTrack(track, idx){
+  try{
+    const ctx = uni.createInnerAudioContext()
+    ctx.autoplay = !!track.enabled
+    ctx.obeyMuteSwitch = false
+    ctx.src = track.src || track.url || ''
+    ctx.volume = typeof track.volume === 'number' ? track.volume : (store.volume || 0.5)
+    ctx.onTimeUpdate(()=>{
+      try{ if(idx===0){ store.positionMs = ctx.currentTime * 1000 } }catch(e){}
+    })
+    ctx.onEnded(()=>{ try{ /* if one track ends, keep others running */ }catch(e){} })
+    ctx.onError((err)=>{ console.warn('[player] audioCtx error idx', idx, err); uni.showToast({ title:'音频加载失败', icon:'none' }) })
+    return ctx
+  }catch(e){ console.warn('createAudioCtxForTrack failed', e); return null }
+}
 
 onLoad((query)=>{
   // read optional title override from query
@@ -836,29 +899,28 @@ onLoad((query)=>{
     try{ playlistTitleOverride.value = decodeURIComponent(query.title) }catch(e){ playlistTitleOverride.value = query.title }
   }
 
-  audioCtx = uni.createInnerAudioContext()
-  audioCtx.autoplay = false
-  audioCtx.obeyMuteSwitch = false
-  audioCtx.src = ''
+  // build initial playlist for multi-track: prefer store.playlist, fallback to currentTrack or samples
+  let tracks = (Array.isArray(store.playlist) && store.playlist.length>0) ? store.playlist.slice(0,3) : (store.currentTrack ? [store.currentTrack] : [])
+  if(tracks.length === 0) tracks = allNoises.slice(0,3)
+  // normalize tracks to include src and enabled
+  const normalized = tracks.map((t,i)=> ({ id: t.id || `t${i}`, name: t.name || t.title || `音轨 ${i+1}`, src: t.src || t.url || '', volume: (t.volume || store.volume || 0.8), enabled: true }))
+  audioTracks.value = normalized
 
-  audioCtx.onCanplay(()=>{
-    try{ if (audioCtx.duration) store.durationMs = audioCtx.duration * 1000 }catch(e){}
-    try{ if (store.isPlaying) audioCtx.play() }catch(e){}
-  })
-  audioCtx.onTimeUpdate(()=>{
-    try{ store.positionMs = audioCtx.currentTime * 1000 }catch(e){}
-  })
-  audioCtx.onEnded(()=>{
-    try{ store.isPlaying = false }catch(e){}
-  })
-  audioCtx.onError((err)=>{
-    try{
-      console.warn('audioCtx error', err)
-      uni.showToast({ title:'音频加载失败，请检查网络或更换音源', icon:'none' })
-      store.isPlaying = false
-    }catch(e){}
-  })
+  // create audio contexts for each track and autoplay
+  try{
+    // cleanup old
+    audioCtxs.forEach(c=>{ try{ c.pause(); c.destroy && c.destroy() }catch(e){} })
+    audioCtxs = []
+    normalized.forEach((t, i)=>{
+      const ctx = createAudioCtxForTrack(t, i)
+      if(ctx){
+        audioCtxs.push(ctx)
+        try{ if(t.enabled && ctx.src){ ctx.play() } }catch(e){ console.warn('play failed', e) }
+      }
+    })
+  }catch(e){ console.warn('multi audio init failed', e) }
 
+  // existing behavior: if query.id open target
   try{
     if(query?.id){
       const target = allNoises.find(n=>n.id===query.id)
@@ -866,18 +928,31 @@ onLoad((query)=>{
         store.setPlaylist(allNoises)
         store.play(target)
         historyStore.add(target)
-        try{ if(typeof target.src === 'string' && target.src && !/oss\.example\.com/i.test(target.src)){ audioCtx.src = target.src } else { console.warn('skip invalid audio domain', target?.src); uni.showToast({ title:'音频资源不可用', icon:'none' }) } }catch(e){ console.warn('set src failed', e); uni.showToast({ title:'音频地址无效', icon:'none' }) }
-        store.durationMs = 180000
       }
-    } else if (store.currentTrack) {
-      try{ const u = store.currentTrack?.src; if(typeof u === 'string' && u && !/oss\.example\.com/i.test(u)){ audioCtx.src = u } else { console.warn('skip invalid audio domain', u); uni.showToast({ title:'音频资源不可用', icon:'none' }) } }catch(e){ console.warn('set src failed', e) }
     }
   }catch(e){ console.warn('audio init failed', e) }
 })
 
 onUnload(()=>{
-  try { audioCtx?.stop(); audioCtx?.destroy() } catch(e) {}
+  try{ audioCtxs.forEach(c=>{ try{ c.stop && c.stop(); c.destroy && c.destroy() }catch(e){} }) }catch(e){}
 })
+
+// update single track enabled -> control audioCtxs
+function setTrackEnabled(idx, enabled){
+  const t = audioTracks.value[idx]
+  if(!t) return
+  t.enabled = !!enabled
+  const ctx = audioCtxs[idx]
+  if(!ctx) return
+  try{
+    if(t.enabled){ if(ctx.src) ctx.play(); // restore volume
+      ctx.volume = t.volume
+    }
+    else { // fade out and pause
+      rampVolumeForCtx(idx, 0, 240).then(()=>{ try{ ctx.pause() }catch(e){} })
+    }
+  }catch(e){ console.warn('setTrackEnabled failed', e) }
+}
 
 // Canvas drawing and interaction for timer ring (兼容 小程序)
 function polarToCartesian(cx, cy, r, angle){
@@ -1062,46 +1137,66 @@ function initCanvas(){
   }
 }
 function toggle(){
-  if (!store.currentTrack) return
-  if (store.isPlaying) { fadePause() }
-  else { fadePlay() }
+  // toggle global play/pause across multi-track contexts
+  const anyPlaying = store.isPlaying
+  if(anyPlaying) {
+    fadePause()
+  } else {
+    fadePlay()
+  }
 }
 async function fadePlay(){
-  store.play()
-  audioCtx.volume = 0
-  audioCtx.play()
-  await rampVolume(store.volume, 400)
+  try{
+    store.play()
+    // ramp up volumes from 0 to target for each enabled ctx
+    const targets = audioTracks.value.map((t,i)=> ({ idx:i, vol: t.enabled ? t.volume : 0 }))
+    // set all to 0 then play
+    audioCtxs.forEach((c, i)=>{ try{ c.volume = 0; if(audioTracks.value[i]?.enabled && c.src) c.play() }catch(e){} })
+    // ramp each to its target in parallel
+    await Promise.all(targets.map(t=> rampVolumeForCtx(t.idx, t.vol, 400)))
+    store.isPlaying = true
+  }catch(e){ console.warn('fadePlay failed', e) }
 }
 async function fadePause(){
-  await rampVolume(0, 400)
-  audioCtx.pause()
-  store.pause()
+  try{
+    // ramp all to 0 then pause
+    await Promise.all(audioCtxs.map((c,i)=> rampVolumeForCtx(i, 0, 300).catch(()=>{})))
+    audioCtxs.forEach((c,i)=>{ try{ c.pause() }catch(e){} })
+    store.pause()
+  }catch(e){ console.warn('fadePause failed', e) }
 }
-function rampVolume(target, ms){
+function rampVolumeForCtx(idx, target, ms){
   return new Promise(resolve=>{
+    const ctx = audioCtxs[idx]
+    if(!ctx) return resolve()
     const steps = 10
-    const start = audioCtx.volume
-    const delta = (target-start)/steps
-    let i=0
+    const start = typeof ctx.volume === 'number' ? ctx.volume : 0
+    const delta = (target - start) / steps
+    let i = 0
     const id = setInterval(()=>{
       i++
-      audioCtx.volume = Math.max(0, Math.min(1, start + delta*i))
+      try{ ctx.volume = Math.max(0, Math.min(1, start + delta * i)) }catch(e){}
       if(i>=steps){ clearInterval(id); resolve() }
-    }, ms/steps)
+    }, Math.max(10, ms/steps))
   })
 }
 
 function seek(ms){
   store.seek(ms)
-  audioCtx.seek(ms/1000)
+  // seek primary ctx (idx 0) if exists
+  try{ if(audioCtxs[0] && typeof audioCtxs[0].seek === 'function'){ audioCtxs[0].seek(ms/1000) } }catch(e){ console.warn('seek failed', e) }
 }
 function setVolume(v){
   store.setVolume(v)
-  audioCtx.volume = store.volume
+  // apply to primary track and update audioTracks[0]
+  try{ if(audioTracks.value[0]){ audioTracks.value[0].volume = v } }catch(e){}
+  audioCtxs.forEach((c,i)=>{ try{ if(i===0) c.volume = store.volume; }catch(e){} })
 }
 function muteToggle(){
   store.toggleMute()
-  audioCtx.volume = store.volume
+  // when muted, set volumes to 0; when unmuted restore from audioTracks
+  const muted = !!store.muted
+  audioCtxs.forEach((c,i)=>{ try{ c.volume = muted ? 0 : (audioTracks.value[i]?.volume || store.volume || 0.5) }catch(e){} })
 }
 function toggleLoop(){
   const nextMode = store.loopMode==='all' ? 'one' : store.loopMode==='one' ? 'off' : 'all'
@@ -1109,11 +1204,13 @@ function toggleLoop(){
 }
 function prev(){
   store.prev()
-  if (store.currentTrack) { historyStore.add(store.currentTrack); audioCtx.src = store.currentTrack.src; fadePlay() }
+  if (store.currentTrack) { historyStore.add(store.currentTrack); // update primary ctx src
+    try{ if(audioCtxs[0]){ audioCtxs[0].src = store.currentTrack.src; fadePlay() }else{ fadePlay() } }catch(e){ fadePlay() }
+  }
 }
 function next(){
   store.next()
-  if (store.currentTrack) { historyStore.add(store.currentTrack); audioCtx.src = store.currentTrack.src; fadePlay() }
+  if (store.currentTrack) { historyStore.add(store.currentTrack); try{ if(audioCtxs[0]){ audioCtxs[0].src = store.currentTrack.src; fadePlay() }else{ fadePlay() } }catch(e){ fadePlay() } }
 }
 function goQueue(){ uni.navigateTo({ url:'/pages/queue/index' }) }
 
@@ -1165,6 +1262,15 @@ onMounted(()=>{
   try{ favStore.syncFromServer?.() }catch(e){ /* silent */ }
   // 更新收藏数量
   updateFavoriteCount()
+
+  // compute listHeight for scroll-view so it can scroll on miniapp
+  try{
+    const sys = uni.getSystemInfoSync()
+    const winH = sys.windowHeight || sys.screenHeight || 667
+    // reserve about 180px for title and close button area (approx)
+    const reserved = 180
+    listHeight.value = Math.max(160, winH - reserved)
+  }catch(e){ listHeight.value = 260 }
 })
 
 function openCozeChat(){
@@ -1499,17 +1605,71 @@ function openCozeChat(){
 
 /* Settings Modal Styles - 半屏弹窗 */
 /* Volume modal: compact centered card (different from settings half-sheet) */
-.volume-modal-overlay{ position:fixed; inset:0; background: rgba(0,0,0,0.45); display:flex; align-items:center; justify-content:center; z-index:1100 }
-.volume-modal{ width:88vw; max-width:360px; background: var(--card-bg, #ffffff); border-radius:12px; padding:14px; box-shadow: 0 12px 30px rgba(0,0,0,0.18); z-index:1110 }
-.volume-modal .vm-header{ display:flex; justify-content:space-between; align-items:center; margin-bottom:8px }
-.volume-modal .vm-header text{ font-weight:700; color: var(--card-fg,#13303f) }
-.volume-modal .vm-reset{ background:transparent; border:none; color:var(--muted); font-size:13px }
-.volume-modal .vm-item{ padding:8px 0; border-bottom:1px solid rgba(0,0,0,0.04) }
-.volume-modal .vm-item-row{ display:flex; justify-content:space-between; align-items:center; margin-bottom:6px }
-.volume-modal .vm-name{ font-size:14px; color:var(--card-fg,#13303f) }
-.volume-modal .vm-value{ font-size:13px; color:var(--muted) }
-.volume-modal .vm-actions{ display:flex; justify-content:flex-end; margin-top:12px }
-.volume-modal .vm-close{ background:#fff; border-radius:8px; border:1px solid rgba(0,0,0,0.06); padding:8px 12px; box-shadow: 0 6px 18px rgba(0,0,0,0.06) }
+.volume-modal-overlay{ position:fixed; inset:0; background: rgba(0,0,0,0.6); display:flex; align-items:flex-end; justify-content:center; z-index:1100 }
+.volume-modal{ width:100%; max-width:720px; background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(250,252,255,0.98) 100%); border-top-left-radius:18px; border-top-right-radius:18px; padding:12px 16px 20px 16px; box-shadow: 0 -10px 30px rgba(10,18,26,0.18); z-index:1110; border-top: 1px solid rgba(10,20,30,0.06); margin:0; }
+.volume-modal .vm-header{ display:flex; justify-content:space-between; align-items:center; margin-bottom:6px }
+.volume-modal .vm-title{ font-weight:800; color:#2b3140; font-size:16px }
+.volume-modal .vm-reset{ background:transparent; border:none; color:#9aa3b2; font-size:13px }
+.volume-modal .vm-list{ margin:6px; max-height:260px; overflow:auto; padding:4px }
+.volume-modal .vm-item{ padding:8px; border-radius:12px; margin-bottom:8px; background: #ffffff; box-shadow: 0 6px 18px rgba(17,24,39,0.04); display:block }
+.volume-modal .vm-item.compact{ padding:6px 8px }
+.volume-modal .vm-row{ display:flex; justify-content:space-between; align-items:center; padding-bottom:0 }
+.volume-modal .vm-name{ font-size:14px; color:#2b3140; background:transparent; border:none; padding:4px 8px; border-radius:10px; text-align:left; flex:1 }
+.volume-modal .vm-name.disabled{ opacity:0.36; color:#7d8794 }
+.volume-modal .vm-right{ min-width:48px; text-align:right }
+.volume-modal .vm-value{ font-size:13px; color:#6b7280; font-weight:700; background:#f3f6fb; padding:6px 8px; border-radius:12px }
+.volume-modal .vm-slider-row{ margin:4px 0 }
+.volume-modal .vm-controls-row{ display:flex; justify-content:flex-end; align-items:center; gap:6px }
+.volume-modal .vm-speed{ display:flex; align-items:center; gap:8px }
+.volume-modal .speed-label{ font-size:13px; color:#95a0af }
+.volume-modal .vm-actions-inline{ display:flex; gap:6px }
+.small-btn{ background:transparent; border:1px solid rgba(43,52,64,0.06); padding:6px 6px; border-radius:8px; color:#2b3140; width:36px; height:36px }
+.volume-modal .vm-actions{ display:flex; justify-content:center; margin-top:6px }
+.volume-modal .vm-close{ background:#fff; border-radius:10px; border:1px solid rgba(43,52,64,0.06); padding:8px 12px; box-shadow: 0 8px 24px rgba(20,30,60,0.06); color:#2b3140 }
+
+/* compact slider row (smaller) */
+.volume-modal .slider-row{ display:flex; align-items:center; gap:6px }
+.volume-modal .vm-slider{ flex:1; margin-right:6px; height:6px }
+.volume-modal slider { height:6px }
+.volume-modal .vm-percent{ font-size:12px; color:#6b7280; font-weight:700; background:#f3f6fb; padding:4px 6px; border-radius:10px; display:flex; align-items:center; justify-content:center; min-width:44px }
+.volume-modal .vm-actions-inline.mini{ display:flex; gap:4px }
+.small-btn{ width:32px; height:32px; padding:4px 6px; border-radius:6px; font-size:14px }
+
+/* reduce item padding/height to fit more */
+.volume-modal .vm-item{ padding:6px; margin-bottom:6px }
+.volume-modal .vm-item.compact{ padding:6px 6px }
+.volume-modal .vm-list .vm-item{ min-height:48px }
+.volume-modal .vm-list .speed-block .vm-item{ min-height:44px }
+
+/* slider thumb smaller fallback */
+.volume-modal slider::-webkit-slider-thumb { width:10px; height:10px; border-radius:10px }
+
+/* section subtitle */
+.volume-modal .vm-subtitle{ font-size:13px; color:#9aa3b2; margin:8px 6px }
+.volume-modal .speed-block .vm-row{ padding-bottom:6px }
+
+/* force overrides to ensure styles load in devtools/runtime */
+.volume-modal .vm-item{ padding:8px !important; border-radius:12px !important; margin-bottom:6px !important; background:#ffffff !important; box-shadow: 0 6px 18px rgba(17,24,39,0.04) !important }
+.volume-modal .vm-name{ text-align:left !important; color:#2b3140 !important; font-size:14px !important }
+.volume-modal .vm-percent{ background:#f3f6fb !important; color:#6b7280 !important; padding:6px 8px !important; border-radius:12px !important }
+.volume-modal .small-btn{ padding:6px 8px !important; border-radius:8px !important }
+.volume-modal .vm-title{ font-weight:800 !important; color:#2b3140 !important }
+
+/* Slider visual tweaks to match sample: thin track, colored progress and small thumb (WXSS compatible) */
+.volume-modal slider { height: 6px; border-radius: 6px; background: #eef2fb }
+/* WXSS doesn't support ::part; provide vendor-friendly fallbacks for common runtimes */
+.volume-modal slider::-webkit-slider-runnable-track { background: #eef2fb }
+.volume-modal slider::-webkit-slider-thumb { width:12px; height:12px; border-radius:12px; background: linear-gradient(90deg,#6fbfef,#7ddf9a); border:none }
+
+/* make vm-list inner spacing match screenshot */
+.volume-modal .vm-item:last-child{ margin-bottom:0 }
+
+/* compact reset link on right */
+.volume-modal .vm-header-right{ display:flex; align-items:center; gap:8px }
+
+/* ensure modal close row spacing */
+.volume-modal .vm-actions .vm-close{ min-width:84px }
+
 
 .settings-overlay{ 
   position:fixed; 
@@ -1681,4 +1841,42 @@ function openCozeChat(){
 .topbar .title, .topbar .center-title { display: none !important }
 /* hide the top play/share buttons */
 .topbar .share, .topbar .play { display: none !important }
+/* Theme polish for volume modal to match project style */
+.volume-modal-overlay{ background: linear-gradient(180deg, rgba(6,18,28,0.45), rgba(6,18,28,0.45)); }
+.volume-modal{ border-radius:18px; padding:12px 14px; background: linear-gradient(180deg, var(--card-bg, #ffffff), rgba(250,252,255,0.98)); border:1px solid rgba(19,40,60,0.04); box-shadow: 0 22px 48px rgba(10,18,26,0.28) }
+.volume-modal .vm-header{ padding-bottom:6px }
+.volume-modal .vm-title{ font-size:16px; letter-spacing:0.2px }
+.volume-modal .vm-reset{ color:var(--muted,#98a3b0) }
+
+/* Card for each track: softer corners and subtle inner spacing */
+.volume-modal .vm-item{ background: linear-gradient(180deg, #ffffff, #fbfdff); border-radius:12px; padding:10px 12px; border:1px solid rgba(19,40,60,0.03); box-shadow: 0 6px 16px rgba(12,22,34,0.04) }
+.volume-modal .vm-row{ align-items:center }
+.volume-modal .vm-name{ color:var(--card-fg,#163047); font-weight:600; font-size:14px }
+.volume-modal .vm-name.disabled{ color:#9aa3b2; opacity:0.6 }
+
+/* Slider visuals: thin track, soft green progress, white thumb with shadow */
+.volume-modal slider { height:8px; border-radius:8px }
+.volume-modal slider::-webkit-slider-runnable-track { background: linear-gradient(90deg,#e9f7ef,#eef6fb) }
+.volume-modal slider::-webkit-slider-thumb { width:14px; height:14px; border-radius:14px; background:#fff; box-shadow:0 6px 12px rgba(20,60,40,0.12); border: 2px solid rgba(124,210,150,0.85) }
+.volume-modal .vm-slider{ background:transparent }
+
+/* Percent pill and +/- buttons alignment */
+.volume-modal .vm-percent{ min-width:42px; padding:4px 6px; font-size:12px; color:var(--card-fg,#163047); background: linear-gradient(180deg,#eef6fb,#ffffff); border-radius:10px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.6) }
+.volume-modal .vm-actions-inline.mini{ align-items:center }
+.small-btn{ width:34px; height:34px; padding:0; display:flex; align-items:center; justify-content:center; border-radius:8px; background:linear-gradient(180deg,#ffffff,#f7fbff); border:1px solid rgba(19,40,60,0.04); box-shadow:0 6px 12px rgba(10,20,30,0.04) }
+.small-btn:active{ transform:translateY(1px) }
+
+/* Make list slightly taller but still scrollable */
+.volume-modal .vm-list{ max-height:340px }
+
+/* Close button style */
+.volume-modal .vm-close{ min-width:100px; padding:10px 16px; border-radius:14px; font-weight:600 }
+
+/* responsive: reduce padding on very small screens */
+@media (max-width:320px){
+  .volume-modal{ padding:8px }
+  .volume-modal .vm-item{ padding:8px }
+  .small-btn{ width:30px; height:30px }
+}
+
 </style>
