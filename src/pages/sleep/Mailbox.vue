@@ -252,8 +252,10 @@ async function sendMessage() {
     loadMyMessages('sent')
   } catch (e) {
     sending.value = false
-    console.error(e)
-    uni.showToast({ title: '投递失败，请重试', icon: 'none' })
+    console.error('[Mailbox] sendMessage error:', e)
+    // 显示具体错误信息
+    const errorMsg = (e && e.message) ? e.message : '投递失败，请重试'
+    uni.showToast({ title: errorMsg, icon: 'none' })
   }
 }
 

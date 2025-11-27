@@ -186,7 +186,7 @@ function goBack() {
   try {
     uni.navigateBack()
   } catch(e) {
-    if(typeof location !== 'undefined') location.hash = '#/pages/home/index'
+    if(typeof location !== 'undefined') location.hash = '#/pages/noise/Free'
   }
 }
 

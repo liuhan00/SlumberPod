@@ -143,7 +143,7 @@ function clearQueue() {
 
 // 跳转首页
 function goToHome() {
-  uni.switchTab({ url: '/pages/home/index' })
+  uni.switchTab({ url: '/pages/noise/Free' })
 }
 
 // 调整播放顺序（长按功能）

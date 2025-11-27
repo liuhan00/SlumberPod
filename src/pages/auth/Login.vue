@@ -131,7 +131,7 @@ async function wxAuthLogin(){
     if (typeof wxLoginFunction === 'function') {
       await wxLoginFunction()
       uni.showToast({ title: '登录成功', icon: 'success' })
-      uni.reLaunch({ url: '/pages/noise/Free' })
+      uni.switchTab({ url: '/pages/noise/Free' })
     } else {
       uni.showToast({ title: '微信登录功能不可用', icon: 'none' })
     }
@@ -149,17 +149,24 @@ async function wxAuthLogin(){
 function guestLogin(){
   // create a temporary guest session locally
   const guest = { id: `guest_${Date.now()}`, guest: true }
-  try{ uni.setStorageSync('app_auth_user', { token: null, user: guest }) }catch(e){}
+  try{ uni.setStorageSync('app_auth_user', { token: null, user: guest, guest: true }) }catch(e){}
+  
+  uni.showToast({ 
+    title: '游客模式：部分功能受限', 
+    icon: 'none', 
+    duration: 2000 
+  })
+  
   // 延迟执行，避免导航冲突
   setTimeout(() => {
     try {
       const pages = getCurrentPages()
       const currentPage = pages[pages.length - 1]
       if (currentPage && currentPage.route !== 'pages/noise/Free') {
-        uni.reLaunch({ url: '/pages/noise/Free' })
+        uni.switchTab({ url: '/pages/noise/Free' })
       }
     } catch(e) {
-      uni.reLaunch({ url: '/pages/noise/Free' })
+      uni.switchTab({ url: '/pages/noise/Free' })
     }
   }, 100)
 }

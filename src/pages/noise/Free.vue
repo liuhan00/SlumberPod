@@ -690,7 +690,7 @@ function openAgent(){
 
 /* mini player - floating style */
 .mini-player{ position:fixed; left:50%; transform:translateX(-50%); bottom:12px; display:flex; align-items:center; gap:8px; background:rgba(58,61,69,0.65); padding:10px 12px; border-radius:14px; box-shadow:0 10px 16px rgba(8,12,16,0.35); backdrop-filter: blur(12px); border:1px solid rgba(255,255,255,0.08); max-width:520px; width: min(520px, calc(100% - 64px)); z-index:1200 }
-.mini-dice{ width:56px; height:56px; display:flex; align-items:center; justify-content:center; border-radius:8px; background: rgba(255,255,255,0.06); border:none; color:#ffffff; box-shadow:none; font-size:32px; line-height:56px }
+.mini-dice{ width:56px; height:56px; display:flex; align-items:center; justify-content:center; border-radius:8px; background: rgba(255,255,255,0.12); border:none; color:rgba(255,255,255,0.95); box-shadow:none; font-size:32px; line-height:56px }
 .mini-dice text, .mini-dice .cat-animation { font-size:32px; line-height:56px }
 .mini-dice { opacity: 0.95 }
 .mini-dice:hover { opacity: 1 }

@@ -8,9 +8,18 @@
 <script setup>
 import { onLoad } from '@dcloudio/uni-app'
 
-// 最小化启动逻辑：直接跳转到首页，确保 Splash 页注册与跳转的稳定性
+// 启动逻辑：先检查登录状态，再决定跳转到哪个页面
 onLoad(() => {
-  uni.switchTab({ url: '/pages/home/index' })
+  // 检查登录状态
+  const auth = uni.getStorageSync('app_auth_user')
+  
+  if (!auth || !auth.token) {
+    // 未登录，跳转到登录页
+    uni.reLaunch({ url: '/pages/auth/Login' })
+  } else {
+    // 已登录，跳转到首页
+    uni.switchTab({ url: '/pages/noise/Free' })
+  }
 })
 </script>
 <style scoped>

@@ -319,12 +319,17 @@ async function toggleFav(){
   const auth = getAuthLocal()
   console.log('[Auth] toggleFav auth value:', auth)
   const loggedIn = Boolean(
-    auth?.id ||
-    auth?.user?.id ||
-    auth?.userId ||
-    auth?.user?.userId ||
-    auth?.token ||
-    auth?.access_token
+    // 游客登录有 guest: true，需要排除
+    !auth?.guest &&
+    !auth?.user?.guest &&
+    (
+      auth?.id ||
+      auth?.user?.id ||
+      auth?.userId ||
+      auth?.user?.userId ||
+      auth?.token ||
+      auth?.access_token
+    )
   )
   if(!loggedIn){
     uni.showToast({
@@ -1239,7 +1244,7 @@ function clearPlaylist() {
 
 function goToHome() {
   hidePlaylist()
-  uni.switchTab({ url: '/pages/home/index' })
+  uni.switchTab({ url: '/pages/noise/Free' })
 }
 
 watch(()=>store.volume, v=>{ if(audioCtx) audioCtx.volume = v })

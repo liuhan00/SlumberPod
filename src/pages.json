@@ -1,10 +1,10 @@
 {
   "pages": [
-    { "path": "pages/noise/Free", "style": { "navigationBarTitleText": "首页" } },
     {
       "path": "pages/splash/index",
       "style": { "navigationBarTitleText": "启动", "navigationStyle": "custom" }
     },
+    { "path": "pages/noise/Free", "style": { "navigationBarTitleText": "首页" } },
     {
       "path": "pages/home/index",
       "style": { "navigationBarTitleText": "首页" }

@@ -143,7 +143,7 @@ async function submit(){
     uni.showToast({ title:'已离线保存，稍后同步', icon:'none' })
   }
   // auto return to home
-  try{ uni.reLaunch({ url:'/pages/home/index' }) }catch(e){ location.hash='#/pages/home/index' }
+  try{ uni.reLaunch({ url:'/pages/noise/Free' }) }catch(e){ location.hash='#/pages/noise/Free' }
 }
 </script>
 

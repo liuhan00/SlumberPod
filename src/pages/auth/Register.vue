@@ -146,7 +146,7 @@ async function submit(){
     const api = await import('@/api/auth')
     await api.register({ username: name.value, email: identifier.value, password: password.value })
     uni.showToast({ title: '注册成功，请检查邮箱验证（如已启用）', icon: 'success' })
-    uni.reLaunch({ url: '/pages/home/index' })
+    uni.reLaunch({ url: '/pages/noise/Free' })
   }catch(e){
     uni.showToast({ title: e.message || '注册失败', icon: 'none' })
   }finally{ loading.value = false }

@@ -23,12 +23,32 @@ async function http(path, { method = 'GET', body, headers = {} } = {}){
 
 export async function sendMail({ content, token }){
   const headers = token ? { Authorization: `Bearer ${token}` } : {}
-  const res = await http('/api/mailbox', { method: 'POST', body: { content }, headers })
+  const res = await http('/api/mailbox/deliver', { method: 'POST', body: { content }, headers })
   // uni.request 返回对象 { statusCode, data }
   if(res.statusCode && res.statusCode >= 200 && res.statusCode < 300) return res.data
   // fetch 返回 Response
   if(res.ok) return await res.json()
-  throw new Error('sendMail failed')
+  
+  // 处理错误响应
+  let errorMessage = 'sendMail failed'
+  try {
+    if(res.statusCode === 400) {
+      const errorData = res.data || await res.json?.()
+      errorMessage = errorData?.message || errorData?.error || '请求数据格式错误'
+    } else if(res.statusCode === 401) {
+      errorMessage = '未授权，请重新登录'
+    } else if(res.statusCode === 403) {
+      errorMessage = '无权限执行此操作'
+    } else if(res.statusCode === 404) {
+      errorMessage = '接口不存在'
+    } else if(res.statusCode >= 500) {
+      errorMessage = '服务器错误，请稍后重试'
+    }
+  } catch(e) {
+    console.warn('解析错误响应失败:', e)
+  }
+  
+  throw new Error(errorMessage)
 }
 
 export async function pickMail({ token }){

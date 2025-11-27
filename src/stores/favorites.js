@@ -121,6 +121,14 @@ export const useFavoritesStore = defineStore('favorites', {
     },
     async add(item){
       if(!item) return;
+      
+      // 检查用户是否登录（排除游客）
+      const auth = getAuthLocal()
+      const isLoggedIn = auth && !auth.guest && (auth.token || auth.access_token)
+      if(!isLoggedIn) {
+        throw new Error('游客无法收藏，请先登录')
+      }
+      
       const metaId = item?.metaId
       const numericMeta = metaId !== undefined && metaId !== null && /^\d+$/.test(String(metaId)) ? Number(metaId) : null
       if (numericMeta === null) throw new Error('当前音频未绑定后端ID，无法收藏')
@@ -162,6 +170,13 @@ export const useFavoritesStore = defineStore('favorites', {
       }
     },
     async remove(id){
+      // 检查用户是否登录（排除游客）
+      const auth = getAuthLocal()
+      const isLoggedIn = auth && !auth.guest && (auth.token || auth.access_token)
+      if(!isLoggedIn) {
+        throw new Error('游客无法取消收藏，请先登录')
+      }
+      
       const existing = this.items.find(x=> x.id === id)
       const had = Boolean(existing)
       // optimistic update: remove now

@@ -1065,7 +1065,20 @@ export async function searchAudios({ keyword, limit = 20, offset = 0 } = {}){
 }
 
 // 获取当前用户的创作列表
+// 检查用户是否已登录（排除游客）
+function checkAuthForProtectedApi(){
+  const auth = getAuthLocal()
+  const isLoggedIn = auth && !auth.guest && (auth.token || auth.access_token)
+  if(!isLoggedIn) {
+    throw new Error('需要登录才能访问此功能，请先使用微信登录')
+  }
+  return true
+}
+
 export async function getMyCreations({ limit = 20, offset = 0 } = {}){
+  // 检查权限：我的创作需要真实登录
+  checkAuthForProtectedApi()
+  
   const pairs = []
   pairs.push('limit=' + encodeURIComponent(String(limit)))
   pairs.push('offset=' + encodeURIComponent(String(offset)))
