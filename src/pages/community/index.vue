@@ -25,8 +25,6 @@
     <!-- 内容区域 -->
     <scroll-view class="content" scroll-y :style="bgStyle">
       <view class="section">
-        <CommunityComposer v-if="activeTab !== '关注'" @submit="createPost" />
-        
         <!-- 帖子列表 -->
         <view v-if="filteredPosts.length > 0">
           <PostCard 
@@ -51,12 +49,16 @@
         </view>
       </view>
     </scroll-view>
+    
+    <!-- 悬浮发帖按钮 -->
+    <view class="floating-post-btn" @click="goToCreatePost">
+      <text class="plus-icon">+</text>
+    </view>
   </view>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import CommunityComposer from '@/components/CommunityComposer.vue'
 import PostCard from '@/components/PostCard.vue'
 import { useGlobalTheme } from '@/composables/useGlobalTheme'
 import { useThemeStore } from '@/stores/theme'
@@ -298,6 +300,14 @@ async function createPost(data) {
   }
 }
 
+function goToCreatePost() {
+  try {
+    uni.navigateTo({ url: '/pages/create-post/index' })
+  } catch(e) {
+    if(typeof location !== 'undefined') location.hash = '#/pages/create-post/index'
+  }
+}
+
 onMounted(async () => {
   try{
     await loadLatest()
@@ -377,6 +387,12 @@ onMounted(async () => {
   padding: 6px;
   border-radius: 6px;
   transition: background 0.2s;
+  outline: none; /* 去掉聚焦时的边框 */
+}
+
+/* 去掉所有边框样式，包括微信小程序的默认边框 */
+.nav-btn::after {
+  border: none;
 }
 
 .nav-btn:active {
@@ -433,5 +449,31 @@ onMounted(async () => {
 .explore-btn:active {
   background: #0f9f6e;
   transform: scale(0.98);
+}
+
+/* 悬浮发帖按钮 */
+.floating-post-btn {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 56px;
+  height: 56px;
+  background: #10b981;
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  transition: background 0.2s;
+}
+
+.floating-post-btn:active {
+  background: #0f9f6e;
+  transform: scale(0.98);
+}
+
+.plus-icon {
+  font-size: 24px;
 }
 </style>

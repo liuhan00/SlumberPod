@@ -27,6 +27,10 @@
       <view class="grid">
         <view class="item" v-for="(n, idx) in filteredNoises" :key="`${n?.id||n?._id||n?.uuid||'item'}-${idx}`" @click="playRemote(n)">
           <!-- 卡片：可扩展成带封面 -->
+          <!-- 显示音频图标，优先使用cover_url，如果没有则使用getNoiseIcon函数 -->
+          <image v-if="n.cover_url && isValidImageUrl(n.cover_url)" :src="n.cover_url" @error="handleImageError" class="cover-icon" mode="aspectFill" />
+          <text v-else-if="n.cover_url" class="icon">🎵</text>
+          <text v-else class="icon">{{ getNoiseIcon(n.title || n.name) }}</text>
           <text class="name">{{ n.title || n.name || '未命名' }}</text>
         </view>
       </view>
@@ -40,7 +44,29 @@
     <view class="mini-player">
       <view class="mini-left">
         <button class="mini-dice" @click="randomizeMini" :disabled="isRandomizing">
-          <view v-if="isRandomizing" class="cat-animation">🐱</view>
+          <view v-if="isRandomizing" class="cat-animation">
+            <view class="cat-container">
+              <view class="cat-face">😸</view>
+              <view class="cat-ears">
+                <view class="ear left">👂</view>
+                <view class="ear right">👂</view>
+              </view>
+              <view class="cat-eyes">
+                <view class="eye left">🌟</view>
+                <view class="eye right">⭐</view>
+              </view>
+              <view class="cat-sparkles">
+                <view class="sparkle s1">✨</view>
+                <view class="sparkle s2">💫</view>
+                <view class="sparkle s3">🌟</view>
+                <view class="sparkle s4">⭐</view>
+              </view>
+              <view class="cat-hearts">
+                <view class="heart h1">💕</view>
+                <view class="heart h2">💖</view>
+              </view>
+            </view>
+          </view>
           <text v-else>🎲</text>
         </button>
       </view>
@@ -71,6 +97,7 @@ import { useColorMode } from '@/composables/useColorMode'
 import { allNoises } from '@/data/noises'
 import { usePlayerStore } from '@/stores/player'
 import * as apiAudios from '@/api/audios'
+import { safeImageUrl } from '@/utils/image'
 import AIHelper from '@/components/AIHelper.vue'
 
 const { bgStyle } = useGlobalTheme()
@@ -159,7 +186,7 @@ const showArrow = ref(false)
 // load categories from backend
 async function fetchCategories(){
   try{
-    const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.150:3003'
+    const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.123:3003'
     // 小程序运行时可能不支持 new URL，因此使用字符串拼接
     // 添加分页参数以获取所有分类
     const url = BASE + '/api/categories?limit=1000'
@@ -266,20 +293,20 @@ const filteredNoises = computed(()=>{
     // 优先使用远端"我的创作"列表，若为空再回退本地存储
     if(Array.isArray(remoteList.value) && remoteList.value.length) return remoteList.value
     const userCreations = uni.getStorageSync('userCreations') || []
-    return userCreations.map(c=>({ id:c.id, title:c.name, audio_url:c.audioUrl || '', duration:c.duration || 0 }))
+    return userCreations.map(c=>({ id:c.id, title:c.name, audio_url:c.audioUrl || '', cover_url: safeImageUrl(c.cover_url || c.coverUrl || ''), duration:c.duration || 0 }))
   }
   // 如果 remoteList 有数据，优先使用 remoteList（远端返回的已按 category/is_free 筛选）
   if(Array.isArray(remoteList.value) && remoteList.value.length) return remoteList.value
-  // 回退：全部 显示 allNoises 名称
+  // 回退：全部 显示 allNoises 名称（临时显示，但音频源为空）
   if(activeCat.value==='全部'){
-    return allNoises.map(n=>({ id:n.id, title:n.name, audio_url:n.src || '', duration:n.duration || 0 }))
+    return allNoises.map(n=>({ id:n.id, title:n.name, audio_url: n.src || '', cover_url: safeImageUrl(n.cover_url || n.coverUrl || n.cover || ''), duration:n.duration || 0, placeholder: true }))
   }
   // 免费回退：从本地数据筛选 is_free 字段为 1 的项（如果本地数据没有该字段则为空）
   if(activeCat.value==='free' || activeCat.value==='免费'){
-    return allNoises.filter(n=> Number(n.is_free)===1 || Number(n.free)===1).map(n=>({ id:n.id, title:n.name, audio_url:n.src||'', duration:n.duration||0 }))
+    return allNoises.filter(n=> Number(n.is_free)===1 || Number(n.free)===1).map(n=>({ id:n.id, title:n.name, audio_url:n.src||'', cover_url: safeImageUrl(n.cover_url || n.coverUrl || n.cover || ''), duration:n.duration||0, placeholder: true }))
   }
   // 其他分类回退到本地过滤（category 字段可能是 id 或名称）
-  return allNoises.filter(n=> String(n.category)===String(activeCat.value) || String(n.category_id)===String(activeCat.value)).map(n=>({ id:n.id, title:n.name, audio_url:n.src||'', duration:n.duration||0 }))
+  return allNoises.filter(n=> String(n.category)===String(activeCat.value) || String(n.category_id)===String(activeCat.value)).map(n=>({ id:n.id, title:n.name, audio_url:n.src||'', cover_url: safeImageUrl(n.cover_url || n.coverUrl || n.cover || ''), duration:n.duration||0, placeholder: true }))
 })
 
 // remote loading state
@@ -298,7 +325,7 @@ async function loadAudiosForCategory(catId){
       const arr = Array.isArray(raw) ? raw : []
       const seen = new Set(); const deduped = []
       for(const it of arr){ const key = it?.id || it?._id || it?.uuid || null; const uid = key ? String(key) : null; if(uid && seen.has(uid)) continue; if(uid) seen.add(uid); deduped.push(it) }
-      remoteList.value = deduped.map(it => ({ id: it.id || it._id || it.uuid || String(Date.now()), backend_id: (it.id ?? it._id ?? it.uuid ?? it.audio_id ?? null), title: it.title || it.name || it.audioName || '', audio_url: it.file_url || it.audio_url || it.audioUrl || it.url || it.src || '', duration: it.duration || it.period || it.length || 0, category_id: it.category_id || it.categoryId || 'my_creations' }))
+      remoteList.value = deduped.map(it => ({ id: it.id || it._id || it.uuid || String(Date.now()), backend_id: (it.id ?? it._id ?? it.uuid ?? it.audio_id ?? null), title: it.title || it.name || it.audioName || '', audio_url: it.file_url || it.audio_url || it.audioUrl || it.url || it.src || '', cover_url: safeImageUrl(it.cover_url || it.coverUrl || ''), duration: it.duration || it.period || it.length || 0, category_id: it.category_id || it.categoryId || 'my_creations' }))
     }catch(e){ console.warn('load my creations failed', e); remoteList.value = [] }
     finally{ remoteLoading.value = false }
     return 
@@ -330,7 +357,7 @@ async function loadAudiosForCategory(catId){
       deduped.push(it)
     }
     // map to normalized shape
-    remoteList.value = deduped.map(it => ({ id: it.id || it._id || it.uuid || String(Date.now()), backend_id: (it.id ?? it._id ?? it.uuid ?? it.audio_id ?? null), title: it.title || it.name || it.audioName || '', audio_url: it.audio_url || it.audioUrl || it.url || it.src || '', duration: it.duration || it.period || it.length || 0, category_id: it.category_id || it.categoryId || null }))
+    remoteList.value = deduped.map(it => ({ id: it.id || it._id || it.uuid || String(Date.now()), backend_id: (it.id ?? it._id ?? it.uuid ?? it.audio_id ?? null), title: it.title || it.name || it.audioName || '', audio_url: it.audio_url || it.audioUrl || it.url || it.src || '', cover_url: safeImageUrl(it.cover_url || it.coverUrl || ''), duration: it.duration || it.period || it.length || 0, category_id: it.category_id || it.categoryId || null }))
     console.log('[Free] remoteList length (deduped)', remoteList.value.length)
     console.log('[Free] deduped ids', remoteList.value.map(i=>({id:i.id})))
   }catch(e){ console.warn('load remote audios failed', e); remoteList.value = []; remoteError.value = e?.message || String(e) }
@@ -339,6 +366,25 @@ async function loadAudiosForCategory(catId){
 
 // 当切换标签时，调用统一的加载函数
 watch(activeCat, (v)=>{ loadAudiosForCategory(v) })
+
+// 图片URL验证函数
+function isValidImageUrl(url) {
+  if (!url || typeof url !== 'string') return false
+  // 检查是否是有效的URL格式
+  try {
+    new URL(url)
+    return true
+  } catch {
+    return false
+  }
+}
+
+// 图片加载错误处理函数
+function handleImageError(event) {
+  console.log('[Free] Image load error:', event)
+  // 可以在这里添加更多的错误处理逻辑
+  // 例如：设置默认图标或隐藏图片元素
+}
 
 function getNoiseIcon(name){
   const map = { '海浪':'🌊','雨声':'🌧️','壁炉':'🔥','树林':'🌲','地铁':'🚇' }
@@ -509,21 +555,52 @@ function goToPlayer(){
   // If miniPlaying has selections, build title from selected names; otherwise pass the three random names
   const ids = Array.from(miniPlaying.value)
   let title = ''
+  let tracks = []
+  
   if(ids.length){
-    const names = ids.map(uid=>{
+    // 构建选中的音轨列表
+    tracks = ids.map(uid=>{
       const fromRandom = randomNoises.value.find(n=> n && getStableId(n)===uid)
-      if(fromRandom) return fromRandom.title || fromRandom.name || fromRandom.audioName || ''
+      if(fromRandom) return { 
+        id: fromRandom.id || fromRandom._id || fromRandom.uuid || uid,
+        metaId: fromRandom.backend_id ?? fromRandom.id ?? fromRandom._id ?? fromRandom.uuid,
+        name: fromRandom.title || fromRandom.name || fromRandom.audioName || '',
+        src: fromRandom.audio_url || fromRandom.audioUrl || fromRandom.url || fromRandom.src || ''
+      }
       const fromRemote = (remoteList.value||[]).find(r=> r && getStableId(r)===uid)
-      if(fromRemote) return fromRemote.title || fromRemote.name || ''
+      if(fromRemote) return { 
+        id: fromRemote.id || fromRemote._id || fromRemote.uuid || uid,
+        metaId: fromRemote.backend_id ?? fromRemote.id ?? fromRemote._id ?? fromRemote.uuid,
+        name: fromRemote.title || fromRemote.name || '',
+        src: fromRemote.audio_url || fromRemote.audioUrl || fromRemote.url || fromRemote.src || ''
+      }
       const fromLocal = allNoises.find(l=> l && getStableId(l)===uid)
-      if(fromLocal) return fromLocal.name || ''
-      return ''
+      if(fromLocal) return { 
+        id: fromLocal.id || uid,
+        metaId: fromLocal.backend_id ?? fromLocal.id,
+        name: fromLocal.name || '',
+        src: fromLocal.src || fromLocal.url || ''
+      }
+      return null
     }).filter(Boolean)
-    title = names.join(' | ')
+    
+    title = tracks.map(t => t.name).filter(Boolean).join(' | ')
   } else {
-    // show the three currently displayed random noises
-    const names = randomNoises.value.map(n=> n ? (n.title || n.name || n.audioName || '') : '').filter(Boolean)
-    title = names.join(' | ')
+    // 使用当前显示的三个随机音频
+    tracks = randomNoises.value.map(n => n ? {
+      id: n.id || n._id || n.uuid || String(Date.now() + Math.random()),
+      metaId: n.backend_id ?? n.id ?? n._id ?? n.uuid,
+      name: n.title || n.name || n.audioName || '',
+      src: n.audio_url || n.audioUrl || n.url || n.src || ''
+    } : null).filter(Boolean)
+    
+    title = tracks.map(t => t.name).filter(Boolean).join(' | ')
+  }
+
+  // 设置完整的播放列表
+  if(tracks.length > 0){
+    player.setPlaylist?.(tracks)
+    player.play?.(tracks[0])
   }
 
   const q = title ? `?title=${encodeURIComponent(title)}` : ''
@@ -690,7 +767,7 @@ function openAgent(){
 
 /* mini player - floating style */
 .mini-player{ position:fixed; left:50%; transform:translateX(-50%); bottom:12px; display:flex; align-items:center; gap:8px; background:rgba(58,61,69,0.65); padding:10px 12px; border-radius:14px; box-shadow:0 10px 16px rgba(8,12,16,0.35); backdrop-filter: blur(12px); border:1px solid rgba(255,255,255,0.08); max-width:520px; width: min(520px, calc(100% - 64px)); z-index:1200 }
-.mini-dice{ width:56px; height:56px; display:flex; align-items:center; justify-content:center; border-radius:8px; background: rgba(255,255,255,0.12); border:none; color:rgba(255,255,255,0.95); box-shadow:none; font-size:32px; line-height:56px }
+.mini-dice{ width:56px; height:56px; display:flex; align-items:center; justify-content:center; border-radius:8px; background: transparent; border:none; color:rgba(255,255,255,0.95); box-shadow:none; font-size:32px; line-height:56px }
 .mini-dice text, .mini-dice .cat-animation { font-size:32px; line-height:56px }
 .mini-dice { opacity: 0.95 }
 .mini-dice:hover { opacity: 1 }
@@ -723,15 +800,271 @@ function openAgent(){
 .mini-dice{ font-size:16px; opacity: 1; transition: opacity 0.2s; }
 .mini-dice:disabled{ opacity: 0.5; }
 .cat-animation {
-  animation: catRotate 0.5s ease-in-out 3;
+  animation: catBounce 0.6s ease-in-out 3;
   display: inline-block;
+  width: 56px;
+  height: 56px;
+  position: relative;
 }
-@keyframes catRotate {
-  0% { transform: rotate(0deg); }
-  50% { transform: rotate(180deg); }
-  100% { transform: rotate(360deg); }
+
+.cat-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-.mini-name{ font-size:14px; -webkit-font-smoothing:antialiased }
+
+.cat-face {
+  font-size: 32px;
+  animation: catFaceSpin 0.6s ease-in-out 3;
+  z-index: 3;
+  position: relative;
+  filter: drop-shadow(0 0 12px rgba(255, 182, 193, 0.8));
+  text-shadow: 0 0 8px rgba(255, 182, 193, 0.4);
+}
+
+.cat-ears {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.ear {
+  position: absolute;
+  font-size: 14px;
+  animation: earWiggle 0.4s ease-in-out infinite alternate;
+}
+
+.ear.left {
+  left: 8px;
+  top: 8px;
+  animation-delay: 0.1s;
+}
+
+.ear.right {
+  right: 8px;
+  top: 8px;
+  animation-delay: 0.3s;
+}
+
+.cat-eyes {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.eye {
+  position: absolute;
+  font-size: 12px;
+  animation: eyeTwinkle 0.3s ease-in-out infinite alternate;
+}
+
+.eye.left {
+  left: 18px;
+  top: 20px;
+  animation-delay: 0.1s;
+}
+
+.eye.right {
+  right: 18px;
+  top: 20px;
+  animation-delay: 0.2s;
+}
+
+.cat-sparkles {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.sparkle {
+  position: absolute;
+  font-size: 10px;
+  animation: sparkleFloat 0.6s ease-in-out infinite;
+}
+
+.sparkle.s1 {
+  top: 10px;
+  left: 12px;
+  animation-delay: 0s;
+}
+
+.sparkle.s2 {
+  top: 8px;
+  right: 14px;
+  animation-delay: 0.2s;
+}
+
+.sparkle.s3 {
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  animation-delay: 0.4s;
+}
+
+.sparkle.s4 {
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  animation-delay: 0.6s;
+}
+
+.cat-hearts {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.heart {
+  position: absolute;
+  font-size: 10px;
+  animation: heartFloat 0.8s ease-in-out infinite;
+}
+
+.heart.h1 {
+  bottom: 8px;
+  left: 10px;
+  animation-delay: 0.2s;
+}
+
+.heart.h2 {
+  bottom: 6px;
+  right: 12px;
+  animation-delay: 0.5s;
+}
+
+@keyframes catBounce {
+  0% { 
+    transform: translateY(0) scale(1) rotate(0deg); 
+    filter: hue-rotate(0deg);
+  }
+  20% { 
+    transform: translateY(-6px) scale(1.05) rotate(-3deg); 
+    filter: hue-rotate(10deg);
+  }
+  40% { 
+    transform: translateY(-14px) scale(1.2) rotate(-2deg); 
+    filter: hue-rotate(20deg);
+  }
+  60% { 
+    transform: translateY(-18px) scale(1.25) rotate(2deg); 
+    filter: hue-rotate(30deg);
+  }
+  80% { 
+    transform: translateY(-10px) scale(1.1) rotate(3deg); 
+    filter: hue-rotate(15deg);
+  }
+  100% { 
+    transform: translateY(0) scale(1) rotate(0deg); 
+    filter: hue-rotate(0deg);
+  }
+}
+
+@keyframes catFaceSpin {
+  0% { transform: rotate(0deg) scale(1); }
+  50% { transform: rotate(180deg) scale(1.2); }
+  100% { transform: rotate(360deg) scale(1); }
+}
+
+@keyframes eyeTwinkle {
+  0% { opacity: 0.3; transform: scale(0.8); }
+  100% { opacity: 1; transform: scale(1.2); }
+}
+
+@keyframes sparkleFloat {
+  0% { 
+    opacity: 0; 
+    transform: translateY(0) scale(0.5) rotate(0deg); 
+  }
+  50% { 
+    opacity: 1; 
+    transform: translateY(-10px) scale(1.2) rotate(180deg); 
+  }
+  100% { 
+    opacity: 0; 
+    transform: translateY(-20px) scale(0.8) rotate(360deg); 
+  }
+}
+
+@keyframes earWiggle {
+  0% { transform: rotate(0deg) scale(1); }
+  100% { transform: rotate(10deg) scale(1.1); }
+}
+
+@keyframes heartFloat {
+  0% { 
+    opacity: 0; 
+    transform: translateY(0) scale(0.3); 
+  }
+  30% { 
+    opacity: 1; 
+    transform: translateY(-8px) scale(1); 
+  }
+  70% { 
+    opacity: 1; 
+    transform: translateY(-12px) scale(1.1) rotate(10deg); 
+  }
+  100% { 
+    opacity: 0; 
+    transform: translateY(-20px) scale(0.6) rotate(-10deg); 
+  }
+}
+
+/* 添加音频图标样式 */
+.cover-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  margin-bottom: 6px;
+}
+
+.icon {
+  font-size: 24px;
+  margin-bottom: 6px;
+}
+
+.name {
+  font-size: 14px;
+  color: var(--text-color);
+  line-height: 1.6;
+  text-align: center;
+}
+
+.item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.02));
+  transition: background 0.18s, transform 0.12s;
+  box-sizing: border-box;
+  flex: 0 0 calc(50% - 6px);
+  max-width: calc(50% - 6px);
+}
+
+@media (min-width: 900px) {
+  .item {
+    flex: 0 0 calc(25% - 12px);
+    max-width: calc(25% - 12px);
+  }
+}
+
 /* override: mini-player names should be light on dark background */
 .mini-player .mini-name{ color: rgba(255,255,255,0.86) !important }
 .mini-player .mini-name.on{ color: #D8FFE7 !important; font-weight:700 }

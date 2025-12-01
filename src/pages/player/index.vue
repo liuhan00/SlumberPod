@@ -495,9 +495,9 @@ const showVolumeModal = ref(false)
 const listHeight = ref(260)
 
 const audioTracks = ref([
-  { id: 't1', name: store.currentTrack?.name || '主音轨', volume: store.volume || 0.5, enabled: true, speedIndex: 2 },
-  { id: 't2', name: store.playlist[1]?.name || store.playlist[1]?.title || '音轨2', volume: 0.8, enabled: true, speedIndex: 2 },
-  { id: 't3', name: store.playlist[2]?.name || store.playlist[2]?.title || '音轨3', volume: 0.8, enabled: true, speedIndex: 2 }
+  { id: 't1', name: store.currentTrack?.name || store.currentTrack?.title || store.currentTrack?.audioName || '主音轨', volume: store.volume || 0.5, enabled: true, speedIndex: 2 },
+  { id: 't2', name: store.playlist[1]?.name || store.playlist[1]?.title || store.playlist[1]?.audioName || store.playlist[1]?.audio_name || '音轨2', volume: 0.8, enabled: true, speedIndex: 2 },
+  { id: 't3', name: store.playlist[2]?.name || store.playlist[2]?.title || store.playlist[2]?.audioName || store.playlist[2]?.audio_name || '音轨3', volume: 0.8, enabled: true, speedIndex: 2 }
 ])
 const speedOptions = ['0.5','0.75','1.0','1.25','1.5']
 
@@ -595,6 +595,14 @@ function closeSettings() {
 
 function openVolumeModal(){
   console.log('[player] openVolumeModal called, store.playlist.length=', Array.isArray(store.playlist)?store.playlist.length:0, 'currentTrack=', store.currentTrack)
+  
+  // 优先使用当前已加载的 audioTracks（如果已经有数据）
+  if(audioTracks.value && audioTracks.value.length > 0 && audioTracks.value[0].name !== '主音轨'){
+    console.log('[player] using existing audioTracks', audioTracks.value)
+    showVolumeModal.value = true
+    return
+  }
+  
   // 构造音轨列表：若当前播放为组合，使用 store.playlist，否则单项
   let playlist = store.playlist && store.playlist.length > 1 ? store.playlist : [store.currentTrack].filter(Boolean)
   // 如果 store 数据为空（dev/初始化问题），回退到内置 sample 列表，避免弹窗空内容
@@ -602,7 +610,15 @@ function openVolumeModal(){
     console.warn('[player] playlist and currentTrack empty — falling back to sample noises')
     playlist = allNoises.slice(0,3).map((n,i)=> ({ id: n.id || `sample${i}`, name: n.name || n.title || `示例 ${i+1}`, volume: 0.8 }))
   }
-  audioTracks.value = playlist.map((t, i)=> ({ id: t?.id || `t${i}`, name: t?.name || t?.title || `音轨 ${i+1}`, icon: '', volume: (typeof t?.volume === 'number' ? t.volume : (store.volume ?? 0.5)), enabled: true, speedIndex: 2 }))
+  // 获取真实音频名称：优先使用 name，其次 title，再次 audioName，最后才用默认值
+  audioTracks.value = playlist.map((t, i)=> ({ 
+    id: t?.id || `t${i}`, 
+    name: t?.name || t?.title || t?.audioName || t?.audio_name || `音轨 ${i+1}`, 
+    icon: '', 
+    volume: (typeof t?.volume === 'number' ? t.volume : (store.volume ?? 0.5)), 
+    enabled: true, 
+    speedIndex: 2 
+  }))
   console.log('[player] audioTracks constructed', audioTracks.value)
   showVolumeModal.value = true
 }
@@ -633,6 +649,32 @@ function resetVolumes(){
 
 // 将 store.volume 同步到 audioTracks（如果只存在单音轨）
 watch(()=>store.volume, v => { if(audioTracks.value.length===1){ audioTracks.value[0].volume = v } })
+
+// 监听 store.playlist 和 store.currentTrack 的变化，自动更新 audioTracks
+watch([()=>store.playlist, ()=>store.currentTrack], ([newPlaylist, newTrack]) => {
+  console.log('[player] store changed, updating audioTracks', { playlist: newPlaylist, currentTrack: newTrack })
+  
+  // 构造新的音轨列表
+  let tracks = []
+  if(Array.isArray(newPlaylist) && newPlaylist.length > 0){
+    tracks = newPlaylist.slice(0, 3)
+  } else if(newTrack){
+    tracks = [newTrack]
+  }
+  
+  // 如果有有效数据，更新 audioTracks
+  if(tracks.length > 0){
+    audioTracks.value = tracks.map((t, i) => ({
+      id: t?.id || `t${i}`,
+      name: t?.name || t?.title || t?.audioName || t?.audio_name || `音轨 ${i+1}`,
+      icon: '',
+      volume: (typeof t?.volume === 'number' ? t.volume : (store.volume ?? 0.5)),
+      enabled: true,
+      speedIndex: 2
+    }))
+    console.log('[player] audioTracks updated from store', audioTracks.value)
+  }
+}, { deep: true })
 
 function onVolumeChangeSetting(e){
   const volume = e.detail.value / 100
@@ -758,7 +800,7 @@ function setCustomTimer() {
 
 async function openMetaPopup(id){
   showMeta.value = true; metaLoading.value = true; metaData.value = null; metaMulti.value = []
-  const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.150:3003'
+  const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.123:3003'
   // 构建ID列表：优先参数id；否则从当前播放或混合列表取 metaId/id（最多3个）
   let ids = []
   if(id){ ids = [id] }
@@ -1426,7 +1468,7 @@ function openCozeChat(){
   font-family: 'Courier New', monospace;
 }
 .author{ margin-top:6px; color: var(--text-primary) }
-.tags{ display:flex; gap:12px; padding:8px 16px; align-items:center }
+.tags{ display:flex; gap:12px; padding:8px 16px; align-items:center; justify-content:space-evenly }
 .tag{ background:var(--card-bg, #ffffff); color: var(--card-fg, #13303f); padding:8px 12px; border-radius:12px; box-shadow: 0 6px 18px rgba(0,0,0,0.06); opacity:1; font-size:14px; min-width:72px; text-align:center; display:inline-flex; align-items:center; justify-content:center; border:1px solid rgba(19,48,63,0.06) }
 .controls{ display:flex; align-items:center; justify-content:space-around; padding:18px 36px }
 .play-btn{ width:64px; height:64px; border-radius:32px; background:#fff; color: var(--text-primary); display:flex; align-items:center; justify-content:center; font-size:22px; box-shadow: 0 8px 24px rgba(0,0,0,0.10) }

@@ -211,7 +211,7 @@ async function loadCategories(){
   
   try {
     // 直接从分类 API 获取数据
-    const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.150:3003'
+    const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.123:3003'
     const url = BASE + '/api/categories?limit=1000'
     console.log('[creation] loading categories from', url)
     

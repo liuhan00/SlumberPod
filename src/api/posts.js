@@ -1,5 +1,5 @@
 import { getAuthLocal } from '@/store/auth'
-const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.150:3003'
+const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.123:3003'
 
 function buildHeaders(token){
   const headers = { 'Content-Type': 'application/json' }

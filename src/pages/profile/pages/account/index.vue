@@ -1,66 +1,3 @@
-<template>
-  <view class="page" :style="bgStyle">
-    <view class="top">
-      <view class="back" @click="goBack">‹</view>
-      <text class="title">账号资料</text>
-    </view>
-
-    <view class="avatar-wrap">
-      <image class="avatar" :src="user.avatar" mode="cover" />
-      <button class="camera-btn" @click="changeAvatar">
-        <text class="camera-icon"></text>
-      </button>
-    </view>
-
-    <scroll-view class="container" scroll-y>
-      <view class="card">
-        <view class="row clickable" @click="editNickname">
-          <text class="label">昵称</text>
-          <view class="right">
-            <text class="value">{{ user.nickname || '眠友9177' }}</text>
-            <text class="arrow">›</text>
-          </view>
-        </view>
-
-        <view class="row clickable" @click="editBio">
-          <text class="label">简介</text>
-          <view class="right">
-            <text class="value">{{ user.bio || '未填写' }}</text>
-            <text class="arrow">›</text>
-          </view>
-        </view>
-
-        <view class="row clickable" @click="editGender">
-          <text class="label">性别</text>
-          <view class="right">
-            <text class="value">{{ user.gender || '未选择' }}</text>
-            <text class="arrow">›</text>
-          </view>
-        </view>
-
-        <!-- 生日放在同一卡片下，使用 picker 包裹行以在小程序上展示原生滚轮 -->
-        <picker mode="date" :value="birthdayValue" @change="onBirthdayChange">
-          <view class="row clickable">
-            <text class="label">生日</text>
-            <view class="right">
-              <text class="value">{{ user.birthday || '未选择' }}</text>
-              <text class="arrow">›</text>
-            </view>
-          </view>
-        </picker>
-      </view>
-
-      <!-- 注：已删除手机号/第三方应用卡片 -->
-
-      <view class="actions-block">
-        <button class="btn logout" @click="logout">退出登录</button>
-        <button class="btn delete" @click="deleteAccount">注销账号</button>
-      </view>
-
-    </scroll-view>
-  </view>
-</template>
-
 <script setup>
 import { useUserStore } from '@/stores/user'
 import { storeToRefs } from 'pinia'
@@ -166,6 +103,69 @@ function deleteAccount(){
 const refs = { birthdayPicker }
 </script>
 
+<template>
+  <view class="page" :style="bgStyle">
+    <view class="top">
+      <view class="back" @click="goBack">‹</view>
+      <text class="title">账号资料</text>
+    </view>
+
+    <view class="avatar-wrap">
+      <image class="avatar" :src="user.avatar" mode="cover" />
+      <button class="camera-btn" @click="changeAvatar">
+        <text class="camera-icon">📸</text>
+      </button>
+    </view>
+
+    <scroll-view class="container" scroll-y>
+      <view class="card">
+        <view class="row clickable" @click="editNickname">
+          <text class="label">昵称</text>
+          <view class="right">
+            <text class="value">{{ user.nickname || '眠友9177' }}</text>
+            <text class="arrow">›</text>
+          </view>
+        </view>
+
+        <view class="row clickable" @click="editBio">
+          <text class="label">简介</text>
+          <view class="right">
+            <text class="value">{{ user.bio || '未填写' }}</text>
+            <text class="arrow">›</text>
+          </view>
+        </view>
+
+        <view class="row clickable" @click="editGender">
+          <text class="label">性别</text>
+          <view class="right">
+            <text class="value">{{ user.gender || '未选择' }}</text>
+            <text class="arrow">›</text>
+          </view>
+        </view>
+
+        <!-- 生日放在同一卡片下，使用 picker 包裹行以在小程序上展示原生滚轮 -->
+        <picker mode="date" :value="birthdayValue" @change="onBirthdayChange">
+          <view class="row clickable">
+            <text class="label">生日</text>
+            <view class="right">
+              <text class="value">{{ user.birthday || '未选择' }}</text>
+              <text class="arrow">›</text>
+            </view>
+          </view>
+        </picker>
+      </view>
+
+      <!-- 注：已删除手机号/第三方应用卡片 -->
+
+      <view class="actions-block">
+        <button class="btn logout" @click="logout">退出登录</button>
+        <button class="btn delete" @click="deleteAccount">注销账号</button>
+      </view>
+
+    </scroll-view>
+  </view>
+</template>
+
 <style scoped>
 .page{ background:var(--bg-color, #0b0b0d); background-image: var(--bg-gradient, none); background-repeat: no-repeat; background-size: 100% 100%; min-height:100vh; color:var(--text-color, #fff); display:flex; flex-direction:column }
 .top{ height:56px; display:flex; align-items:center; justify-content:center; position:relative; padding-top: env(safe-area-inset-top); }
@@ -174,8 +174,8 @@ const refs = { birthdayPicker }
 
 .avatar-wrap{ display:flex; justify-content:center; align-items:center; margin:16px 0; position:relative }
 .avatar{ width:26vw; height:26vw; max-width:140px; max-height:140px; min-width:90px; min-height:90px; border-radius:50%; border:4px solid rgba(255,255,255,0.04); box-shadow:0 10px 30px rgba(0,0,0,0.7); object-fit:cover }
-.camera-btn{ position:absolute; right:calc(50% - (26vw)/2 + 10px); bottom:6px; background:linear-gradient(180deg,#444,#222); width:44px; height:44px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:18px; color:var(--fg); border:3px solid var(--bg-color, #0b0b0d); padding:0 }
-.camera-icon{ color:var(--fg); font-size:18px }
+.camera-btn{ position:absolute; right:calc(50% - (26vw)/2 + 10px); bottom:6px; background:linear-gradient(180deg,#444,#222); width:44px; height:44px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:18px; color:var(--fg); border:3px solid var(--bg-color, #0b0b0d); padding:0; box-sizing: border-box; }
+.camera-icon{ color:var(--fg); font-size:24px; line-height: 1; }
 
 .container{ padding:18px; flex:1; overflow:hidden }
 scroll-view.container{ flex:1 }
@@ -203,5 +203,4 @@ scroll-view.container{ flex:1 }
   .camera{ max-width:44px; max-height:44px }
   .label, .value{ font-size:16px }
 }
-
 </style>

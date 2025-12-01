@@ -7,19 +7,16 @@
 </template>
 <script setup>
 import { onLoad } from '@dcloudio/uni-app'
+import { getAuthStatus } from '@/store/auth'
 
 // 启动逻辑：先检查登录状态，再决定跳转到哪个页面
 onLoad(() => {
-  // 检查登录状态
-  const auth = uni.getStorageSync('app_auth_user')
-  
-  if (!auth || !auth.token) {
-    // 未登录，跳转到登录页
+  const { isAuthenticated } = getAuthStatus()
+  if (!isAuthenticated) {
     uni.reLaunch({ url: '/pages/auth/Login' })
-  } else {
-    // 已登录，跳转到首页
-    uni.switchTab({ url: '/pages/noise/Free' })
+    return
   }
+  uni.switchTab({ url: '/pages/noise/Free' })
 })
 </script>
 <style scoped>

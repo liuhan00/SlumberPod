@@ -7,7 +7,72 @@
 <script>
 import MiniPlayer from '@/components/MiniPlayer.vue'
 import { usePlayerStore } from '@/stores/player'
+import { getAuthStatus } from '@/store/auth'
 import { getHour, getThemeByHour, baseColors, textColors, gradients } from '@/utils/timeTheme'
+const AUTH_WHITELIST = new Set(['pages/auth/Login', 'pages/auth/Register'])
+let navigationGuardInstalled = false
+let isRedirectingToLogin = false
+
+function normalizePagePath(value){
+  if(!value) return ''
+  return value.split('?')[0].replace(/^\/+/, '')
+}
+
+function resolveCurrentRoute(){
+  if(typeof getCurrentPages !== 'function') return ''
+  const pages = getCurrentPages()
+  if(!pages || !pages.length) return ''
+  const page = pages[pages.length - 1]
+  return normalizePagePath(page?.route || page?.__route__ || '')
+}
+
+function redirectToLogin(){
+  if(isRedirectingToLogin) return
+  isRedirectingToLogin = true
+  uni.reLaunch({
+    url: '/pages/auth/Login',
+    complete: () => {
+      setTimeout(() => { isRedirectingToLogin = false }, 200)
+    }
+  })
+}
+
+function ensureAuthenticated({ allowGuest = true } = {}){
+  const { isAuthenticated, isGuest } = getAuthStatus()
+  if(isAuthenticated){
+    if(!allowGuest && isGuest){
+      redirectToLogin()
+      return false
+    }
+    return true
+  }
+  const currentRoute = resolveCurrentRoute()
+  if(currentRoute && AUTH_WHITELIST.has(currentRoute)){
+    return false
+  }
+  redirectToLogin()
+  return false
+}
+
+function installNavigationGuards(){
+  if(navigationGuardInstalled) return
+  if(typeof uni === 'undefined' || typeof uni.addInterceptor !== 'function') return
+  const guard = (options = {}) => {
+    const targetPath = normalizePagePath(options.url || options.path || '')
+    if(!targetPath || AUTH_WHITELIST.has(targetPath)) return options
+    if(ensureAuthenticated({ allowGuest: true })) return options
+    const currentRoute = resolveCurrentRoute()
+    if(!currentRoute || !AUTH_WHITELIST.has(currentRoute)){
+      try{ uni.showToast({ title: '请先登录', icon: 'none' }) }catch(e){}
+    }
+    return false
+  }
+  ;['navigateTo', 'redirectTo', 'switchTab'].forEach((method) => {
+    uni.addInterceptor(method, { invoke: guard })
+  })
+  navigationGuardInstalled = true
+}
+
 export default {
   components: { MiniPlayer },
   onLaunch() {
@@ -22,31 +87,12 @@ export default {
       store.isMuted = s.isMuted || false
       store.loopMode = s.loopMode || 'all'
     }
-    // Auth check: 立即检查登录状态
-    try{
-      const auth = uni.getStorageSync('app_auth_user')
-      const authObj = typeof auth === 'string' ? JSON.parse(auth) : auth
-      
-      // 区分游客登录和真实登录：游客登录没有token或guest为true
-      const isLoggedIn = authObj && !authObj.guest && authObj.token
-      
-      if(!isLoggedIn){
-        // 检查当前页面，避免重复跳转
-        const pages = getCurrentPages()
-        const currentPage = pages[pages.length - 1]
-        if (currentPage && currentPage.route !== 'pages/auth/Login') {
-          uni.reLaunch({ url: '/pages/auth/Login' })
-        }
-      }
-    }catch(e){
-      const pages = getCurrentPages()
-      const currentPage = pages[pages.length - 1]
-      if (currentPage && currentPage.route !== 'pages/auth/Login') {
-        uni.reLaunch({ url: '/pages/auth/Login' })
-      }
-    }
+    installNavigationGuards()
+    ensureAuthenticated()
   },
   onShow() {
+    installNavigationGuards()
+    ensureAuthenticated()
     const h = getHour()
     const t = getThemeByHour(h)
     try {

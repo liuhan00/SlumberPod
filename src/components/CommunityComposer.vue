@@ -144,10 +144,21 @@ function handleImageError(e) {
   margin: 0 auto 16px; 
   box-shadow: 0 2px 8px rgba(0,0,0,0.1);
   width: 100%;
-  max-width: 680px;
+  max-width: 100%;
   box-sizing: border-box;
 }
-.title-input{ width:100%; box-sizing:border-box; height:44px; padding:8px 12px; border-radius:8px; border:1px solid #e9ecef; margin-bottom:12px; font-size:15px; color: rgba(0,0,0,0.9) }
+.title-input{ 
+  width: 100%; 
+  box-sizing: border-box; 
+  height: 44px; 
+  padding: 8px 12px; 
+  border-radius: 8px; 
+  border: 1px solid #e9ecef; 
+  margin-bottom: 12px; 
+  font-size: 15px; 
+  color: rgba(0,0,0,0.9);
+  max-width: 100%;
+}
 
 .user-info {
   display: flex;
@@ -179,6 +190,7 @@ function handleImageError(e) {
   font-size: 14px;
   border: 1px solid #e9ecef;
   resize: none;
+  max-width: 100%;
 }
 .input::placeholder { color: rgba(0,0,0,0.45); }
 
@@ -199,12 +211,15 @@ function handleImageError(e) {
 .image-preview {
   position: relative;
   margin-top: 12px;
+  max-width: 100%;
 }
 
 .preview-image {
   width: 100%;
   height: 200px;
   border-radius: 8px;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .remove-image {
@@ -229,11 +244,13 @@ function handleImageError(e) {
   justify-content: space-between;
   align-items: center;
   margin-top: 16px;
+  flex-wrap: wrap;
 }
 
 .tools {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .tool-btn {
@@ -269,10 +286,34 @@ function handleImageError(e) {
   border: none;
   outline: none;
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .publish-btn.disabled {
   background: #ccc;
   opacity: 0.6;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .composer {
+    padding: 12px;
+  }
+  
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  
+  .tools {
+    justify-content: center;
+  }
+  
+  .publish-btn {
+    align-self: center;
+    width: 100%;
+    max-width: 200px;
+  }
 }
 </style>

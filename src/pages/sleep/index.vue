@@ -534,13 +534,13 @@ function handleImageLoad(e) {
 }
 
 .sleep-button {
-  /* 更大幅度向右且略向上，确保落在床面而非床脚 */
+  /* 放在床上的抱枕位置 */
   position: absolute !important;
-  left: 68vw; /* 明显向右 */
-  top: 56vh; /* 向上，落在床面 */
+  right: 18vw; /* 床的右侧区域 */
+  bottom: 22vh; /* 床面的高度 */
   width: clamp(100px, 18vw, 140px);
   height: auto;
-  transform: translate(-50%, -50%);
+  transform: translate(0, 0);
   z-index: 1200;
 }
 
@@ -554,13 +554,20 @@ function handleImageLoad(e) {
 }
 
 .sleep-button .pillow-shell {
-  /* 更强调抱枕形状，放置在床上 */
-  border-radius: 48% 48% 44% 44% / 60% 60% 50% 50%;
-  padding: 12% 10%;
-  background: linear-gradient(135deg, rgba(255,255,255,0.14), rgba(255,255,255,0.04));
-  border: 1px solid rgba(255,255,255,0.08);
-  box-shadow: 0 18px 36px rgba(0,0,0,0.22), inset 0 6px 12px rgba(255,255,255,0.06);
-  transform: translateY(6px) rotate(-4deg) perspective(100px);
+  /* 抱枕按钮的特殊样式：更蓬松、更柔软 */
+  border-radius: 46% 46% 42% 42% / 58% 58% 50% 50%;
+  padding: 14% 12%;
+  /* 点击时的微动画 */
+  transform: translateY(4px) rotate(-3deg) perspective(180px);
+}
+
+.sleep-button:active .pillow-shell {
+  transform: translateY(8px) rotate(-3deg) perspective(180px) scale(0.98);
+  box-shadow: 
+    0 12px 30px rgba(0, 0, 0, 0.2),
+    0 5px 15px rgba(0, 0, 0, 0.1),
+    inset 0 -8px 18px rgba(200, 180, 150, 0.15),
+    inset 0 8px 22px rgba(255, 255, 255, 0.18);
 }
 
 .study-button {
@@ -636,32 +643,50 @@ function handleImageLoad(e) {
 .pillow-shell {
   position: relative;
   width: 100%;
-  aspect-ratio: 1.3 / 0.9;
-  border-radius: 40% 40% 35% 35% / 50% 50% 45% 45%;
-  /* 半透明 + 模糊，跟随背景更柔和 */
-  background: linear-gradient(135deg, rgba(255,255,255,0.18), rgba(255,255,255,0.06));
-  border: 1px solid rgba(255,255,255,0.12);
-  backdrop-filter: blur(6px) saturate(120%);
-  box-shadow: 0 14px 30px rgba(0,0,0,0.18), inset 0 4px 8px rgba(255,255,255,0.08);
+  aspect-ratio: 1.4 / 1;
+  /* 更柔和的抱枕形状：圆润的矩形，模拟抱枕的蓬松感 */
+  border-radius: 45% 45% 40% 40% / 55% 55% 48% 48%;
+  /* 抱枕质感：柔软的渐变，带有填充物的蓬松感 */
+  background: linear-gradient(145deg, 
+    rgba(255, 248, 235, 0.28) 0%, 
+    rgba(255, 240, 220, 0.22) 30%,
+    rgba(255, 235, 210, 0.18) 60%,
+    rgba(255, 230, 200, 0.12) 100%);
+  border: 2px solid rgba(255, 250, 240, 0.25);
+  backdrop-filter: blur(8px) saturate(130%);
+  /* 更柔和的阴影，模拟抱枕的立体感 */
+  box-shadow: 
+    0 20px 45px rgba(0, 0, 0, 0.15),
+    0 8px 20px rgba(0, 0, 0, 0.08),
+    inset 0 -10px 20px rgba(200, 180, 150, 0.12),
+    inset 0 10px 25px rgba(255, 255, 255, 0.15);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 16% 12%; /* 稍微减少内边距 */
+  padding: 18% 14%;
   overflow: hidden;
-  transform: perspective(100px) rotateX(3deg);
+  /* 添加轻微的3D倾斜，模拟抱枕被压的感觉 */
+  transform: perspective(200px) rotateX(2deg) rotateY(-1deg);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
 .pillow-shell::before {
   content: '';
   position: absolute;
-  top: 15%;
-  left: 10%;
-  right: 10%;
-  height: 20%;
-  background: radial-gradient(ellipse at center, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.05) 70%);
-  border-radius: 50% / 30%;
-  filter: blur(2px);
+  top: 12%;
+  left: 8%;
+  right: 8%;
+  height: 28%;
+  /* 抱枕顶部的高光，模拟布料的光泽 */
+  background: radial-gradient(ellipse at 45% 30%, 
+    rgba(255, 255, 255, 0.65) 0%,
+    rgba(255, 250, 240, 0.35) 40%,
+    rgba(255, 255, 255, 0.08) 70%,
+    transparent 100%);
+  border-radius: 50% / 35%;
+  filter: blur(3px);
   pointer-events: none;
+  opacity: 0.8;
 }
 
 .pillow-shell::after {
@@ -679,35 +704,97 @@ function handleImageLoad(e) {
 
 .pillow-stitch {
   position: absolute;
-  left: 10%;
-  right: 10%;
-  height: 3px;
+  left: 12%;
+  right: 12%;
+  height: 2px;
   border-radius: 50%;
-  background: linear-gradient(90deg, rgba(139, 69, 19, 0.3), rgba(139, 69, 19, 0.1) 50%, rgba(139, 69, 19, 0.3));
-  opacity: 0.6;
+  /* 抱枕的缝线：更细腻，带有虚线效果 */
+  background: repeating-linear-gradient(
+    90deg,
+    rgba(180, 140, 100, 0.4) 0px,
+    rgba(180, 140, 100, 0.4) 6px,
+    transparent 6px,
+    transparent 12px
+  );
+  opacity: 0.5;
   pointer-events: none;
-  transform: scale(0.8);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15), 0 -1px 2px rgba(255, 255, 255, 0.3);
+  filter: blur(0.3px);
 }
 
 .pillow-stitch-top {
-  top: 40%;
+  top: 35%;
 }
 
 .pillow-stitch-bottom {
-  bottom: 40%;
+  bottom: 35%;
+}
+
+/* 添加侧边缝线，增强抱枕感 */
+.pillow-shell::after {
+  content: '';
+  position: absolute;
+  top: 15%;
+  bottom: 15%;
+  left: 8%;
+  width: 2px;
+  border-radius: 50%;
+  background: repeating-linear-gradient(
+    180deg,
+    rgba(180, 140, 100, 0.35) 0px,
+    rgba(180, 140, 100, 0.35) 5px,
+    transparent 5px,
+    transparent 10px
+  );
+  opacity: 0.4;
+  pointer-events: none;
+  box-shadow: 1px 0 2px rgba(0, 0, 0, 0.12);
+  filter: blur(0.3px);
+}
+
+/* 右侧缝线 */
+.pillow-emblem::after {
+  content: '';
+  position: absolute;
+  top: -55%;
+  bottom: -55%;
+  right: -155%;
+  width: 2px;
+  border-radius: 50%;
+  background: repeating-linear-gradient(
+    180deg,
+    rgba(180, 140, 100, 0.35) 0px,
+    rgba(180, 140, 100, 0.35) 5px,
+    transparent 5px,
+    transparent 10px
+  );
+  opacity: 0.4;
+  pointer-events: none;
+  box-shadow: -1px 0 2px rgba(0, 0, 0, 0.12);
+  filter: blur(0.3px);
 }
 
 .pillow-emblem {
   position: relative;
-  width: 38%;
+  width: 42%;
   aspect-ratio: 1 / 1;
   border-radius: 50%;
-  background: radial-gradient(circle at 40% 30%, rgba(255, 255, 255, 1), rgba(255, 200, 132, 0.7));
+  /* 抱枕中心的图案：柔和的光晕效果 */
+  background: radial-gradient(circle at 38% 28%, 
+    rgba(255, 252, 245, 1) 0%,
+    rgba(255, 245, 230, 0.95) 25%,
+    rgba(255, 235, 210, 0.85) 50%,
+    rgba(255, 220, 180, 0.75) 75%,
+    rgba(255, 210, 160, 0.7) 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: inset 0 5px 10px rgba(255, 255, 255, 0.5), inset 0 -7px 12px rgba(230, 141, 60, 0.6);
+  /* 更柔和的内嵌阴影，模拟刺绣图案的立体感 */
+  box-shadow: 
+    inset 0 6px 14px rgba(255, 255, 255, 0.6),
+    inset 0 -8px 16px rgba(220, 160, 90, 0.45),
+    0 4px 12px rgba(0, 0, 0, 0.1);
+  border: 1.5px solid rgba(255, 240, 220, 0.5);
   z-index: 1;
 }
 

@@ -46,6 +46,19 @@ export function getAuthToken(){
   }catch(e){ return null }
 }
 
+export function getAuthStatus(){
+  try{
+    const auth = getAuthLocal()
+    if(!auth) return { auth: null, token: null, isGuest: false, isAuthenticated: false }
+    const token = auth.token || auth.access_token || null
+    const isGuest = !!(auth.guest || auth.user?.guest)
+    const isAuthenticated = Boolean(token) || isGuest
+    return { auth, token, isGuest, isAuthenticated }
+  }catch(e){
+    return { auth: null, token: null, isGuest: false, isAuthenticated: false }
+  }
+}
+
 // utilities to integrate with Supabase client elsewhere
 export function applySession(session){
   try{

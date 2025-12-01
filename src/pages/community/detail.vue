@@ -1,3 +1,91 @@
+<script setup>
+import { onLoad } from '@dcloudio/uni-app'
+import { ref } from 'vue'
+import * as apiCommunity from '@/api/community'
+import { useGlobalTheme } from '@/composables/useGlobalTheme'
+import { getPlaceholder } from '@/utils/image'
+
+const { bgStyle } = useGlobalTheme()
+
+const loading = ref(true)
+const error = ref('')
+const post = ref({})
+
+onLoad(async (q)=>{
+  const id = q?.id
+  if(!id){ loading.value=false; error.value='缺少帖子ID'; return }
+  // 仅允许纯数字ID调用后端，避免用前端占位ID触发404
+  const isNumeric = /^\d+$/.test(String(id))
+  if(!isNumeric){ loading.value=false; error.value='无效帖子ID'; return }
+  const numericId = Number(id)
+  try{
+    const res = await apiCommunity.getCommunityDetail(numericId)
+    const data = res?.data || res
+    
+    // 处理帖子数据
+    post.value = {
+      id: data.id || data.post_id || numericId,
+      title: data.title || '',
+      content: data.content || data.body || '',
+      image: (data.imageUrls && data.imageUrls[0]) || data.image || data.cover_image || '',
+      play_count: data.play_count || data.playCount || 0,
+      favorite_count: data.favorite_count || data.favoriteCount || data.likes || 0,
+      comment_count: data.comment_count || data.commentCount || (Array.isArray(data.comments) ? data.comments.length : 0),
+      time: data.time || data.created_at || data.createdAt || '未知时间',
+      author: data.author || { 
+        name: data.userName || data.user_name || '用户', 
+        avatar: data.author?.avatar || data.user_avatar || getPlaceholder('avatar') 
+      },
+      comments: Array.isArray(data.comments) ? data.comments : []
+    }
+    
+    loading.value = false
+  }catch(e){
+    console.error('[community.detail] load failed', e)
+    error.value = e?.message || '加载失败'
+    loading.value = false
+  }
+})
+
+function goBack() {
+  try {
+    uni.navigateBack()
+  } catch(e) {
+    if(typeof location !== 'undefined') location.hash = '#/pages/community/index'
+  }
+}
+
+function openActions() {
+  uni.showActionSheet({
+    itemList: ['分享', '举报', '复制链接'],
+    success: (res) => {
+      switch (res.tapIndex) {
+        case 0:
+          uni.showToast({ title: '分享功能开发中', icon: 'none' })
+          break
+        case 1:
+          uni.showToast({ title: '举报成功', icon: 'success' })
+          break
+        case 2:
+          uni.setClipboardData({
+            data: `帖子链接: ${window.location.href}`,
+            success: () => {
+              uni.showToast({ title: '链接已复制', icon: 'success' })
+            }
+          })
+          break
+      }
+    }
+  })
+}
+
+function formatTime(timeStr) {
+  // 简单的时间格式化
+  if (!timeStr) return '未知时间'
+  return timeStr
+}
+</script>
+
 <template>
   <view class="page" :style="bgStyle">
     <!-- Topbar -->
@@ -47,59 +135,6 @@
     </scroll-view>
   </view>
 </template>
-
-<script setup>
-import { onLoad } from '@dcloudio/uni-app'
-import { ref } from 'vue'
-import * as apiCommunity from '@/api/community'
-import { useGlobalTheme } from '@/composables/useGlobalTheme'
-
-const { bgStyle } = useGlobalTheme()
-
-const loading = ref(true)
-const error = ref('')
-const post = ref({})
-
-onLoad(async (q)=>{
-  const id = q?.id
-  if(!id){ loading.value=false; error.value='缺少帖子ID'; return }
-  // 仅允许纯数字ID调用后端，避免用前端占位ID触发404
-  const isNumeric = /^\d+$/.test(String(id))
-  if(!isNumeric){ loading.value=false; error.value='无效帖子ID'; return }
-  const numericId = Number(id)
-  try{
-    const res = await apiCommunity.getCommunityDetail(numericId)
-    const data = res?.data || res
-    post.value = {
-      id: data.post_id ?? data.id ?? numericId,
-      title: data.title || '',
-      content: data.content || data.body || '',
-      image: data.image || (data.imageUrls && data.imageUrls[0]) || '',
-      time: data.created_at || data.createdAt || '',
-      favorite_count: data.favorite_count ?? 0,
-      comment_count: data.comment_count ?? 0,
-      play_count: data.play_count ?? 0,
-      author: { name: data.user_name || data.author?.name || '用户', avatar: data.user_avatar || data.author?.avatar || '' }
-    }
-  }catch(e){ error.value = String(e?.message || e) }
-  finally{ loading.value=false }
-})
-
-function goBack(){ try{ uni.navigateBack() }catch(e){ history.back() } }
-
-function openActions(){ uni.showActionSheet({ itemList:['举报','收藏'], success(r){ uni.showToast({ title:'已操作', icon:'success' }) } }) }
-
-function formatTime(t){
-  if(!t) return ''
-  try{
-    const d = new Date(t)
-    const y = d.getFullYear()
-    const m = String(d.getMonth()+1).padStart(2,'0')
-    const dd = String(d.getDate()).padStart(2,'0')
-    return `${y}-${m}-${dd}`
-  }catch{ return String(t) }
-}
-</script>
 
 <style scoped>
 .page{ min-height:100vh }

@@ -166,7 +166,7 @@ async function loadCoffeeRainAudios(){
   console.log('[Study] loadCoffeeRainAudios start')
   // 先尝试从后端查分类拿到对应的 category_id，再分别请求两类音频
   try{
-    const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.150:3003'
+    const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.123:3003'
     const url = BASE + '/api/categories?limit=1000'
     console.log('[Study] fetch categories url', url)
     let resp

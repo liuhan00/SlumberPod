@@ -1,7 +1,7 @@
 // Unified auth API with platform-specific branches
 import { saveAuthLocal, clearAuthLocal, applySession } from '@/store/auth'
 
-const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.150:3003'
+const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.123:3003'
 
 async function httpFetch(path, opts = {}){
   const url = BASE + path
@@ -50,28 +50,43 @@ export async function wxLogin(){
   return new Promise((resolve, reject)=>{
     uni.login({ provider: 'weixin', success: async (loginRes)=>{
       try{
-        console.log('微信登录code:', loginRes.code)
-        console.log('发送请求到后端:', '/api/wechat/login')
+        console.log('[wxLogin] 步骤1: 获取微信code成功:', loginRes.code)
+        console.log('[wxLogin] 步骤2: 发送请求到后端:', '/api/wechat/login')
+        
         const res = await httpFetch('/api/wechat/login', { method: 'POST', body: JSON.stringify({ code: loginRes.code }) })
-        console.log('后端响应状态:', res.status)
+        
+        console.log('[wxLogin] 步骤3: 后端响应状态:', res.status, res.ok ? '成功' : '失败')
         const j = await res.json()
-        console.log('后端响应数据:', j)
-        if(!res.ok) return reject(new Error(j.message || j.error || '微信登录失败'))
+        console.log('[wxLogin] 步骤4: 后端响应数据:', JSON.stringify(j, null, 2))
+        
+        if(!res.ok) {
+          const errorMsg = j.message || j.error || j.msg || '微信登录失败'
+          console.error('[wxLogin] 登录失败:', errorMsg, '完整响应:', j)
+          return reject(new Error(errorMsg))
+        }
         
         // 处理后端返回的数据结构 {success: true, data: {token, user, ...}}
         const loginData = j.data || j
-        console.log('处理登录数据:', loginData)
+        console.log('[wxLogin] 步骤5: 处理登录数据:', loginData)
         
         if(loginData.token) {
           applySession({ user: loginData.user, access_token: loginData.token })
-          console.log('登录状态已保存')
+          console.log('[wxLogin] 步骤6: 登录状态已保存到本地存储')
         } else {
-          console.warn('登录响应中缺少token:', loginData)
+          console.warn('[wxLogin] 警告: 登录响应中缺少token:', loginData)
+          return reject(new Error('登录响应格式错误：缺少token'))
         }
         
+        console.log('[wxLogin] ✅ 登录成功')
         resolve(j)
-      }catch(e){ reject(e) }
-    }, fail: reject })
+      }catch(e){ 
+        console.error('[wxLogin] 异常:', e.message, e)
+        reject(e) 
+      }
+    }, fail: (err) => {
+      console.error('[wxLogin] uni.login失败:', err)
+      reject(err)
+    } })
   })
   // #endif
   
