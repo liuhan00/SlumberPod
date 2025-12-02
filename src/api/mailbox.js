@@ -1,4 +1,4 @@
-const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.123:3003'
+const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.135:3003'
 
 // 简单 http helper compatible with uni.request
 async function http(path, { method = 'GET', body, headers = {} } = {}){
@@ -274,6 +274,12 @@ export async function getMyBox({ token, page = 1, limit = 20 }){
 }
 
 export async function getMyMails({ token, type = 'received', page = 1, limit = 20 }){
+  // 检查 token 是否存在
+  if (!token) {
+    console.warn('[Mailbox API] Token 未提供')
+    throw new Error('未提供访问令牌，请先登录')
+  }
+  
   const headers = token ? { Authorization: `Bearer ${token}` } : {}
   const normalizedType = String(type || 'received').toLowerCase()
   const tab = mapMailboxType(normalizedType)
@@ -285,6 +291,7 @@ export async function getMyMails({ token, type = 'received', page = 1, limit = 2
   let lastError = null
   for(const path of candidates){
     try{
+      console.log(`[Mailbox API] 请求 ${path}，headers:`, headers)
       const res = await http(path, { method: 'GET', headers })
       if(isSuccessfulMailboxResponse(res)){
         const payload = await extractMailboxPayload(res)

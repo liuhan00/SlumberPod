@@ -247,7 +247,7 @@ async function fetchMyCreations(){
         status: (Number(it.is_shared)===1 ? 'shared' : (Number(it.is_published)===1 ? 'published' : 'draft')),
         createdAt: it.created_at || it.createdAt || new Date().toISOString(),
         views: it.play_count || 0,
-        likes: it.favorite_count || 0,
+        likes: it.favorite_count || it.like_count || 0,
         comments: it.comment_count || 0
       }
     })

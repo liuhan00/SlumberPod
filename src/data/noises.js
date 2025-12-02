@@ -1,9 +1,7 @@
-import { getPlaceholder } from '@/utils/image'
-
 export const allNoises = [
-  { id:'n1', name:'海浪', author:'自然声', cover:getPlaceholder('noise'), cover_url: getPlaceholder('noise'), category:'自然', src:'' },
-  { id:'n2', name:'雨声', author:'自然声', cover:getPlaceholder('noise'), cover_url: getPlaceholder('noise'), category:'自然', src:'' },
-  { id:'n3', name:'壁炉', author:'居家', cover:getPlaceholder('noise'), cover_url: getPlaceholder('noise'), category:'居家', src:'' },
-  { id:'n4', name:'树林', author:'自然声', cover:getPlaceholder('noise'), cover_url: getPlaceholder('noise'), category:'自然', src:'' },
-  { id:'n5', name:'地铁', author:'环境', cover:getPlaceholder('noise'), cover_url: getPlaceholder('noise'), category:'环境', src:'' },
+  { id:'n1', name:'海浪', author:'自然声', cover:'https://images.unsplash.com/photo-1518709268805-4e9042af2171?w=100&h=100&fit=crop', cover_url: 'https://images.unsplash.com/photo-1518709268805-4e9042af2171?w=100&h=100&fit=crop', category:'自然', src:'' },
+  { id:'n2', name:'雨声', author:'自然声', cover:'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=100&h=100&fit=crop', cover_url: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=100&h=100&fit=crop', category:'自然', src:'' },
+  { id:'n3', name:'壁炉', author:'居家', cover:'https://images.unsplash.com/photo-1518709268805-4e9042af2171?w=100&h=100&fit=crop', cover_url: 'https://images.unsplash.com/photo-1518709268805-4e9042af2171?w=100&h=100&fit=crop', category:'居家', src:'' },
+  { id:'n4', name:'树林', author:'自然声', cover:'https://images.unsplash.com/photo-1448375240586-882707db888b?w=100&h=100&fit=crop', cover_url: 'https://images.unsplash.com/photo-1448375240586-882707db888b?w=100&h=100&fit=crop', category:'自然', src:'' },
+  { id:'n5', name:'地铁', author:'环境', cover:'https://images.unsplash.com/photo-1518709268805-4e9042af2171?w=100&h=100&fit=crop', cover_url: 'https://images.unsplash.com/photo-1518709268805-4e9042af2171?w=100&h=100&fit=crop', category:'环境', src:'' },
 ]

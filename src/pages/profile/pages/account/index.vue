@@ -4,6 +4,8 @@ import { storeToRefs } from 'pinia'
 import { useGlobalTheme } from '@/composables/useGlobalTheme'
 import { ref } from 'vue'
 import { getPlaceholder } from '@/utils/image'
+// 导入上传头像的API
+import { uploadAvatar } from '@/api/users'
 
 let bgStyle = {}
 try{
@@ -56,12 +58,43 @@ if (!user.value || !user.value.userId) {
 function goBack(){
   uni.navigateBack()
 }
+
+// 修改changeAvatar函数，实现真正的上传功能
 function changeAvatar(){
-  uni.chooseImage({ count:1, sourceType:['album','camera'], success(res){ const temp = res.tempFilePaths[0]; user.value.avatar = temp; uni.showToast({ title:'头像已更新' }) }, fail(){ uni.showToast({ title:'取消', icon:'none' }) } })
+  console.log('[Profile Account] changeAvatar called')
+  uni.chooseImage({
+    count: 1,
+    sourceType: ['album', 'camera'],
+    success: async (res) => {
+      const tempFilePath = res.tempFilePaths[0]
+      console.log('[Profile Account] Image selected:', tempFilePath)
+      try {
+        // 调用上传接口
+        console.log('[Profile Account] Calling uploadAvatar API')
+        const result = await uploadAvatar(tempFilePath)
+        console.log('[Profile Account] Upload result:', result)
+        // 更新用户头像
+        user.value.avatar = result.url || result.data?.url || tempFilePath
+        uni.showToast({ title: '头像上传成功' })
+      } catch (err) {
+        console.error('[Profile Account] 上传头像失败:', err)
+        uni.showToast({ 
+          title: '上传失败: ' + (err.message || '未知错误'), 
+          icon: 'none',
+          duration: 3000
+        })
+      }
+    },
+    fail: () => {
+      uni.showToast({ title: '取消上传', icon: 'none' })
+    }
+  })
 }
+
 function editNickname(){
   uni.showModal({ title:'修改昵称', editable:true, placeholderText:'请输入昵称', success(res){ if(res.confirm) user.value.nickname = res.content } })
 }
+
 function editBio(){
   uni.showModal({ title:'修改简介', editable:true, placeholderText:'请输入个人简介（1-50字）', success(res){ if(res.confirm && res.content){ user.value.bio = res.content; uni.showToast({ title:'简介已保存' }) } } })
 }
@@ -90,9 +123,9 @@ function openThirdParty(){
 
 function logout(){
   uni.showModal({ title:'退出登录', content:'确定要退出当前账号吗？', success(res){ if(res.confirm){ // 清除用户状态示例
-      user.value = {};
-      uni.reLaunch({ url:'/pages/login/index' })
-    } } })
+    user.value = {};
+    uni.reLaunch({ url:'/pages/login/index' })
+  } } })
 }
 
 function deleteAccount(){

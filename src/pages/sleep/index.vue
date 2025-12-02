@@ -1122,6 +1122,4 @@ function handleImageLoad(e) {
 .firefly:nth-child(odd) {
   filter: blur(0.4px);
 }
-
-
 </style>

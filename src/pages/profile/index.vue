@@ -13,7 +13,6 @@
       <!-- 登录/注册 按钮已移除。若已登录显示用户信息与退出 -->
       <view v-if="authUser">
         <text>已登录：{{ authUser.name || authUser.id }}</text>
-        <button class="btn" @click="logout">登出</button>
       </view>
     </view>
 
@@ -82,27 +81,6 @@ async function loadHistory(){
 
 function openLogin(){ try{ uni.navigateTo({ url:'/pages/auth/Login' }) }catch(e){ location.hash='#/pages/auth/Login' } }
 function openRegister(){ try{ uni.navigateTo({ url:'/pages/auth/Register' }) }catch(e){ location.hash='#/pages/auth/Register' } }
-async function logout(){
-  uni.showModal({
-    title: '确认登出',
-    content: '确定要退出当前账号吗？',
-    success: async (res) => {
-      if(!res.confirm) return
-      try{
-        const api = await import('@/api/auth')
-        await api.logout()
-        authUser.value = null
-        const { useUserStore } = await import('@/stores/user')
-        useUserStore().applyAuth(null)
-        uni.showToast({ title:'已登出' })
-        setTimeout(()=>{ uni.reLaunch({ url: '/pages/auth/Login' }) }, 300)
-      }catch(e){
-        uni.showToast({ title:'登出失败', icon:'none' })
-      }
-    }
-  })
-}
-
 
 const settings = [
   { key:'favorites', label:'我喜欢的' },
@@ -119,13 +97,13 @@ function go(url){
 }
 function onSetting(key){
   console.log('[profile] onSetting:', key)
-  if(key==='favorites') go('pages/favorites/index')
+  if(key==='favorites') go('../../favorites/index')
   else if(key==='history') { showHistory.value = true; loadHistory() }
-  else if(key==='comments') go('pages/comments/index')
+  else if(key==='comments') go('../../comments/index')
   else if(key==='account') go('pages/account/index')
-  else if(key==='help') go('pages/help/index')
-  else if(key==='about') go('pages/about/index')
-  else if(key==='queue') go('pages/queue/index')
+  else if(key==='help') go('../../help/index')
+  else if(key==='about') go('../../about/index')
+  else if(key==='queue') go('../../queue/index')
   else if(key==='nickname') uni.showToast({ title:'请在后续版本中支持修改昵称', icon:'none' })
 }
 function closeHistory(){ showHistory.value = false; list.value = [] }
@@ -146,4 +124,5 @@ function closeHistory(){ showHistory.value = false; list.value = [] }
 .history-item{ padding:12px 0; border-bottom:1px solid var(--border) }
 .name{ font-size:16px; color:var(--text-primary); font-weight:600 }
 .meta{ font-size:12px; color:var(--text-secondary); margin-top:6px }
+.btn{ padding:14px 12px; border-radius:10px; border:none; font-weight:600; background: var(--card-bg, rgba(255,255,255,0.02)); color: var(--fg, #fff); }
 </style>

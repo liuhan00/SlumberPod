@@ -82,7 +82,7 @@
 
 <script setup>
 import { ref } from 'vue'
-import { scheduleFeedbackReminder, submitFeedback } from '@/store/feedback'
+import { scheduleFeedbackReminder, submitFeedback } from '../../store/feedback'
 
 const isWeixinMini = (typeof wx !== 'undefined' && typeof wx.getSystemInfoSync === 'function')
 const emit = defineEmits(['close'])
@@ -97,7 +97,7 @@ const comment = ref('')
 // wheel data
 const hoursList = Array.from({length:13}).map((_,i)=>i) // 0..12
 const minutesList = Array.from({length:60}).map((_,i)=>i) // 0..59
-const pickerValue = ref([1,0]) // indices for hour/minute lists
+const pickerValue = ref([1,0])
 
 function dismiss(){
   try{ emit('close') }catch(e){}

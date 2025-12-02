@@ -41,7 +41,7 @@
           <text class="empty-icon">{{ activeTab === '关注' ? '👥' : '💭' }}</text>
           <text class="empty-text">
             {{ activeTab === '关注' ? '你关注的人还没有发过帖子哦' : '暂无内容，快来发布第一条动态吧！' }}
-            {{ activeTab === '关注' ? '去「精选」逛逛吧' : '' }}
+            {{ activeTab === '关注' ? '去「最热」逛逛吧' : '' }}
           </text>
           <button v-if="activeTab === '关注'" class="explore-btn" @click="goToFeatured">
             去逛逛
@@ -59,93 +59,20 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import PostCard from '@/components/PostCard.vue'
-import { useGlobalTheme } from '@/composables/useGlobalTheme'
-import { useThemeStore } from '@/stores/theme'
+import { onLoad } from '@dcloudio/uni-app'
 import { getAuthLocal } from '@/store/auth'
+import { useGlobalTheme } from '@/composables/useGlobalTheme'
+import { getPlaceholder } from '@/utils/image'
+import PostCard from '@/components/PostCard.vue'
 import * as apiPosts from '@/api/posts'
-import { safeImageUrl, getPlaceholder } from '@/utils/image'
-
-const themeStore = useThemeStore()
-themeStore.load()
-const { bgStyle } = useGlobalTheme()
-
-// 导航标签
-const tabs = ['关注', '综合', '最新']
-const activeTab = ref('最新') // 默认选中"最新"
-
 import * as apiCommunity from '@/api/community'
 
-// 后端数据
-const posts = ref([
-  { 
-    id: 'p1', backendId: null,
-    time: '刚刚', 
-    content: '昨晚试了雨声+树林组合，很快入睡。推荐给失眠的朋友们！', 
-    image: getPlaceholder('post'), 
-    likes: 12, 
-    comments: [
-      { id: 'c1', content: '这个组合确实不错！', author: { name: 'Dreamer', avatar: getPlaceholder('avatar') } }
-    ], 
-    author: { name: 'Sleepy', avatar: getPlaceholder('avatar') } 
-  },
-  { 
-    id: 'p2', backendId: null,
-    time: '1小时前', 
-    content: '有谁用过壁炉声？感觉很温暖~ 特别是冬天的时候', 
-    image: '', 
-    likes: 7, 
-    comments: [], 
-    author: { name: 'Cozy', avatar: getPlaceholder('avatar') } 
-  },
-  { 
-    id: 'p3', backendId: null,
-    time: '3小时前', 
-    content: '分享一个助眠技巧：睡前30分钟关闭电子设备，配合海浪声效果更佳', 
-    image: getPlaceholder('post'), 
-    likes: 25, 
-    comments: [
-      { id: 'c2', content: '学到了！今晚试试', author: { name: 'Relax', avatar: getPlaceholder('avatar') } },
-      { id: 'c3', content: '确实有效，已经坚持一周了', author: { name: 'Peace', avatar: getPlaceholder('avatar') } }
-    ], 
-    author: { name: 'Expert', avatar: getPlaceholder('avatar') } 
-  }
-])
+// 导航标签
+const tabs = ['关注', '最热', '最新']
+const activeTab = ref('最新') // 默认选中"最新"
 
-// 计算属性：根据当前标签筛选帖子
-const filteredPosts = computed(() => {
-  let result = [...posts.value]
-  
-  switch (activeTab.value) {
-    case '关注':
-      // 关注列表：只显示你关注的人发的帖子（从后端或本地 auth 获取关注名单）
-      try{
-        const auth = getAuthLocal()
-        const following = auth?.following || auth?.user?.following || ['Sleepy','Expert']
-        result = result.filter(post => following.includes(post.author.name))
-      }catch(e){
-        result = result.filter(post => ['Sleepy', 'Expert'].includes(post.author.name))
-      }
-      break
-    case '综合':
-      // 综合排序：按热度（点赞数+评论数）
-      result.sort((a, b) => {
-        const aScore = a.likes + a.comments.length
-        const bScore = b.likes + b.comments.length
-        return bScore - aScore
-      })
-      break
-    case '最新':
-      // 按时间倒序（最新在前）
-      result.sort((a, b) => {
-        const timeMap = { '刚刚': 0, '1小时前': 1, '3小时前': 3 }
-        return timeMap[a.time] - timeMap[b.time]
-      })
-      break
-  }
-  
-  return result
-})
+// 后端数据
+const posts = ref([])
 
 // 归一化后端帖子为本地渲染结构
 function normalizeList(list){
@@ -159,9 +86,10 @@ function normalizeList(list){
     title: item.title || '',
     content: item.content || item.body || '',
     image: (item.imageUrls && item.imageUrls[0]) || item.image || '',
-    favorite_count: item.favorite_count ?? item.likes ?? 0,
-    comment_count: item.comment_count ?? (Array.isArray(item.comments) ? item.comments.length : 0),
-    likes: item.likes || item.favorite_count || 0,
+    // 使用数据库中的真实点赞和评论数量
+    favorite_count: item.favorite_count ?? item.like_count ?? item.likes ?? 0,
+    comment_count: item.comment_count ?? item.commentCount ?? (Array.isArray(item.comments) ? item.comments.length : 0),
+    likes: item.likes || item.favorite_count || item.like_count || 0,
     comments: Array.isArray(item.comments) ? item.comments : [],
     author: item.author || { name: item.userName || item.user_name || '用户', avatar: safeImageUrl((item.author && item.author.avatar) || item.user_avatar, 'avatar') }
   }))
@@ -203,8 +131,44 @@ async function loadHot(){
 function switchTab(tab) {
   activeTab.value = tab
   if(tab === '最新') loadLatest().catch(()=>{})
-  if(tab === '综合') loadHot().catch(()=>{})
+  if(tab === '最热') loadHot().catch(()=>{})
 }
+
+// 计算属性：根据当前标签筛选帖子
+const filteredPosts = computed(() => {
+  let result = [...posts.value]
+  
+  switch (activeTab.value) {
+    case '关注':
+      // 关注列表：只显示你关注的人发的帖子（从后端或本地 auth 获取关注名单）
+      try{
+        const auth = getAuthLocal()
+        const following = auth?.following || auth?.user?.following || ['Sleepy','Expert']
+        result = result.filter(post => following.includes(post.author.name))
+      }catch(e){
+        result = result.filter(post => ['Sleepy', 'Expert'].includes(post.author.name))
+      }
+      break
+    case '最热':
+      // 最热排序：按热度（点赞数+评论数）
+      result.sort((a, b) => {
+        // 使用 favorite_count 和 comment_count 字段进行排序
+        const aScore = (a.favorite_count || a.likes || 0) + (a.comment_count || a.comments?.length || 0)
+        const bScore = (b.favorite_count || b.likes || 0) + (b.comment_count || b.comments?.length || 0)
+        return bScore - aScore
+      })
+      break
+    case '最新':
+      // 按时间倒序（最新在前）
+      result.sort((a, b) => {
+        const timeMap = { '刚刚': 0, '1小时前': 1, '3小时前': 3 }
+        return timeMap[a.time] - timeMap[b.time]
+      })
+      break
+  }
+  
+  return result
+})
 
 function showSearch() {
   uni.showToast({
@@ -229,36 +193,91 @@ function showNotifications() {
 }
 
 function goToFeatured() {
-  activeTab.value = '综合'
+  activeTab.value = '最热'
 }
 
-function onLike(id) { 
+// 处理点赞
+async function onLike(id) { 
   const post = posts.value.find(x => x.id === id)
   if (post) {
-    post.likes++
-    uni.showToast({ title: '点赞成功', icon: 'success' })
+    try {
+      // 检查用户是否已登录
+      const auth = getAuthLocal()
+      if (!auth || !auth.token) {
+        uni.showToast({
+          title: '请先登录',
+          icon: 'none'
+        })
+        setTimeout(() => {
+          uni.navigateTo({ url: '/pages/auth/Login' })
+        }, 1500)
+        return
+      }
+      
+      // 调用点赞API
+      await apiCommunity.likePost({ postId: post.backendId || post.id }, auth.token)
+      
+      // 更新本地数据
+      post.likes++
+      post.favorite_count++
+      
+      uni.showToast({ title: '点赞成功', icon: 'success' })
+    } catch (e) {
+      console.error('点赞失败:', e)
+      uni.showToast({ title: '点赞失败', icon: 'none' })
+    }
   }
 }
 
-function onComment(id) { 
-  uni.showModal({
-    title: '添加评论',
-    editable: true,
-    placeholderText: '请输入评论内容',
-    success: (res) => {
-      if (res.confirm && res.content) {
-        const post = posts.value.find(x => x.id === id)
-        if (post) {
-          post.comments.push({
-            id: `c${Date.now()}`,
-            content: res.content,
-            author: { name: '我', avatar: getPlaceholder('avatar') }
-          })
-          uni.showToast({ title: '评论成功', icon: 'success' })
+// 处理评论
+async function onComment(id) { 
+  const post = posts.value.find(x => x.id === id)
+  if (post) {
+    // 检查用户是否登录
+    const auth = getAuthLocal()
+    if (!auth || !auth.token) {
+      uni.showToast({
+        title: '请先登录',
+        icon: 'none'
+      })
+      setTimeout(() => {
+        uni.navigateTo({ url: '/pages/auth/Login' })
+      }, 1500)
+      return
+    }
+    
+    uni.showModal({
+      title: '添加评论',
+      editable: true,
+      placeholderText: '请输入评论内容',
+      success: async (res) => {
+        if (res.confirm && res.content) {
+          try {
+            // 调用评论API
+            const result = await apiCommunity.createComment({ 
+              postId: post.backendId || post.id, 
+              content: res.content 
+            }, auth.token)
+            
+            // 更新本地数据
+            const newComment = {
+              id: result.data?.id || `c${Date.now()}`,
+              content: res.content,
+              author: { name: '我', avatar: getPlaceholder('avatar') }
+            }
+            
+            post.comments.push(newComment)
+            post.comment_count++
+            
+            uni.showToast({ title: '评论成功', icon: 'success' })
+          } catch (e) {
+            console.error('评论失败:', e)
+            uni.showToast({ title: '评论失败', icon: 'none' })
+          }
         }
       }
-    }
-  })
+    })
+  }
 }
 
 const creating = ref(false)
@@ -286,6 +305,7 @@ async function createPost(data) {
       content: returned.content || data.content,
       image: (returned.imageUrls && returned.imageUrls[0]) || returned.image || data.image || '',
       likes: returned.likes || returned.favorite_count || 0,
+      comment_count: returned.comment_count || returned.commentCount || 0,
       comments: returned.comments || [],
       author: returned.author || { name: '我', avatar: getPlaceholder('avatar') }
     }

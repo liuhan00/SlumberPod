@@ -4,12 +4,15 @@ import { ref } from 'vue'
 import * as apiCommunity from '@/api/community'
 import { useGlobalTheme } from '@/composables/useGlobalTheme'
 import { getPlaceholder } from '@/utils/image'
+import { getAuthLocal } from '@/store/auth'
 
 const { bgStyle } = useGlobalTheme()
 
 const loading = ref(true)
 const error = ref('')
 const post = ref({})
+const comments = ref([])
+const newComment = ref('')
 
 onLoad(async (q)=>{
   const id = q?.id
@@ -29,7 +32,7 @@ onLoad(async (q)=>{
       content: data.content || data.body || '',
       image: (data.imageUrls && data.imageUrls[0]) || data.image || data.cover_image || '',
       play_count: data.play_count || data.playCount || 0,
-      favorite_count: data.favorite_count || data.favoriteCount || data.likes || 0,
+      favorite_count: data.favorite_count || data.like_count || data.likes || 0,
       comment_count: data.comment_count || data.commentCount || (Array.isArray(data.comments) ? data.comments.length : 0),
       time: data.time || data.created_at || data.createdAt || '未知时间',
       author: data.author || { 
@@ -39,6 +42,9 @@ onLoad(async (q)=>{
       comments: Array.isArray(data.comments) ? data.comments : []
     }
     
+    // 加载评论
+    await loadComments(numericId)
+    
     loading.value = false
   }catch(e){
     console.error('[community.detail] load failed', e)
@@ -46,6 +52,18 @@ onLoad(async (q)=>{
     loading.value = false
   }
 })
+
+// 加载评论
+async function loadComments(postId) {
+  try {
+    const res = await apiCommunity.getComments({ postId })
+    const data = res?.data || res
+    comments.value = Array.isArray(data) ? data : (data?.items || data?.comments || [])
+  } catch(e) {
+    console.error('[community.detail] load comments failed', e)
+    comments.value = []
+  }
+}
 
 function goBack() {
   try {
@@ -55,20 +73,86 @@ function goBack() {
   }
 }
 
+// 分享到朋友圈
+function shareToMoments() {
+  // 获取当前页面路径
+  const pages = getCurrentPages()
+  const currentPage = pages[pages.length - 1]
+  const baseUrl = `${currentPage.route}?id=${post.value.id}`
+  
+  // 检查是否支持分享到朋友圈
+  if (typeof uni.shareToMoments === 'function') {
+    uni.shareToMoments({
+      title: post.value.title || '来看看这个有趣的帖子',
+      content: post.value.content.substring(0, 50) + '...',
+      imageUrl: post.value.image || '',
+      path: baseUrl,
+      success: () => {
+        uni.showToast({ title: '分享成功', icon: 'success' })
+      },
+      fail: (err) => {
+        console.error('分享失败', err)
+        uni.showToast({ title: '分享失败', icon: 'none' })
+      }
+    })
+  } else {
+    // 如果不支持分享到朋友圈，使用通用分享
+    uni.showActionSheet({
+      itemList: ['发送给朋友', '分享到朋友圈', '复制链接'],
+      success: (res) => {
+        switch (res.tapIndex) {
+          case 0:
+            // 发送给朋友
+            uni.share({
+              title: post.value.title || '来看看这个有趣的帖子',
+              content: post.value.content.substring(0, 50) + '...',
+              href: `/${baseUrl}`,
+              success: () => {
+                uni.showToast({ title: '分享成功', icon: 'success' })
+              },
+              fail: () => {
+                uni.showToast({ title: '分享失败', icon: 'none' })
+              }
+            })
+            break
+          case 1:
+            // 复制链接
+            uni.setClipboardData({
+              data: `/${baseUrl}`,
+              success: () => {
+                uni.showToast({ title: '链接已复制，可在微信中分享', icon: 'success' })
+              }
+            })
+            break
+          case 2:
+            // 复制链接
+            uni.setClipboardData({
+              data: `/${baseUrl}`,
+              success: () => {
+                uni.showToast({ title: '链接已复制', icon: 'success' })
+              }
+            })
+            break
+        }
+      }
+    })
+  }
+}
+
 function openActions() {
   uni.showActionSheet({
-    itemList: ['分享', '举报', '复制链接'],
+    itemList: ['分享到朋友圈', '举报', '复制链接'],
     success: (res) => {
       switch (res.tapIndex) {
         case 0:
-          uni.showToast({ title: '分享功能开发中', icon: 'none' })
+          shareToMoments()
           break
         case 1:
           uni.showToast({ title: '举报成功', icon: 'success' })
           break
         case 2:
           uni.setClipboardData({
-            data: `帖子链接: ${window.location.href}`,
+            data: `${window.location.origin}/#/pages/community/detail?id=${post.value.id}`,
             success: () => {
               uni.showToast({ title: '链接已复制', icon: 'success' })
             }
@@ -77,6 +161,87 @@ function openActions() {
       }
     }
   })
+}
+
+// 提交评论
+async function submitComment() {
+  if (!newComment.value.trim()) {
+    uni.showToast({ title: '请输入评论内容', icon: 'none' })
+    return
+  }
+  
+  try {
+    // 检查用户是否登录
+    const auth = getAuthLocal()
+    if (!auth || !auth.token) {
+      uni.showToast({
+        title: '请先登录',
+        icon: 'none'
+      })
+      setTimeout(() => {
+        uni.navigateTo({ url: '/pages/auth/Login' })
+      }, 1500)
+      return
+    }
+    
+    // 调用评论API
+    const result = await apiCommunity.createComment({ 
+      postId: post.value.id, 
+      content: newComment.value 
+    }, auth.token)
+    
+    // 更新本地数据
+    const commentData = result?.data || {}
+    comments.value.unshift({
+      id: commentData.id || `c${Date.now()}`,
+      content: newComment.value,
+      created_at: '刚刚',
+      author: {
+        name: '我',
+        avatar: getPlaceholder('avatar')
+      }
+    })
+    
+    // 清空输入框
+    newComment.value = ''
+    
+    // 更新帖子的评论数
+    post.value.comment_count = (post.value.comment_count || 0) + 1
+    
+    uni.showToast({ title: '评论成功', icon: 'success' })
+  } catch(e) {
+    console.error('[community.detail] submit comment failed', e)
+    uni.showToast({ title: '评论失败', icon: 'none' })
+  }
+}
+
+// 点赞帖子
+async function likePost() {
+  try {
+    // 检查用户是否登录
+    const auth = getAuthLocal()
+    if (!auth || !auth.token) {
+      uni.showToast({
+        title: '请先登录',
+        icon: 'none'
+      })
+      setTimeout(() => {
+        uni.navigateTo({ url: '/pages/auth/Login' })
+      }, 1500)
+      return
+    }
+    
+    // 调用点赞API
+    await apiCommunity.likePost({ postId: post.value.id }, auth.token)
+    
+    // 更新本地数据
+    post.value.favorite_count = (post.value.favorite_count || 0) + 1
+    
+    uni.showToast({ title: '点赞成功', icon: 'success' })
+  } catch(e) {
+    console.error('[community.detail] like post failed', e)
+    uni.showToast({ title: '点赞失败', icon: 'none' })
+  }
 }
 
 function formatTime(timeStr) {
@@ -92,6 +257,7 @@ function formatTime(timeStr) {
     <view class="topbar">
       <button class="tb-btn tb-back" @click="goBack">←</button>
       <text class="tb-title">帖子详情</text>
+      <button class="tb-btn tb-share" @click="shareToMoments">↗️</button>
     </view>
 
     <scroll-view class="content" scroll-y>
@@ -127,9 +293,43 @@ function formatTime(timeStr) {
 
         <!-- Stats -->
         <view class="chips">
-          <view class="chip"><text class="chip-icon">▶</text><text class="chip-text">播放 {{ post.play_count ?? 0 }}</text></view>
-          <view class="chip"><text class="chip-icon">❤</text><text class="chip-text">喜欢 {{ post.favorite_count ?? 0 }}</text></view>
-          <view class="chip"><text class="chip-icon">💬</text><text class="chip-text">评论 {{ post.comment_count ?? (post.comments?.length || 0) }}</text></view>
+          <view class="chip" @click="likePost">
+            <text class="chip-icon">👍</text>
+            <text class="chip-text">{{ post.favorite_count || 0 }} 个赞</text>
+          </view>
+          <view class="chip">
+            <text class="chip-icon">💬</text>
+            <text class="chip-text">{{ post.comment_count || 0 }} 条评论</text>
+          </view>
+        </view>
+
+        <!-- 评论输入框 -->
+        <view class="comment-input">
+          <textarea 
+            v-model="newComment" 
+            class="comment-textarea" 
+            placeholder="写下你的评论..." 
+            auto-height
+          />
+          <button class="comment-submit" @click="submitComment">发送</button>
+        </view>
+
+        <!-- 评论列表 -->
+        <view class="comments">
+          <view v-for="comment in comments" :key="comment.id" class="comment">
+            <image 
+              class="comment-avatar" 
+              :src="comment.author?.avatar || getPlaceholder('avatar')" 
+              mode="aspectFill" 
+            />
+            <view class="comment-content">
+              <view class="comment-header">
+                <text class="comment-author">{{ comment.author?.name || '用户' }}</text>
+                <text class="comment-time">{{ comment.created_at || '刚刚' }}</text>
+              </view>
+              <text class="comment-text">{{ comment.content }}</text>
+            </view>
+          </view>
         </view>
       </view>
     </scroll-view>
@@ -141,6 +341,7 @@ function formatTime(timeStr) {
 .topbar{ position:sticky; top:0; display:flex; align-items:center; justify-content:center; padding:10px 14px }
 .tb-btn{ background:transparent; border:none; font-size:18px; color: var(--card-fg, #13303f) }
 .tb-back{ position:absolute; left:12px; }
+.tb-share{ position:absolute; right:12px; }
 .tb-title{ font-size:16px; font-weight:700; color: var(--card-fg, #13303f) }
 .content{ flex:1 }
 
@@ -161,6 +362,66 @@ function formatTime(timeStr) {
 .chip{ display:flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; background: var(--input-bg, #f1f8ff); color: var(--card-fg, #13303f); box-shadow: 0 6px 16px rgba(0,0,0,0.06) }
 .chip-icon{ font-size:14px }
 .chip-text{ font-size:13px }
+
+/* 评论输入框 */
+.comment-input{ 
+  display: flex; 
+  margin-top: 20px; 
+  padding: 10px; 
+  background: var(--card-bg, rgba(255,255,255,0.92)); 
+  border-radius: 8px; 
+  gap: 10px;
+}
+.comment-textarea{ 
+  flex: 1; 
+  padding: 8px; 
+  border: 1px solid #ddd; 
+  border-radius: 4px; 
+  font-size: 14px; 
+  background: white;
+}
+.comment-submit{ 
+  padding: 8px 16px; 
+  background: #007aff; 
+  color: white; 
+  border: none; 
+  border-radius: 4px; 
+  font-size: 14px;
+}
+
+/* 评论列表 */
+.comments{ margin-top: 20px; }
+.comment{ 
+  display: flex; 
+  padding: 10px 0; 
+  border-bottom: 1px solid #eee; 
+}
+.comment-avatar{ 
+  width: 36px; 
+  height: 36px; 
+  border-radius: 50%; 
+  margin-right: 10px; 
+}
+.comment-content{ flex: 1; }
+.comment-header{ 
+  display: flex; 
+  justify-content: space-between; 
+  margin-bottom: 4px; 
+}
+.comment-author{ 
+  font-weight: bold; 
+  font-size: 14px; 
+  color: var(--card-fg, #13303f);
+}
+.comment-time{ 
+  font-size: 12px; 
+  color: #999; 
+}
+.comment-text{ 
+  font-size: 14px; 
+  color: var(--card-fg, #13303f);
+  line-height: 1.4;
+}
 
 /* Loading skeleton */
 .loading{ padding:20px }

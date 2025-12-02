@@ -186,7 +186,7 @@ const showArrow = ref(false)
 // load categories from backend
 async function fetchCategories(){
   try{
-    const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.123:3003'
+    const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.135:3003'
     // 小程序运行时可能不支持 new URL，因此使用字符串拼接
     // 添加分页参数以获取所有分类
     const url = BASE + '/api/categories?limit=1000'
@@ -291,22 +291,36 @@ const filteredNoises = computed(()=>{
   // 我的创作仍优先使用本地创作
   if(activeCat.value==='我的创作'){
     // 优先使用远端"我的创作"列表，若为空再回退本地存储
-    if(Array.isArray(remoteList.value) && remoteList.value.length) return remoteList.value
+    if(Array.isArray(remoteList.value) && remoteList.value.length) {
+      console.log('[Free] 使用远程我的创作列表:', remoteList.value)
+      return remoteList.value
+    }
     const userCreations = uni.getStorageSync('userCreations') || []
-    return userCreations.map(c=>({ id:c.id, title:c.name, audio_url:c.audioUrl || '', cover_url: safeImageUrl(c.cover_url || c.coverUrl || ''), duration:c.duration || 0 }))
+    const result = userCreations.map(c=>({ id:c.id, title:c.name, audio_url:c.audioUrl || '', cover_url: safeImageUrl(c.cover_url || c.coverUrl || ''), duration:c.duration || 0 }))
+    console.log('[Free] 使用本地我的创作列表:', result)
+    return result
   }
   // 如果 remoteList 有数据，优先使用 remoteList（远端返回的已按 category/is_free 筛选）
-  if(Array.isArray(remoteList.value) && remoteList.value.length) return remoteList.value
+  if(Array.isArray(remoteList.value) && remoteList.value.length) {
+    console.log('[Free] 使用远程列表:', remoteList.value)
+    return remoteList.value
+  }
   // 回退：全部 显示 allNoises 名称（临时显示，但音频源为空）
   if(activeCat.value==='全部'){
-    return allNoises.map(n=>({ id:n.id, title:n.name, audio_url: n.src || '', cover_url: safeImageUrl(n.cover_url || n.coverUrl || n.cover || ''), duration:n.duration || 0, placeholder: true }))
+    const result = allNoises.map(n=>({ id:n.id, title:n.name, audio_url: n.src || '', cover_url: safeImageUrl(n.cover_url || n.coverUrl || n.cover || ''), duration:n.duration || 0, placeholder: true }))
+    console.log('[Free] 使用本地全部列表:', result)
+    return result
   }
   // 免费回退：从本地数据筛选 is_free 字段为 1 的项（如果本地数据没有该字段则为空）
   if(activeCat.value==='free' || activeCat.value==='免费'){
-    return allNoises.filter(n=> Number(n.is_free)===1 || Number(n.free)===1).map(n=>({ id:n.id, title:n.name, audio_url:n.src||'', cover_url: safeImageUrl(n.cover_url || n.coverUrl || n.cover || ''), duration:n.duration||0, placeholder: true }))
+    const result = allNoises.filter(n=> Number(n.is_free)===1 || Number(n.free)===1).map(n=>({ id:n.id, title:n.name, audio_url:n.src||'', cover_url: safeImageUrl(n.cover_url || n.coverUrl || n.cover || ''), duration:n.duration||0, placeholder: true }))
+    console.log('[Free] 使用本地免费列表:', result)
+    return result
   }
   // 其他分类回退到本地过滤（category 字段可能是 id 或名称）
-  return allNoises.filter(n=> String(n.category)===String(activeCat.value) || String(n.category_id)===String(activeCat.value)).map(n=>({ id:n.id, title:n.name, audio_url:n.src||'', cover_url: safeImageUrl(n.cover_url || n.coverUrl || n.cover || ''), duration:n.duration||0, placeholder: true }))
+  const result = allNoises.filter(n=> String(n.category)===String(activeCat.value) || String(n.category_id)===String(activeCat.value)).map(n=>({ id:n.id, title:n.name, audio_url:n.src||'', cover_url: safeImageUrl(n.cover_url || n.coverUrl || n.cover || ''), duration:n.duration||0, placeholder: true }))
+  console.log('[Free] 使用本地分类列表:', result)
+  return result
 })
 
 // remote loading state
@@ -382,8 +396,14 @@ function isValidImageUrl(url) {
 // 图片加载错误处理函数
 function handleImageError(event) {
   console.log('[Free] Image load error:', event)
-  // 可以在这里添加更多的错误处理逻辑
-  // 例如：设置默认图标或隐藏图片元素
+  // 在图片加载失败时，隐藏图片元素，让emoji图标显示出来
+  const imgElement = event.target || event.srcElement
+  if (imgElement) {
+    // 检查元素是否存在再设置样式
+    if (imgElement.style) {
+      imgElement.style.display = 'none'
+    }
+  }
 }
 
 function getNoiseIcon(name){
@@ -743,9 +763,9 @@ function openAgent(){
 .tabs-arrow{ position:absolute; right:6px; top:50%; transform:translateY(-50%); background:rgba(255,255,255,0.95); border-radius:50%; width:30px; height:30px; display:flex; align-items:center; justify-content:center; border:none; box-shadow:0 6px 12px rgba(0,0,0,0.10) }
 
 .grid{ display:flex !important; flex-wrap:wrap; gap:8px 10px; padding:8px 6px }
-/* two-column responsive cards */
-.grid .item{ box-sizing:border-box; flex: 0 0 calc(50% - 6px); max-width: calc(50% - 6px); padding:8px; border-radius:10px; background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.02)); transition: background 0.14s, transform 0.12s; position: relative; z-index: 1 }
-@media (min-width:900px){ .grid .item{ flex: 0 0 calc(25% - 12px); max-width: calc(25% - 12px) } }
+/* three-column responsive cards */
+.grid .item{ box-sizing:border-box; flex: 0 0 calc(33.333% - 7px); max-width: calc(33.333% - 7px); padding:8px; border-radius:10px; background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.02)); transition: background 0.14s, transform 0.12s; position: relative; z-index: 1 }
+@media (min-width:900px){ .grid .item{ flex: 0 0 calc(16.666% - 12px); max-width: calc(16.666% - 12px) } }
 
 /* ensure scroll-view children are positioned normally */
 .list-scroll{ min-height: calc(100vh - 160px); padding-bottom: 140px }

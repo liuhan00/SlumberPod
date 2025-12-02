@@ -1,149 +1,20 @@
-<template>
-  <view class="post">
-    <!-- 用户信息区域 -->
-    <view class="header">
-      <image 
-        class="avatar" 
-        :src="avatarSrc" 
-        @error="handleAvatarError"
-        @click="viewProfile" 
-      />
-      <view class="author-info">
-        <text class="name">{{ post.author.name }}</text>
-        <text class="time">{{ displayTime }}</text>
-      </view>
-      <view class="more-actions">
-        <button class="more-btn" @click="showMoreActions">⋯</button>
-      </view>
-    </view>
-    
-    <!-- 内容区域 -->
-    <view class="content-area">
-      <text v-if="post.title" class="post-title" @click="viewDetail">{{ post.title }}</text>
-      <text class="content" @click="viewDetail">{{ post.content }}</text>
-      
-      <!-- 图片展示 -->
-      <view v-if="post.image" class="image-container">
-        <image 
-          class="post-image" 
-          :src="imageSrc" 
-          mode="aspectFill" 
-          @error="handleImageError"
-          @click="previewImage"
-        />
-      </view>
-      
-      <!-- 话题标签 -->
-      <view v-if="hasTopics" class="topics">
-        <text 
-          v-for="topic in extractTopics(post.content)" 
-          :key="topic" 
-          class="topic-tag"
-          @click="searchTopic(topic)"
-        >
-          {{ topic }}
-        </text>
-      </view>
-    </view>
-    
-    <!-- 互动区域 -->
-    <view class="actions">
-      <view class="action-group">
-        <button 
-          class="action-btn" 
-          :class="{ liked: isLiked }" 
-          @click="handleLike"
-        >
-          <text class="action-icon">{{ isLiked ? '❤️' : '🤍' }}</text>
-          <text class="action-count">{{ post.favorite_count ?? post.likes ?? 0 }}</text>
-        </button>
-        
-        <button class="action-btn" @click="handleComment">
-          <text class="action-icon">💬</text>
-          <text class="action-count">{{ post.comment_count ?? (post.comments?.length || 0) }}</text>
-        </button>
-        
-        <button class="action-btn" @click="handleShare">
-          <text class="action-icon">↗️</text>
-          <text class="action-text">分享</text>
-        </button>
-      </view>
-      
-      <view class="stats">
-        <text class="stat-text">{{ post.comment_count ?? (post.comments?.length || 0) }}条评论</text>
-        <text class="stat-text">·</text>
-        <text class="stat-text">{{ post.favorite_count ?? post.likes ?? 0 }}个赞</text>
-      </view>
-    </view>
-    
-    <!-- 评论预览 -->
-    <view v-if="post.comments.length > 0" class="comments-preview">
-      <view 
-        v-for="comment in post.comments.slice(0, 2)" 
-        :key="comment.id" 
-        class="comment-item"
-      >
-        <text class="comment-author">{{ comment.author.name }}：</text>
-        <text class="comment-content">{{ comment.content }}</text>
-      </view>
-      <text 
-        v-if="post.comments.length > 2" 
-        class="view-all-comments"
-        @click="viewDetail"
-      >
-        查看全部{{ post.comments.length }}条评论
-      </text>
-    </view>
-  </view>
-</template>
-
 <script setup>
-import { ref, computed } from 'vue'
-import { safeImageUrl, getPlaceholder } from '@/utils/image'
+import { ref } from 'vue'
+import { getPlaceholder } from '@/utils/image'
 
-const props = defineProps({ 
-  post: { 
-    type: Object, 
-    required: true 
-  } 
+const props = defineProps({
+  post: {
+    type: Object,
+    required: true
+  }
 })
 
 const emit = defineEmits(['like', 'comment', 'share'])
 
-const isLiked = ref(false)
-const avatarSrc = ref(safeImageUrl(props.post.author?.avatar, 'avatar'))
-const imageSrc = ref(safeImageUrl(props.post.image, 'cover'))
-
-// 计算属性
-const hasTopics = computed(() => {
-  return extractTopics(props.post.content).length > 0
-})
-
-// 友好时间显示
-const displayTime = computed(() => {
-  const raw = props.post.time
-  if (!raw) return ''
-  const t = new Date(raw)
-  if (isNaN(t)) return String(raw)
-  const now = new Date()
-  const diff = Math.floor((now - t) / 1000) // seconds
-  if (diff < 60) return `${diff}秒前`
-  if (diff < 3600) return `${Math.floor(diff / 60)}分钟前`
-  if (diff < 86400) return `${Math.floor(diff / 3600)}小时前`
-  if (diff < 2592000) return `${Math.floor(diff / 86400)}天前`
-  if (diff < 31536000) return `${Math.floor(diff / 2592000)}个月前`
-  return `${Math.floor(diff / 31536000)}年前`
-})
-
-// 方法
-function extractTopics(content) {
-  const topicRegex = /#([^#\s]+)#/g
-  const matches = content.match(topicRegex) || []
-  return matches.slice(0, 3) // 最多显示3个话题
-}
+const avatarSrc = ref(props.post.author?.avatar || getPlaceholder('avatar'))
+const imageSrc = ref(props.post.image || '')
 
 function handleLike() {
-  isLiked.value = !isLiked.value
   emit('like', props.post.id)
 }
 
@@ -151,8 +22,70 @@ function handleComment() {
   emit('comment', props.post.id)
 }
 
+// 分享到朋友圈
 function handleShare() {
-  emit('share', props.post.id)
+  // 获取当前页面路径
+  const pages = getCurrentPages()
+  const currentPage = pages[pages.length - 1]
+  const baseUrl = `${currentPage.route}?id=${props.post.id}`
+  
+  // 检查是否支持分享到朋友圈
+  if (typeof uni.shareToMoments === 'function') {
+    uni.shareToMoments({
+      title: props.post.title || '来看看这个有趣的帖子',
+      content: props.post.content.substring(0, 50) + '...',
+      imageUrl: props.post.image || '',
+      path: baseUrl,
+      success: () => {
+        uni.showToast({ title: '分享成功', icon: 'success' })
+      },
+      fail: (err) => {
+        console.error('分享失败', err)
+        uni.showToast({ title: '分享失败', icon: 'none' })
+      }
+    })
+  } else {
+    // 如果不支持分享到朋友圈，使用通用分享
+    uni.showActionSheet({
+      itemList: ['发送给朋友', '分享到朋友圈', '复制链接'],
+      success: (res) => {
+        switch (res.tapIndex) {
+          case 0:
+            // 发送给朋友
+            uni.share({
+              title: props.post.title || '来看看这个有趣的帖子',
+              content: props.post.content.substring(0, 50) + '...',
+              href: `/${baseUrl}`,
+              success: () => {
+                uni.showToast({ title: '分享成功', icon: 'success' })
+              },
+              fail: () => {
+                uni.showToast({ title: '分享失败', icon: 'none' })
+              }
+            })
+            break
+          case 1:
+            // 分享到朋友圈（复制链接提示用户手动分享）
+            uni.setClipboardData({
+              data: `/${baseUrl}`,
+              success: () => {
+                uni.showToast({ title: '链接已复制，可在微信中分享到朋友圈', icon: 'success' })
+              }
+            })
+            break
+          case 2:
+            // 复制链接
+            uni.setClipboardData({
+              data: `/${baseUrl}`,
+              success: () => {
+                uni.showToast({ title: '链接已复制', icon: 'success' })
+              }
+            })
+            break
+        }
+      }
+    })
+  }
 }
 
 function viewProfile() {
@@ -184,16 +117,19 @@ function searchTopic(topic) {
 
 function showMoreActions() {
   uni.showActionSheet({
-    itemList: ['举报', '不感兴趣', '收藏'],
+    itemList: ['分享到朋友圈', '举报', '不感兴趣', '收藏'],
     success: (res) => {
       switch (res.tapIndex) {
         case 0:
-          uni.showToast({ title: '举报成功', icon: 'success' })
+          handleShare()
           break
         case 1:
-          uni.showToast({ title: '已标记', icon: 'success' })
+          uni.showToast({ title: '举报成功', icon: 'success' })
           break
         case 2:
+          uni.showToast({ title: '已标记', icon: 'success' })
+          break
+        case 3:
           uni.showToast({ title: '收藏成功', icon: 'success' })
           break
       }
@@ -209,6 +145,60 @@ function handleImageError(e) {
   imageSrc.value = getPlaceholder('cover')
 }
 </script>
+
+<template>
+  <view class="post">
+    <!-- 头部区域 -->
+    <view class="header">
+      <image 
+        class="avatar" 
+        :src="avatarSrc" 
+        mode="aspectFill" 
+        @error="handleAvatarError"
+        @click="viewProfile"
+      />
+      <view class="author-info">
+        <text class="name">{{ post.author?.name || '用户' }}</text>
+        <text class="time">{{ post.time }}</text>
+      </view>
+      <button class="more-btn" @click="showMoreActions">⋯</button>
+    </view>
+
+    <!-- 内容区域 -->
+    <view class="content-area" @click="viewDetail">
+      <text v-if="post.title" class="title">{{ post.title }}</text>
+      <text class="content">{{ post.content }}</text>
+      <image 
+        v-if="post.image" 
+        class="cover" 
+        :src="imageSrc" 
+        mode="aspectFill" 
+        @error="handleImageError"
+        @click.stop="previewImage"
+      />
+    </view>
+
+    <!-- 统计信息 -->
+    <view class="stats">
+      <!-- 点赞数 -->
+      <view class="stat-item" @click="handleLike">
+        <text class="icon">👍</text>
+        <text class="count">{{ post.favorite_count || post.likes || 0 }}</text>
+      </view>
+      
+      <!-- 评论数 -->
+      <view class="stat-item" @click="handleComment">
+        <text class="icon">💬</text>
+        <text class="count">{{ post.comment_count || post.comments?.length || 0 }}</text>
+      </view>
+      
+      <!-- 分享 -->
+      <view class="stat-item" @click="handleShare">
+        <text class="icon">↗️</text>
+      </view>
+    </view>
+  </view>
+</template>
 
 <style scoped>
 .post { 
@@ -281,130 +271,58 @@ function handleImageError(e) {
   margin-bottom: 16px;
 }
 
-.post-title{ font-size:18px; font-weight:700; color: var(--text-contrast, var(--fg)) ; margin-bottom:6px }
-.content {
-  color: var(--text-contrast, var(--fg)) ;
-  font-size: 15px;
-  line-height: 1.5;
-  margin-bottom: 12px;
+.title {
   display: block;
-}
-
-.image-container {
-  margin: 12px 0;
-}
-
-.post-image {
-  width: 100%;
-  height: 200px;
-  border-radius: 8px;
-}
-
-.topics {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 8px;
-}
-
-.topic-tag {
-  color: #007aff;
-  font-size: 13px;
-  padding: 4px 8px;
-  background: #f0f7ff;
-  border-radius: 12px;
-}
-
-/* 互动区域 */
-.actions {
-  border-top: 1px solid #f0f0f0;
-  border-bottom: 1px solid #f0f0f0;
-  padding: 12px 0;
-  margin-bottom: 12px;
-}
-
-.action-group {
-  display: flex;
-  justify-content: space-around;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-contrast, var(--fg));
   margin-bottom: 8px;
 }
 
-.action-btn {
+.content {
+  display: block;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-contrast, var(--fg));
+  margin-bottom: 12px;
+  white-space: pre-wrap;
+}
+
+.cover {
+  width: 100%;
+  height: 200px;
+  border-radius: 8px;
+  margin-top: 8px;
+}
+
+/* 统计信息 */
+.stats {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.stat-item {
   display: flex;
   align-items: center;
   gap: 6px;
-  background: none;
-  border: none;
-  outline: none;
-  padding: 8px 16px;
-  border-radius: 6px;
+  padding: 6px 12px;
+  border-radius: 16px;
+  background: var(--card-bg, rgba(255,255,255,0.05));
+  cursor: pointer;
   transition: background 0.2s;
 }
 
-/* 微信小程序去边框 */
-.action-btn::after {
-  border: none;
+.stat-item:hover {
+  background: var(--card-bg-hover, rgba(255,255,255,0.1));
 }
 
-.action-btn:active {
-  background: #f5f5f5;
-}
-
-.action-btn.liked {
-  color: #ff3852;
-}
-
-.action-icon {
+.icon {
   font-size: 16px;
 }
 
-.action-count, .action-text {
-  font-size: 13px;
-  color: #666;
-}
-
-.action-btn.liked .action-count {
-  color: #ff3852;
-}
-
-.stats {
-  display: flex;
-  gap: 8px;
-  justify-content: center;
-}
-
-.stat-text {
-  font-size: 12px;
-  color: var(--muted-contrast, #999);
-}
-
-/* 评论预览 */
-.comments-preview {
-  padding-top: 8px;
-}
-
-.comment-item {
-  display: flex;
-  margin-bottom: 6px;
-  font-size: 13px;
-  line-height: 1.4;
-}
-
-.comment-author {
-  color: #007aff;
-  font-weight: 500;
-  margin-right: 4px;
-}
-
-.comment-content {
-  color: var(--text-contrast, var(--fg)) ;
-  flex: 1;
-}
-
-.view-all-comments {
-  color: var(--muted-contrast, #999);
-  font-size: 12px;
-  margin-top: 4px;
-  display: block;
+.count {
+  font-size: 14px;
+  color: var(--text-contrast, var(--fg));
 }
 </style>

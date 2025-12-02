@@ -264,7 +264,7 @@
               </view>
               <view class="meta-chips">
                 <view class="meta-chip"><text class="chip-icon">▶</text><text class="chip-text">{{ m?.play_count ?? m?.playCount ?? 0 }}</text></view>
-                <view class="meta-chip"><text class="chip-icon">❤</text><text class="chip-text">{{ m?.favorite_count ?? m?.favoriteCount ?? 0 }}</text></view>
+                <view class="meta-chip"><text class="chip-icon">❤</text><text class="chip-text">{{ m?.favorite_count ?? m?.like_count ?? m?.favoriteCount ?? 0 }}</text></view>
                 <view class="meta-chip"><text class="chip-icon">💬</text><text class="chip-text">{{ m?.comment_count ?? m?.commentCount ?? 0 }}</text></view>
               </view>
             </view>
@@ -277,7 +277,7 @@
               </view>
               <view class="meta-chips">
                 <view class="meta-chip"><text class="chip-icon">▶</text><text class="chip-text">{{ metaData?.play_count ?? metaData?.playCount ?? 0 }}</text></view>
-                <view class="meta-chip"><text class="chip-icon">❤</text><text class="chip-text">{{ metaData?.favorite_count ?? metaData?.favoriteCount ?? 0 }}</text></view>
+                <view class="meta-chip"><text class="chip-icon">❤</text><text class="chip-text">{{ metaData?.favorite_count ?? metaData?.like_count ?? metaData?.favoriteCount ?? 0 }}</text></view>
                 <view class="meta-chip"><text class="chip-icon">💬</text><text class="chip-text">{{ metaData?.comment_count ?? metaData?.commentCount ?? 0 }}</text></view>
               </view>
             </view>
@@ -800,7 +800,7 @@ function setCustomTimer() {
 
 async function openMetaPopup(id){
   showMeta.value = true; metaLoading.value = true; metaData.value = null; metaMulti.value = []
-  const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.123:3003'
+  const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.135:3003'
   // 构建ID列表：优先参数id；否则从当前播放或混合列表取 metaId/id（最多3个）
   let ids = []
   if(id){ ids = [id] }

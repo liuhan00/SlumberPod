@@ -7,7 +7,10 @@
     </view>
     
     <!-- 标题输入 -->
-    <input class="title-input" v-model="title" placeholder="标题（必填）" />
+    <view class="title-row">
+      <text class="required-star" :class="{ hidden: title.trim() }">*</text>
+      <input class="title-input" v-model="title" placeholder="标题" />
+    </view>
     <!-- 文本输入 -->
     <textarea 
       class="input" 
@@ -158,6 +161,22 @@ function handleImageError(e) {
   font-size: 15px; 
   color: rgba(0,0,0,0.9);
   max-width: 100%;
+}
+
+.title-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.required-star {
+  color: red;
+  font-weight: bold;
+  margin-right: 4px;
+}
+
+.required-star.hidden {
+  display: none;
 }
 
 .user-info {

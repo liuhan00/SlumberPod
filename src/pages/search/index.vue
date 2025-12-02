@@ -163,8 +163,8 @@ async function doSearch(reset = true){
       author: it.author || it.user_name || it.username || (it.author?.name) || '用户',
       cover: it.cover || it.cover_url || it.image || it.thumb || '',
       duration: it.duration || it.duration_seconds || it.durationSeconds || 0,
-      favorite_count: it.favorite_count ?? it.likes ?? 0,
-      comment_count: it.comment_count ?? (Array.isArray(it.comments) ? it.comments.length : 0),
+      favorite_count: it.favorite_count ?? it.like_count ?? it.likes ?? 0,
+      comment_count: it.comment_count ?? it.commentCount ?? (Array.isArray(it.comments) ? it.comments.length : 0),
       content: it.content || '',
     }))
     searchResults.value = reset ? mapped : searchResults.value.concat(mapped)

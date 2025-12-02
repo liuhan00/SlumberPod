@@ -77,15 +77,31 @@
         </view>
       </view>
     </view>
+    
+    <!-- 退出确认弹窗 -->
+    <view v-if="showExitConfirm" class="exit-confirm-overlay" @click="closeExitConfirm">
+      <view class="exit-confirm" @click.stop>
+        <text class="ec-title">学习计时</text>
+        <text class="ec-message">请选择退出后的操作：</text>
+        <view class="ec-options">
+          <button class="ec-option-btn" @click="handleExitWithPause">暂停计时（下次继续）</button>
+          <button class="ec-option-btn" @click="handleExitWithEnd">结束计时（本次学习结束）</button>
+        </view>
+        <view class="ec-actions">
+          <button class="ec-cancel" @click="closeExitConfirm">取消</button>
+        </view>
+      </view>
+    </view>
   </view>
 </template>
 
 <script setup>
 import learnPng from '@/static/learn.png'
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, onBeforeUnmount } from 'vue'
 import { useGlobalTheme } from '@/composables/useGlobalTheme'
 import { usePlayerStore } from '@/stores/player'
 import * as apiAudios from '@/api/audios'
+import * as studyApi from '@/api/study'
 
 const { bgStyle } = useGlobalTheme()
 const player = usePlayerStore()
@@ -95,8 +111,9 @@ const elapsedSeconds = ref(0)
 const isTimerRunning = ref(false)
 const currentAudio = ref(null)
 const showMusicSelector = ref(false)
-let timerInterval = null
-let timeInterval = null
+const showExitConfirm = ref(false)
+const sessionId = ref(null)
+const timerRefs = ref({ timerInterval: null, timeInterval: null })
 const showTimerSettings = ref(false)
 const resumePolicy = ref(true) // true: resume next time; false: reset next time
 
@@ -133,27 +150,78 @@ function updateCurrentTime() {
   currentTime.value = `${hh}:${mm}`
 }
 
-function togglePause() {
+// 切换暂停/开始状态
+async function togglePause() {
+  console.log('[Study] 切换暂停/开始状态，当前状态:', isTimerRunning.value)
   if (isTimerRunning.value) {
-    pauseTimer()
+    await pauseTimer()
   } else {
-    startTimer()
+    await startTimer()
   }
 }
 
-function startTimer() {
-  isTimerRunning.value = true
-  
-  timerInterval = setInterval(() => {
-    elapsedSeconds.value += 1
-  }, 1000)
+// 开始/恢复计时
+async function startTimer() {
+  try {
+    console.log('[Study] 开始计时')
+    // 如果还没有会话ID，则开始新会话
+    if (!sessionId.value) {
+      console.log('[Study] 调用 startStudySession API')
+      const response = await studyApi.startStudySession()
+      console.log('[Study] startStudySession 响应:', response)
+      
+      // 更健壮地处理响应数据，尝试从不同字段获取 sessionId
+      sessionId.value = response.sessionId || response.id || response._id || response.session_id || null
+      if (!sessionId.value) {
+        console.warn('[Study] 无法从响应中获取 sessionId:', response)
+        throw new Error('服务器响应中缺少会话ID')
+      }
+      
+      // 同样更健壮地处理持续时间
+      elapsedSeconds.value = response.duration || response.seconds || response.time || 0
+    }
+    
+    isTimerRunning.value = true
+    
+    // 每秒更新本地显示的时间（实际计时由后端处理）
+    timerRefs.value.timerInterval = setInterval(() => {
+      elapsedSeconds.value += 1
+    }, 1000)
+    console.log('[Study] 计时器已启动')
+  } catch (error) {
+    console.error('[Study] 开始计时失败:', error)
+    uni.showToast({ title: '开始计时失败: ' + (error.message || '未知错误'), icon: 'none' })
+  }
 }
 
-function pauseTimer() {
-  isTimerRunning.value = false
-  if (timerInterval) {
-    clearInterval(timerInterval)
-    timerInterval = null
+// 暂停计时
+async function pauseTimer() {
+  if (!sessionId.value) {
+    console.log('[Study] 没有会话ID，无法暂停')
+    uni.showToast({ title: '没有有效的学习会话，无法暂停', icon: 'none' })
+    return
+  }
+  
+  try {
+    console.log('[Study] 暂停计时，会话ID:', sessionId.value)
+    isTimerRunning.value = false
+    
+    // 清除本地定时器
+    if (timerRefs.value.timerInterval) {
+      clearInterval(timerRefs.value.timerInterval)
+      timerRefs.value.timerInterval = null
+    }
+    
+    // 调用后端暂停接口
+    const response = await studyApi.pauseStudySession(sessionId.value)
+    console.log('[Study] pauseStudySession 响应:', response)
+    
+    // 更健壮地处理持续时间
+    elapsedSeconds.value = response.duration || response.seconds || response.time || elapsedSeconds.value
+    console.log('[Study] 计时器已暂停')
+  } catch (error) {
+    console.error('[Study] 暂停计时失败:', error)
+    uni.showToast({ title: '暂停计时失败: ' + (error.message || '未知错误'), icon: 'none' })
   }
 }
 
@@ -166,7 +234,7 @@ async function loadCoffeeRainAudios(){
   console.log('[Study] loadCoffeeRainAudios start')
   // 先尝试从后端查分类拿到对应的 category_id，再分别请求两类音频
   try{
-    const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.123:3003'
+    const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.135:3003'
     const url = BASE + '/api/categories?limit=1000'
     console.log('[Study] fetch categories url', url)
     let resp
@@ -240,6 +308,7 @@ async function loadCoffeeRainAudios(){
 }
 
 function toggleMusic() {
+  console.log('[Study] 切换音乐选择器，当前状态:', showMusicSelector.value)
   showMusicSelector.value = !showMusicSelector.value
   if (showMusicSelector.value) {
     // 打开时请求后端音频分类（优先获取真实数据）
@@ -248,16 +317,34 @@ function toggleMusic() {
 }
 
 function toggleTimer() {
+  console.log('[Study] 切换计时器设置，当前状态:', showTimerSettings.value)
   showTimerSettings.value = true
 }
 
-function closeTimerSettings(){ showTimerSettings.value = false }
-function setResumePolicy(val){ resumePolicy.value = !!val }
+function closeTimerSettings(){ 
+  console.log('[Study] 关闭计时器设置')
+  showTimerSettings.value = false 
+}
+
+function setResumePolicy(val){ 
+  console.log('[Study] 设置恢复策略:', val)
+  resumePolicy.value = !!val 
+}
+
 function saveTimerSettings(){
+  console.log('[Study] 保存计时器设置，策略:', resumePolicy.value)
   // 保存设置到本地
   uni.setStorageSync('studyTimerResumePolicy', { resume: resumePolicy.value })
   showTimerSettings.value = false
-  uni.showToast({ title: '保存成功', icon: 'success' })
+  
+  // 根据用户选择执行相应操作
+  if (resumePolicy.value) {
+    // 用户选择继续计时，调用暂停接口
+    handleExitWithPause()
+  } else {
+    // 用户选择重新计时，调用结束接口
+    handleExitWithEnd()
+  }
 }
 
 function toggleScreen() {
@@ -265,16 +352,112 @@ function toggleScreen() {
 }
 
 function selectAudio(audio) {
+  console.log('[Study] 选择音频:', audio)
   currentAudio.value = audio
   showMusicSelector.value = false
   // 这里应该调用播放器播放音频
   // player.play(audio)
 }
 
+// 在<script setup>中，我们需要将函数声明改为函数表达式的形式以确保正确的提升
+// 处理退出并暂停计时
+const handleExitWithPause = async function() {
+  console.log('[Study] 处理退出并暂停计时')
+  if (sessionId.value) {
+    try {
+      console.log('[Study] 调用 pauseStudySession API，会话ID:', sessionId.value)
+      const response = await studyApi.pauseStudySession(sessionId.value)
+      console.log('[Study] pauseStudySession 响应:', response)
+      uni.showToast({ title: '已暂停计时', icon: 'success' })
+      console.log('[Study] 计时已暂停')
+    } catch (error) {
+      console.error('[Study] 暂停计时失败:', error)
+      uni.showToast({ title: '暂停计时失败: ' + (error.message || '未知错误'), icon: 'none' })
+    }
+  } else {
+    console.log('[Study] 没有会话ID，跳过暂停API调用')
+    uni.showToast({ title: '没有有效的学习会话', icon: 'none' })
+  }
+  closeExitConfirm()
+  // 返回到小屋页面
+  uni.navigateBack()
+}
+
+// 处理退出并结束计时
+const handleExitWithEnd = async function() {
+  console.log('[Study] 处理退出并结束计时')
+  if (sessionId.value) {
+    try {
+      console.log('[Study] 调用 endStudySession API，会话ID:', sessionId.value)
+      const response = await studyApi.endStudySession(sessionId.value)
+      console.log('[Study] endStudySession 响应:', response)
+      // 显示学习统计信息
+      const duration = response.duration || response.seconds || response.time || elapsedSeconds.value
+      const minutes = Math.floor(duration / 60)
+      
+      // 获取学习统计数据
+      let statsMessage = `${minutes} 分钟`
+      try {
+        console.log('[Study] 调用 getStudyStats API')
+        const stats = await studyApi.getStudyStats()
+        console.log('[Study] getStudyStats 响应:', stats)
+        // 假设返回的数据结构包含 totalMinutes 字段
+        if (stats && typeof stats === 'object' && 'totalMinutes' in stats) {
+          const totalHours = Math.floor(stats.totalMinutes / 60)
+          const remainingMinutes = stats.totalMinutes % 60
+          statsMessage = `${minutes} 分钟，累计学习 ${totalHours} 小时 ${remainingMinutes} 分钟`
+        } else if (stats && typeof stats === 'object' && 'totalHours' in stats) {
+          // 备用字段名
+          statsMessage = `${minutes} 分钟，累计学习 ${stats.totalHours} 小时`
+        }
+      } catch (statsError) {
+        console.warn('[Study] 获取学习统计失败:', statsError)
+      }
+      
+      uni.showModal({
+        title: '学习完成',
+        content: `本次学习了 ${statsMessage}，继续保持！`,
+        showCancel: false,
+        success: () => {
+          // 返回到小屋页面
+          uni.navigateBack()
+        }
+      })
+    } catch (error) {
+      console.error('[Study] 结束计时失败:', error)
+      uni.showToast({ title: '结束计时失败: ' + (error.message || '未知错误'), icon: 'none' })
+      // 即使失败也返回到小屋页面
+      uni.navigateBack()
+    }
+  } else {
+    // 没有会话ID，直接返回
+    console.log('[Study] 没有会话ID，直接返回')
+    uni.showToast({ title: '没有有效的学习会话', icon: 'none' })
+    uni.navigateBack()
+  }
+  closeExitConfirm()
+}
+
+// 显示退出确认弹窗（用于其他场景）
+const showExitConfirmation = function() {
+  console.log('[Study] 显示退出确认弹窗')
+  showExitConfirm.value = true
+}
+
+// 关闭退出确认弹窗
+const closeExitConfirm = function() {
+  console.log('[Study] 关闭退出确认弹窗')
+  showExitConfirm.value = false
+}
+
+
+
+// 在onMounted中注册onBackPress事件处理器
 onMounted(() => {
+  console.log('[Study] 页面挂载')
   updateCurrentTime()
   // 每秒更新一次当前时间
-  timeInterval = setInterval(updateCurrentTime, 1000)
+  timerRefs.value.timeInterval = setInterval(updateCurrentTime, 1000)
   
   // 恢复上次状态
   const savedState = uni.getStorageSync('studyTimerState')
@@ -285,30 +468,142 @@ onMounted(() => {
     if(resumePolicy.value){
       elapsedSeconds.value = savedState.elapsedSeconds || 0
       isTimerRunning.value = savedState.isTimerRunning || false
-      if (isTimerRunning.value) {
+      sessionId.value = savedState.sessionId || null
+      if (isTimerRunning.value && sessionId.value) {
         startTimer()
       }
     } else {
       // 不恢复计时，只恢复状态为未运行
       elapsedSeconds.value = 0
       isTimerRunning.value = false
+      sessionId.value = null
     }
+  }
+  console.log('[Study] 初始化完成，状态:', { elapsedSeconds: elapsedSeconds.value, isTimerRunning: isTimerRunning.value, sessionId: sessionId.value })
+  
+  // 注册返回按键事件处理器
+  // 在uni-app中，我们可以通过getCurrentPages获取当前页面并设置onBackPress
+  try {
+    const pages = getCurrentPages()
+    if (pages && pages.length > 0) {
+      const currentPage = pages[pages.length - 1]
+      // 确保currentPage存在且可以设置属性
+      if (currentPage && typeof currentPage === 'object') {
+        currentPage.onBackPress = onBackPress
+        console.log('[Study] onBackPress 已注册到当前页面')
+      }
+    }
+  } catch (e) {
+    console.warn('[Study] 注册onBackPress失败:', e)
+  }
+  
+  // 另一种注册方式：尝试直接在全局对象上设置
+  try {
+    const globalObject = typeof window !== 'undefined' ? window : global
+    if (globalObject) {
+      globalObject.currentOnBackPress = onBackPress
+      console.log('[Study] onBackPress 已注册到全局对象')
+    }
+  } catch (e) {
+    console.warn('[Study] 注册onBackPress到全局对象失败:', e)
+  }
+  
+  // 尝试使用uni-app提供的事件监听机制
+  // 在某些平台上，可以使用uni.$on来监听特定事件
+  try {
+    if (uni && typeof uni.$on === 'function') {
+      uni.$on('onBackPress', onBackPress)
+      console.log('[Study] onBackPress 已通过uni.$on注册')
+    }
+  } catch (e) {
+    console.warn('[Study] 通过uni.$on注册onBackPress失败:', e)
+  }
+  
+  // 特殊处理：在某些平台可能需要直接赋值
+  try {
+    // 尝试在不同对象上设置onBackPress
+    if (typeof global !== 'undefined' && global) {
+      global.onBackPress = onBackPress
+    }
+    
+    // 在H5平台的特殊处理
+    if (typeof window !== 'undefined' && window) {
+      window.onBackPress = onBackPress
+    }
+    
+    console.log('[Study] onBackPress 已注册到多个全局对象')
+  } catch (e) {
+    console.warn('[Study] 注册onBackPress到多个全局对象失败:', e)
   }
 })
 
+// 页面返回事件处理（uni-app推荐方式）
+// 这个函数会在页面返回时被调用
+onBeforeUnmount(() => {
+  console.log('[Study] 页面即将卸载')
+  // 注意：这里不能阻止返回，只能做一些清理工作
+})
+
+// uni-app 特有的页面返回处理函数
+// 这个函数在某些平台上会被自动调用
+function onBackPress() {
+  console.log('[Study] 页面返回事件触发')
+  // 如果计时器正在运行或存在会话ID，显示计时器设置弹窗
+  if (isTimerRunning.value || sessionId.value) {
+    // 显示计时器设置弹窗，让用户选择继续计时还是重新计时
+    showTimerSettings.value = true
+    console.log('[Study] 显示计时器设置弹窗')
+    // 阻止默认的返回行为
+    return true
+  }
+  // 允许默认的返回行为
+  console.log('[Study] 允许默认返回行为')
+  return false
+}
+
+// 在某些平台上，我们需要显式地将onBackPress函数暴露给页面实例
+// 这是为了确保在页面级别能够正确调用该函数
+defineExpose({
+  onBackPress
+})
+
+// 为了确保onBackPress能被调用，我们再添加一个全局函数
+// 这种方式在某些小程序平台上可能更有效
+try {
+  const globalObject = typeof window !== 'undefined' ? window : global
+  if (globalObject) {
+    globalObject.handleStudyBackPress = onBackPress
+  }
+} catch (e) {
+  console.warn('[Study] 注册全局返回处理函数失败:', e)
+}
+
+// 同时，我们也提供一个手动触发的方法，以防自动监听失败
+// 可以通过页面上的按钮来手动触发
+function manualBackPress() {
+  console.log('[Study] 手动触发返回按键处理')
+  return onBackPress()
+}
+
 onUnmounted(() => {
-  if (timerInterval) {
-    clearInterval(timerInterval)
+  console.log('[Study] 页面卸载，清理定时器')
+  // 清除所有定时器
+  if (timerRefs.value.timerInterval) {
+    clearInterval(timerRefs.value.timerInterval)
   }
-  if (timeInterval) {
-    clearInterval(timeInterval)
+  if (timerRefs.value.timeInterval) {
+    clearInterval(timerRefs.value.timeInterval)
   }
+  
   // 保存状态
   uni.setStorageSync('studyTimerState', {
     elapsedSeconds: elapsedSeconds.value,
-    isTimerRunning: isTimerRunning.value
+    isTimerRunning: isTimerRunning.value,
+    sessionId: sessionId.value
   })
+  console.log('[Study] 状态已保存')
 })
+
 </script>
 
 <style scoped>
@@ -512,6 +807,42 @@ onUnmounted(() => {
 .timer-settings .ts-actions{ display:flex; gap:10px; justify-content:flex-end; margin-top:12px }
 .timer-settings .ts-cancel{ background:transparent; border:1px solid rgba(0,0,0,0.06); padding:8px 12px; border-radius:8px }
 .timer-settings .ts-save{ background:#111; color:#fff; border:none; padding:8px 12px; border-radius:8px }
+
+/* 退出确认弹窗样式 */
+.exit-confirm-overlay{
+  position: fixed;
+  left: 0; right: 0; top: 0; bottom: 0;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+.exit-confirm{
+  width: calc(100vw - 48px);
+  max-width: 420px;
+  background: rgba(255,255,255,0.98);
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.28);
+}
+.exit-confirm .ec-title{ font-size:16px; font-weight:700; margin-bottom:12px; color:#111 }
+.exit-confirm .ec-message{ font-size:14px; color:#333; margin-bottom:16px; display:block }
+.exit-confirm .ec-options{ display:flex; flex-direction:column; gap:10px; margin-bottom:16px }
+.ec-option-btn{ 
+  background:#f5f5f5; 
+  border:none; 
+  padding:12px; 
+  border-radius:8px; 
+  text-align:left;
+  width:100%;
+}
+.ec-option-btn:first-child{
+  background:#7B61FF;
+  color:white;
+}
+.exit-confirm .ec-actions{ display:flex; justify-content:flex-end }
+.exit-confirm .ec-cancel{ background:transparent; border:1px solid rgba(0,0,0,0.06); padding:8px 12px; border-radius:8px }
 
 /* 响应式调整 */
 @media (max-width: 750px) {
