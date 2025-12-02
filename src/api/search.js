@@ -35,3 +35,85 @@ export async function searchAll({ q, page = 1, limit = 20, type = null } = {}){
     }catch(e){ reject(e) }
   })
 }
+
+// 获取热门搜索: GET /api/search/hot
+export async function getHotSearch(){
+  const url = BASE + '/api/search/hot'
+  console.log('[search] GET hot search', url)
+
+  if (typeof fetch === 'function'){
+    const res = await fetch(url, { method:'GET', headers: buildHeaders() })
+    let j = null
+    try{ j = await res.json() }catch(e){ j = null }
+    if(!res.ok) throw new Error(j?.message || j?.error || 'get hot search failed')
+    return j ?? []
+  }
+
+  return await new Promise((resolve, reject)=>{
+    try{
+      uni.request({ url, method:'GET', header: buildHeaders(), success(r){ resolve(r.data) }, fail(err){ reject(err) } })
+    }catch(e){ reject(e) }
+  })
+}
+
+// 获取用户搜索历史: GET /api/search
+export async function getSearchHistory(){
+  const url = BASE + '/api/search'
+  console.log('[search] GET search history', url)
+
+  if (typeof fetch === 'function'){
+    const res = await fetch(url, { method:'GET', headers: buildHeaders() })
+    let j = null
+    try{ j = await res.json() }catch(e){ j = null }
+    if(!res.ok) throw new Error(j?.message || j?.error || 'get search history failed')
+    return j ?? []
+  }
+
+  return await new Promise((resolve, reject)=>{
+    try{
+      uni.request({ url, method:'GET', header: buildHeaders(), success(r){ resolve(r.data) }, fail(err){ reject(err) } })
+    }catch(e){ reject(e) }
+  })
+}
+
+// 记录搜索行为: POST /api/search
+export async function recordSearch(query){
+  const url = BASE + '/api/search'
+  console.log('[search] POST record search', url, query)
+
+  const body = JSON.stringify({ query })
+
+  if (typeof fetch === 'function'){
+    const res = await fetch(url, { method:'POST', headers: buildHeaders(), body })
+    let j = null
+    try{ j = await res.json() }catch(e){ j = null }
+    if(!res.ok) throw new Error(j?.message || j?.error || 'record search failed')
+    return j ?? {}
+  }
+
+  return await new Promise((resolve, reject)=>{
+    try{
+      uni.request({ url, method:'POST', header: buildHeaders(), data: { query }, success(r){ resolve(r.data) }, fail(err){ reject(err) } })
+    }catch(e){ reject(e) }
+  })
+}
+
+// 清空搜索历史: DELETE /api/search
+export async function clearSearchHistory(){
+  const url = BASE + '/api/search'
+  console.log('[search] DELETE clear search history', url)
+
+  if (typeof fetch === 'function'){
+    const res = await fetch(url, { method:'DELETE', headers: buildHeaders() })
+    let j = null
+    try{ j = await res.json() }catch(e){ j = null }
+    if(!res.ok) throw new Error(j?.message || j?.error || 'clear search history failed')
+    return j ?? {}
+  }
+
+  return await new Promise((resolve, reject)=>{
+    try{
+      uni.request({ url, method:'DELETE', header: buildHeaders(), success(r){ resolve(r.data) }, fail(err){ reject(err) } })
+    }catch(e){ reject(e) }
+  })
+}

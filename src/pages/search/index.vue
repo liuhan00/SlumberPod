@@ -109,14 +109,10 @@ const { bgStyle } = useGlobalTheme()
 
 // 搜索相关数据
 const searchText = ref('')
-const searchHistory = ref(['海浪', '雨声', '自然声', '睡眠'])
+const searchHistory = ref([])
 
 // 热门搜索标签
-const hotTags = ref([
-  '海浪', '雨声', '壁炉', '树林', 
-  '地铁', '自然声', '居家', '环境',
-  '睡眠', '放松', '专注', '冥想'
-])
+const hotTags = ref([])
 
 // 后端搜索结果与分页
 const searchResults = ref([])
@@ -125,6 +121,24 @@ const limit = ref(20)
 const loading = ref(false)
 const hasMore = ref(true)
 const errorMsg = ref('')
+
+// 页面加载时获取热门搜索和搜索历史
+onMounted(async () => {
+  try {
+    // 获取热门搜索
+    const hotRes = await apiSearch.getHotSearch()
+    hotTags.value = Array.isArray(hotRes) ? hotRes : (hotRes.data || hotRes.items || ['海浪', '雨声', '自然声', '睡眠'])
+    
+    // 获取搜索历史
+    const historyRes = await apiSearch.getSearchHistory()
+    searchHistory.value = Array.isArray(historyRes) ? historyRes : (historyRes.data || historyRes.items || [])
+  } catch (e) {
+    console.error('[search] init failed', e)
+    // 使用默认值
+    hotTags.value = ['海浪', '雨声', '壁炉', '树林', '地铁', '自然声', '居家', '环境', '睡眠', '放松', '专注', '冥想']
+    searchHistory.value = ['海浪', '雨声', '自然声', '睡眠']
+  }
+})
 
 async function doSearch(reset = true){
   const kw = searchText.value.trim()
@@ -191,10 +205,10 @@ function goBack() {
 }
 
 // 处理搜索
-function handleSearch() {
+async function handleSearch() {
   const kw = searchText.value.trim()
   if (!kw) return
-  addToHistory(kw)
+  await addToHistory(kw)
   doSearch(true)
 }
 
@@ -225,16 +239,24 @@ function clearSearch() {
 }
 
 // 通过标签搜索
-function searchByTag(tag) {
+async function searchByTag(tag) {
   searchText.value = tag
-  addToHistory(tag)
+  await addToHistory(tag)
   doSearch(true)
 }
 
 // 添加到搜索历史
-function addToHistory(query) {
+async function addToHistory(query) {
   if (!query.trim()) return
   
+  try {
+    // 调用API记录搜索行为
+    await apiSearch.recordSearch(query)
+  } catch (e) {
+    console.warn('[search] record search failed', e)
+  }
+  
+  // 更新本地搜索历史
   // 移除重复项
   searchHistory.value = searchHistory.value.filter(item => item !== query)
   
@@ -257,9 +279,16 @@ function clearHistory() {
   uni.showModal({
     title: '确认清空',
     content: '确定要清空所有搜索历史吗？',
-    success: (res) => {
+    success: async (res) => {
       if (res.confirm) {
-        searchHistory.value = []
+        try {
+          // 调用API清空搜索历史
+          await apiSearch.clearSearchHistory()
+          searchHistory.value = []
+        } catch (e) {
+          console.error('[search] clear history failed', e)
+          uni.showToast({ title: '清空失败', icon: 'none' })
+        }
       }
     }
   })
@@ -279,10 +308,6 @@ function openPost(result){
     uni.showToast({ title:'帖子ID无效', icon:'none' })
   }
 }
-
-onMounted(() => {
-  // 页面加载时的初始化逻辑
-})
 </script>
 
 <style scoped>
@@ -545,6 +570,24 @@ onMounted(() => {
 .result-author {
   font-size: 14px;
   color: var(--muted, #666);
+}
+
+.post-stats {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted, #999);
+}
+
+.stat {
+  font-size: 12px;
+  color: var(--muted, #999);
+}
+
+.dot {
+  font-size: 12px;
+  color: var(--muted, #ccc);
 }
 
 .play-icon {

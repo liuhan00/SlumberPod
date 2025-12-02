@@ -252,7 +252,12 @@ function formatTime(timeStr) {
 </script>
 
 <template>
-  <view class="page" :style="bgStyle">
+  <view class="page">
+    <!-- 背景图片容器 -->
+    <view class="background-container">
+      <image class="background-image" src="/static/find.png" mode="aspectFill" />
+    </view>
+    
     <!-- Topbar -->
     <view class="topbar">
       <button class="tb-btn tb-back" @click="goBack">←</button>
@@ -295,11 +300,11 @@ function formatTime(timeStr) {
         <view class="chips">
           <view class="chip" @click="likePost">
             <text class="chip-icon">👍</text>
-            <text class="chip-text">{{ post.favorite_count || 0 }} 个赞</text>
+            <text class="chip-text">{{ post.favorite_count || 0 }}</text>
           </view>
           <view class="chip">
             <text class="chip-icon">💬</text>
-            <text class="chip-text">{{ post.comment_count || 0 }} 条评论</text>
+            <text class="chip-text">{{ post.comment_count || 0 }}</text>
           </view>
         </view>
 
@@ -337,16 +342,54 @@ function formatTime(timeStr) {
 </template>
 
 <style scoped>
-.page{ min-height:100vh }
-.topbar{ position:sticky; top:0; display:flex; align-items:center; justify-content:center; padding:10px 14px }
+.page{ 
+  min-height: 100vh;
+  position: relative;
+}
+
+/* 背景图片容器 */
+.background-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+}
+
+.background-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.topbar{ 
+  position:sticky; 
+  top:0; 
+  display:flex; 
+  align-items:center; 
+  justify-content:center; 
+  padding:10px 14px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid #f0f0f0;
+  z-index: 100;
+}
 .tb-btn{ background:transparent; border:none; font-size:18px; color: var(--card-fg, #13303f) }
 .tb-back{ position:absolute; left:12px; }
 .tb-share{ position:absolute; right:12px; }
 .tb-title{ font-size:16px; font-weight:700; color: var(--card-fg, #13303f) }
-.content{ flex:1 }
+.content{ flex:1; margin-top: 10px; }
 
 /* Card - glass style to match app */
-.card{ margin:14px; padding:14px; border-radius:14px; background: var(--card-bg, rgba(255,255,255,0.92)); box-shadow: 0 12px 28px rgba(0,0,0,0.08) }
+.card{ 
+  margin:14px; 
+  padding:14px; 
+  border-radius:14px; 
+  background: var(--card-bg, rgba(255,255,255,0.92)); 
+  box-shadow: 0 12px 28px rgba(0,0,0,0.08);
+  backdrop-filter: blur(10px);
+}
 .header{ display:flex; align-items:center; gap:10px; margin-bottom:8px }
 .avatar{ width:40px; height:40px; border-radius:50% }
 .author{ display:flex; flex-direction:column }
@@ -371,6 +414,7 @@ function formatTime(timeStr) {
   background: var(--card-bg, rgba(255,255,255,0.92)); 
   border-radius: 8px; 
   gap: 10px;
+  backdrop-filter: blur(5px);
 }
 .comment-textarea{ 
   flex: 1; 
@@ -397,38 +441,48 @@ function formatTime(timeStr) {
   border-bottom: 1px solid #eee; 
 }
 .comment-avatar{ 
-  width: 36px; 
-  height: 36px; 
+  width: 32px; 
+  height: 32px; 
   border-radius: 50%; 
   margin-right: 10px; 
 }
 .comment-content{ flex: 1; }
-.comment-header{ 
-  display: flex; 
-  justify-content: space-between; 
-  margin-bottom: 4px; 
-}
-.comment-author{ 
-  font-weight: bold; 
-  font-size: 14px; 
-  color: var(--card-fg, #13303f);
-}
-.comment-time{ 
-  font-size: 12px; 
-  color: #999; 
-}
-.comment-text{ 
-  font-size: 14px; 
-  color: var(--card-fg, #13303f);
-  line-height: 1.4;
+.comment-header{ display: flex; justify-content: space-between; margin-bottom: 4px; }
+.comment-author{ font-weight: 500; font-size: 14px; color: #333; }
+.comment-time{ font-size: 12px; color: #999; }
+.comment-text{ font-size: 14px; color: #666; line-height: 1.4; }
+
+/* 加载和错误状态 */
+.loading, .error {
+  padding: 20px;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 12px;
+  margin: 16px;
+  backdrop-filter: blur(5px);
 }
 
-/* Loading skeleton */
-.loading{ padding:20px }
-.skeleton{ background: linear-gradient(90deg, #f2f4f8 25%, #e9edf3 37%, #f2f4f8 63%); background-size: 400% 100%; animation: shimmer 1.4s ease infinite; border-radius:8px }
-.skeleton.title{ height:20px; margin:14px }
-.skeleton.line{ height:12px; margin:10px 14px }
-@keyframes shimmer{ 0%{ background-position: 100% 0 } 100%{ background-position: -100% 0 } }
+.skeleton {
+  background: #f0f0f0;
+  border-radius: 4px;
+  margin-bottom: 10px;
+  animation: pulse 1.5s ease-in-out infinite;
+}
 
-.error{ padding:20px; text-align:center; color:#d14 }
+.skeleton.title {
+  height: 24px;
+  width: 60%;
+  margin-bottom: 16px;
+}
+
+.skeleton.line {
+  height: 16px;
+  width: 100%;
+}
+
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.5; }
+  100% { opacity: 1; }
+}
 </style>

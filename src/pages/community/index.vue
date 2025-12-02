@@ -1,5 +1,10 @@
 <template>
   <view class="page">
+    <!-- 背景图片容器 -->
+    <view class="background-container">
+      <image class="background-image" src="/static/find.png" mode="aspectFill" />
+    </view>
+    
     <!-- 顶部导航栏 -->
     <view class="nav-header">
       <view class="nav-tabs">
@@ -23,7 +28,7 @@
     </view>
 
     <!-- 内容区域 -->
-    <scroll-view class="content" scroll-y :style="bgStyle">
+    <scroll-view class="content" scroll-y>
       <view class="section">
         <!-- 帖子列表 -->
         <view v-if="filteredPosts.length > 0">
@@ -62,7 +67,7 @@ import { ref, computed, onMounted } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { getAuthLocal } from '@/store/auth'
 import { useGlobalTheme } from '@/composables/useGlobalTheme'
-import { getPlaceholder } from '@/utils/image'
+import { getPlaceholder, safeImageUrl } from '@/utils/image'
 import PostCard from '@/components/PostCard.vue'
 import * as apiPosts from '@/api/posts'
 import * as apiCommunity from '@/api/community'
@@ -338,7 +343,7 @@ onMounted(async () => {
     const result = await apiCommunity.getCommunityList({ page: 1, limit: 20 })
     const list = result.data || result.items || result || []
       posts.value = normalizeList(list)
-    }catch(e2){ console.warn('fallback community list failed', e2) }
+  }catch(e2){ console.warn('fallback community list failed', e2) }
   }
 })
 </script>
@@ -347,8 +352,24 @@ onMounted(async () => {
 .page {
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  background: var(--bg-color, #f5f5f5);
+  min-height: 100vh;
+  position: relative;
+}
+
+/* 背景图片容器 */
+.background-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+}
+
+.background-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 /* 顶部导航栏 */
@@ -357,12 +378,13 @@ onMounted(async () => {
   align-items: center;
   justify-content: space-between;
   padding: 12px 16px;
-  background: #fff;
+  background: rgba(255, 255, 255, 0.8);
   border-bottom: 1px solid #f0f0f0;
   box-shadow: 0 1px 4px rgba(0,0,0,0.05);
   position: sticky;
   top: 0;
   z-index: 100;
+  backdrop-filter: blur(10px);
 }
 
 .nav-tabs {
@@ -427,6 +449,7 @@ onMounted(async () => {
 .content {
   flex: 1;
   min-height: 0;
+  margin-top: 10px;
 }
 
 .section {
@@ -441,6 +464,10 @@ onMounted(async () => {
   justify-content: center;
   padding: 60px 20px;
   text-align: center;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 12px;
+  margin: 16px;
+  backdrop-filter: blur(5px);
 }
 
 .empty-icon {
@@ -486,6 +513,7 @@ onMounted(async () => {
   justify-content: center;
   box-shadow: 0 4px 8px rgba(0,0,0,0.1);
   transition: background 0.2s;
+  z-index: 100;
 }
 
 .floating-post-btn:active {

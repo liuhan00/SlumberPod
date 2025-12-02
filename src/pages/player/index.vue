@@ -39,6 +39,7 @@
           </view>
           
 
+
         </view>
       </view>
       <text class="author text-contrast">{{ displayNames }}</text>
@@ -297,6 +298,7 @@ import { useFavoritesStore } from '@/stores/favorites'
 import { allNoises } from '@/data/noises'
 import { getAuthLocal } from '@/store/auth'
 import { useGlobalTheme } from '@/composables/useGlobalTheme'
+import * as apiAudios from '@/api/audios'
 
 const { bgStyle } = useGlobalTheme()
 const store = usePlayerStore()
@@ -477,6 +479,7 @@ function triStyle(idx){ const p = threePositions.value[idx] || {left:'0px', top:
 // keep only triangle decoration state
 const svgRef = ref(null)
 const canvasRef = ref(null)
+
 
 const ringLabels = [ { angle:-90, text:'∞' }, { angle:-30, text:'120' }, { angle:30, text:'90' }, { angle:90, text:'60' }, { angle:150, text:'30' }, { angle:210, text:'0' } ]
 
@@ -1459,6 +1462,9 @@ function openCozeChat(){
 }
 .favorite-btn.active .favorite-badge{ color:#ff3b6a; background: #fff0f2 }
 .share-btn{ background: transparent; border: none; font-size: 20px; padding: 8px; }
+
+
+
 .time-display {
   margin-top: 8px;
 }

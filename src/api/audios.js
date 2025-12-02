@@ -1064,6 +1064,286 @@ export async function searchAudios({ keyword, limit = 20, offset = 0 } = {}){
   })
 }
 
+// 通用文件上传接口（用于上传音频图标等）
+export async function uploadFile(file) {
+  const url = BASE + '/api/audio/upload-with-cover'
+  
+  // 检测是否为小程序环境
+  const isMiniProgram = typeof uni !== 'undefined' && uni.uploadFile
+  
+  if (isMiniProgram) {
+    // 小程序环境使用 uni.uploadFile
+    return new Promise((resolve, reject) => {
+      try {
+        const headers = buildHeaders()
+        // uni.uploadFile 会自动设置 Content-Type，所以移除它避免冲突
+        delete headers['Content-Type']
+        delete headers['content-type']
+        
+        // 获取文件路径
+        let filePath = file
+        if (typeof file === 'object') {
+          filePath = file.tempFilePath || file.path || file.uri || file.url || ''
+        }
+        
+        if (!filePath) {
+          return reject(new Error('文件路径为空，请重新选择文件'))
+        }
+        
+        console.log('[api/audios] uploadFile 上传到 /api/audio/upload-with-cover')
+        console.log('[api/audios] filePath:', filePath)
+        console.log('[api/audios] headers:', headers)
+        
+        uni.uploadFile({
+          url: url,
+          filePath: filePath,
+          name: 'file',
+          header: headers,
+          success(uploadRes) {
+            console.log('[api/audios] uploadFile 响应状态码:', uploadRes.statusCode)
+            console.log('[api/audios] uploadFile 响应数据:', uploadRes.data)
+            
+            try {
+              let uploadData = uploadRes.data
+              if (typeof uploadData === 'string') {
+                try {
+                  uploadData = JSON.parse(uploadData)
+                } catch (parseErr) {
+                  console.warn('[api/audios] uploadFile 解析响应失败', parseErr, '原始数据:', uploadData)
+                  // 如果解析失败但状态码是 2xx，尝试直接使用原始数据
+                  if (uploadRes.statusCode >= 200 && uploadRes.statusCode < 300) {
+                    uploadData = { raw: uploadRes.data }
+                  } else {
+                    // 尝试提取错误信息
+                    let errorMsg = '上传失败'
+                    try {
+                      const errorObj = JSON.parse(uploadData)
+                      errorMsg = errorObj?.message || errorObj?.error || errorMsg
+                    } catch (_) {
+                      if (uploadData && typeof uploadData === 'string') {
+                        errorMsg = uploadData
+                      }
+                    }
+                    return reject(new Error(`上传失败 (${uploadRes.statusCode}): ${errorMsg}`))
+                  }
+                }
+              }
+              
+              if (uploadRes.statusCode >= 200 && uploadRes.statusCode < 300) {
+                resolve(uploadData)
+              } else {
+                let errorMsg = uploadData?.message || uploadData?.error || `上传失败 (HTTP ${uploadRes.statusCode})`
+                if (uploadRes.statusCode === 401 || String(errorMsg).includes('未授权') || String(errorMsg).includes('token')) {
+                  errorMsg = '认证失败，请重新登录'
+                } else if (uploadRes.statusCode === 500) {
+                  errorMsg = `服务器内部错误 (500)。请检查：1) 文件格式是否正确 2) 文件大小是否超限 3) 服务器日志。响应: ${JSON.stringify(uploadData)}`
+                }
+                reject(new Error(errorMsg))
+              }
+            } catch (e) {
+              console.error('[api/audios] uploadFile 处理响应失败', e)
+              reject(new Error('处理上传响应失败: ' + e.message))
+            }
+          },
+          fail(err) {
+            console.error('[api/audios] uploadFile 上传失败', err)
+            let errorMsg = err.errMsg || err.message || '上传失败'
+            if (String(errorMsg).includes('timeout') || String(errorMsg).includes('超时')) {
+              errorMsg = '上传超时，请检查网络连接或尝试较小的文件'
+            } else if (String(errorMsg).includes('fail') && String(errorMsg).includes('500')) {
+              errorMsg = '服务器内部错误 (500)，请稍后重试或联系管理员'
+            }
+            reject(new Error(errorMsg))
+          }
+        })
+      } catch (e) {
+        console.error('[api/audios] uploadFile 异常', e)
+        reject(e)
+      }
+    })
+  }
+  
+  // Web 环境使用 FormData + fetch
+  const fd = new FormData()
+  fd.append('file', file)
+  
+  const headers = buildHeaders()
+  
+  try {
+    console.log('[api/audios] uploadFile 上传到 /api/audio/upload-with-cover (Web)')
+    const uploadRes = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: fd
+    })
+    
+    let uploadData = null
+    try {
+      uploadData = await uploadRes.json()
+    } catch (parseErr) {
+      if (uploadRes.ok) {
+        // 2xx 但无法解析 JSON，尝试作为文本处理
+        const text = await uploadRes.text()
+        uploadData = { raw: text }
+      } else {
+        throw new Error(`上传失败: HTTP ${uploadRes.status}`)
+      }
+    }
+    
+    if (!uploadRes.ok) {
+      const errorMsg = uploadData?.message || uploadData?.error || `上传失败: HTTP ${uploadRes.status}`
+      throw new Error(errorMsg)
+    }
+    
+    console.log('[api/audios] uploadFile 上传成功 (Web)', uploadData)
+    return uploadData
+  } catch (err) {
+    console.error('[api/audios] uploadFile 失败 (Web)', err)
+    throw err
+  }
+}
+
+// 上传音频图标到指定音频
+export async function uploadAudioCover(audioId, file) {
+  if (!audioId) throw new Error('audioId is required')
+  
+  const url = BASE + `/api/audios/${audioId}/cover/upload`
+  
+  // 检测是否为小程序环境
+  const isMiniProgram = typeof uni !== 'undefined' && uni.uploadFile
+  
+  if (isMiniProgram) {
+    // 小程序环境使用 uni.uploadFile
+    return new Promise((resolve, reject) => {
+      try {
+        const headers = buildHeaders()
+        // uni.uploadFile 会自动设置 Content-Type，所以移除它避免冲突
+        delete headers['Content-Type']
+        delete headers['content-type']
+        
+        // 获取文件路径
+        let filePath = file
+        if (typeof file === 'object') {
+          filePath = file.tempFilePath || file.path || file.uri || file.url || ''
+        }
+        
+        if (!filePath) {
+          return reject(new Error('文件路径为空，请重新选择文件'))
+        }
+        
+        console.log('[api/audios] uploadAudioCover 上传到 /api/audios/:id/cover/upload')
+        console.log('[api/audios] filePath:', filePath)
+        console.log('[api/audios] headers:', headers)
+        
+        uni.uploadFile({
+          url: url,
+          filePath: filePath,
+          name: 'file',
+          header: headers,
+          success(uploadRes) {
+            console.log('[api/audios] uploadAudioCover 响应状态码:', uploadRes.statusCode)
+            console.log('[api/audios] uploadAudioCover 响应数据:', uploadRes.data)
+            
+            try {
+              let uploadData = uploadRes.data
+              if (typeof uploadData === 'string') {
+                try {
+                  uploadData = JSON.parse(uploadData)
+                } catch (parseErr) {
+                  console.warn('[api/audios] uploadAudioCover 解析响应失败', parseErr, '原始数据:', uploadData)
+                  // 如果解析失败但状态码是 2xx，尝试直接使用原始数据
+                  if (uploadRes.statusCode >= 200 && uploadRes.statusCode < 300) {
+                    uploadData = { raw: uploadRes.data }
+                  } else {
+                    // 尝试提取错误信息
+                    let errorMsg = '上传失败'
+                    try {
+                      const errorObj = JSON.parse(uploadData)
+                      errorMsg = errorObj?.message || errorObj?.error || errorMsg
+                    } catch (_) {
+                      if (uploadData && typeof uploadData === 'string') {
+                        errorMsg = uploadData
+                      }
+                    }
+                    return reject(new Error(`上传失败 (${uploadRes.statusCode}): ${errorMsg}`))
+                  }
+                }
+              }
+              
+              if (uploadRes.statusCode >= 200 && uploadRes.statusCode < 300) {
+                resolve(uploadData)
+              } else {
+                let errorMsg = uploadData?.message || uploadData?.error || `上传失败 (HTTP ${uploadRes.statusCode})`
+                if (uploadRes.statusCode === 401 || String(errorMsg).includes('未授权') || String(errorMsg).includes('token')) {
+                  errorMsg = '认证失败，请重新登录'
+                } else if (uploadRes.statusCode === 500) {
+                  errorMsg = `服务器内部错误 (500)。请检查：1) 文件格式是否正确 2) 文件大小是否超限 3) 服务器日志。响应: ${JSON.stringify(uploadData)}`
+                }
+                reject(new Error(errorMsg))
+              }
+            } catch (e) {
+              console.error('[api/audios] uploadAudioCover 处理响应失败', e)
+              reject(new Error('处理上传响应失败: ' + e.message))
+            }
+          },
+          fail(err) {
+            console.error('[api/audios] uploadAudioCover 上传失败', err)
+            let errorMsg = err.errMsg || err.message || '上传失败'
+            if (String(errorMsg).includes('timeout') || String(errorMsg).includes('超时')) {
+              errorMsg = '上传超时，请检查网络连接或尝试较小的文件'
+            } else if (String(errorMsg).includes('fail') && String(errorMsg).includes('500')) {
+              errorMsg = '服务器内部错误 (500)，请稍后重试或联系管理员'
+            }
+            reject(new Error(errorMsg))
+          }
+        })
+      } catch (e) {
+        console.error('[api/audios] uploadAudioCover 异常', e)
+        reject(e)
+      }
+    })
+  }
+  
+  // Web 环境使用 FormData + fetch
+  const fd = new FormData()
+  fd.append('file', file)
+  
+  const headers = buildHeaders()
+  
+  try {
+    console.log('[api/audios] uploadAudioCover 上传到 /api/audios/:id/cover/upload (Web)')
+    const uploadRes = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: fd
+    })
+    
+    let uploadData = null
+    try {
+      uploadData = await uploadRes.json()
+    } catch (parseErr) {
+      if (uploadRes.ok) {
+        // 2xx 但无法解析 JSON，尝试作为文本处理
+        const text = await uploadRes.text()
+        uploadData = { raw: text }
+      } else {
+        throw new Error(`上传失败: HTTP ${uploadRes.status}`)
+      }
+    }
+    
+    if (!uploadRes.ok) {
+      const errorMsg = uploadData?.message || uploadData?.error || `上传失败: HTTP ${uploadRes.status}`
+      throw new Error(errorMsg)
+    }
+    
+    console.log('[api/audios] uploadAudioCover 上传成功 (Web)', uploadData)
+    return uploadData
+  } catch (err) {
+    console.error('[api/audios] uploadAudioCover 失败 (Web)', err)
+    throw err
+  }
+}
+
 // 获取当前用户的创作列表
 // 检查用户是否已登录（排除游客）
 function checkAuthForProtectedApi(){

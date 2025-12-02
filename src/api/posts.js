@@ -75,9 +75,9 @@ export async function getPosts({ page = 1, limit = 10 } = {}){
   })
 }
 
-// 获取最新帖子列表：/api/lastest
+// 获取最新帖子列表：/api/latest
 export async function getLatest(){
-  const url = BASE + '/api/lastest'
+  const url = BASE + '/api/latest'
   const headers = buildHeaders()
   
   // 兼容小程序环境：优先使用 fetch，否则使用 uni.request

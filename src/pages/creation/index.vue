@@ -59,6 +59,23 @@
               </view>
             </view>
           </view>
+          
+          <!-- 上传图标按钮 -->
+          <view class="input-group">
+            <text class="input-label">作品图标</text>
+            <view class="cover-upload-section">
+              <view class="cover-preview" v-if="creationData.cover_url">
+                <image class="cover-image" :src="creationData.cover_url" mode="aspectFill" />
+                <view class="cover-overlay">
+                  <text class="cover-change-btn" @click="uploadCoverImage">更换</text>
+                </view>
+              </view>
+              <view class="cover-placeholder" v-else @click="uploadCoverImage">
+                <text class="cover-placeholder-icon">📷</text>
+                <text class="cover-placeholder-text">上传图标</text>
+              </view>
+            </view>
+          </view>
         </view>
 
         <!-- 音频录制 -->
@@ -179,6 +196,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useGlobalTheme } from '@/composables/useGlobalTheme'
 import { useThemeStore } from '@/stores/theme'
+import { getAuthLocal } from '@/store/auth'
 
 const themeStore = useThemeStore(); themeStore.load()
 const { bgStyle } = useGlobalTheme()
@@ -190,7 +208,8 @@ const creationData = ref({
   category: '',
   shareToCommunity: true,
   isPublic: true,
-  allowDownload: true
+  allowDownload: true,
+  cover_url: '' // 添加封面图片URL字段
 })
 
 // 分类选项
@@ -559,6 +578,291 @@ function showSoundLibrary() {
   })
 }
 
+// 上传音频图标到指定音频
+async function uploadAudioCover(audioId, file) {
+  if (!audioId) throw new Error('audioId is required')
+  
+  const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.135:3003'
+  const url = BASE + `/api/audios/${audioId}/cover/upload`
+  
+  // 获取认证信息
+  const auth = getAuthLocal()
+  const token = auth?.token || auth?.access_token || null
+  
+  // 检查是否已登录
+  if (!token) {
+    throw new Error('未登录，无法上传图标')
+  }
+  
+  // 检测是否为小程序环境
+  const isMiniProgram = typeof uni !== 'undefined' && uni.uploadFile
+  
+  if (isMiniProgram) {
+    // 小程序环境使用 uni.uploadFile
+    return new Promise((resolve, reject) => {
+      try {
+        // 获取文件路径
+        let filePath = file
+        if (typeof file === 'object') {
+          filePath = file.tempFilePath || file.path || file.uri || file.url || ''
+        }
+        
+        if (!filePath) {
+          return reject(new Error('文件路径为空，请重新选择文件'))
+        }
+        
+        console.log('[creation] uploadAudioCover 上传到 /api/audios/:id/cover/upload')
+        console.log('[creation] filePath:', filePath)
+        
+        // 构建请求头
+        const header = {
+          Authorization: `Bearer ${token}`
+        }
+        
+        // 尝试使用不同的字段名
+        const fieldNames = ['cover', 'file', 'image']
+        
+        const tryUpload = (fieldName, fieldIndex) => {
+          uni.uploadFile({
+            url: url,
+            filePath: filePath,
+            name: fieldName,
+            header: header,
+            success(uploadRes) {
+              console.log(`[creation] uploadAudioCover 使用字段名 '${fieldName}' 响应状态码:`, uploadRes.statusCode)
+              console.log(`[creation] uploadAudioCover 使用字段名 '${fieldName}' 响应数据:`, uploadRes.data)
+              
+              try {
+                let uploadData = uploadRes.data
+                if (typeof uploadData === 'string') {
+                  try {
+                    uploadData = JSON.parse(uploadData)
+                  } catch (parseErr) {
+                    console.warn('[creation] uploadAudioCover 解析响应失败', parseErr, '原始数据:', uploadData)
+                    // 如果解析失败但状态码是 2xx，尝试直接使用原始数据
+                    if (uploadRes.statusCode >= 200 && uploadRes.statusCode < 300) {
+                      uploadData = { raw: uploadRes.data }
+                    } else {
+                      // 尝试提取错误信息
+                      let errorMsg = '上传失败'
+                      try {
+                        const errorObj = JSON.parse(uploadData)
+                        errorMsg = errorObj?.message || errorObj?.error || errorMsg
+                      } catch (_) {
+                        if (uploadData && typeof uploadData === 'string') {
+                          errorMsg = uploadData
+                        }
+                      }
+                      // 如果是字段名错误，尝试下一个字段名
+                      if (uploadRes.statusCode === 500 && String(errorMsg).includes('Unexpected field')) {
+                        if (fieldIndex < fieldNames.length - 1) {
+                          console.log(`[creation] 字段名 '${fieldName}' 不正确，尝试下一个字段名`)
+                          return tryUpload(fieldNames[fieldIndex + 1], fieldIndex + 1)
+                        }
+                      }
+                      return reject(new Error(`上传失败 (${uploadRes.statusCode}): ${errorMsg}`))
+                    }
+                  }
+                }
+                
+                if (uploadRes.statusCode >= 200 && uploadRes.statusCode < 300) {
+                  resolve(uploadData)
+                } else {
+                  let errorMsg = uploadData?.message || uploadData?.error || `上传失败 (HTTP ${uploadRes.statusCode})`
+                  // 特别处理认证失败的情况
+                  if (uploadRes.statusCode === 401) {
+                    errorMsg = '认证失败，请重新登录'
+                  }
+                  // 如果是字段名错误，尝试下一个字段名
+                  if (uploadRes.statusCode === 500 && String(errorMsg).includes('Unexpected field')) {
+                    if (fieldIndex < fieldNames.length - 1) {
+                      console.log(`[creation] 字段名 '${fieldName}' 不正确，尝试下一个字段名`)
+                      return tryUpload(fieldNames[fieldIndex + 1], fieldIndex + 1)
+                    }
+                  }
+                  reject(new Error(errorMsg))
+                }
+              } catch (e) {
+                console.error('[creation] uploadAudioCover 处理响应失败', e)
+                reject(new Error('处理上传响应失败: ' + e.message))
+              }
+            },
+            fail(err) {
+              console.error('[creation] uploadAudioCover 上传失败', err)
+              let errorMsg = err.errMsg || err.message || '上传失败'
+              if (String(errorMsg).includes('timeout') || String(errorMsg).includes('超时')) {
+                errorMsg = '上传超时，请检查网络连接或尝试较小的文件'
+              } else if (String(errorMsg).includes('fail') && String(errorMsg).includes('500')) {
+                errorMsg = '服务器内部错误 (500)，请稍后重试或联系管理员'
+              }
+              reject(new Error(errorMsg))
+            }
+          })
+        }
+        
+        // 开始尝试上传，先使用第一个字段名
+        tryUpload(fieldNames[0], 0)
+      } catch (e) {
+        console.error('[creation] uploadAudioCover 异常', e)
+        reject(e)
+      }
+    })
+  }
+  
+  // Web 环境使用 FormData + fetch
+  // 尝试不同的字段名
+  const fieldNames = ['cover', 'file', 'image']
+  
+  for (const fieldName of fieldNames) {
+    const fd = new FormData()
+    fd.append(fieldName, file)
+    
+    // 构建请求头
+    const headers = {
+      Authorization: `Bearer ${token}`
+    }
+    
+    try {
+      console.log(`[creation] uploadAudioCover 使用字段名 '${fieldName}' 上传到 /api/audios/:id/cover/upload (Web)`)
+      const uploadRes = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: fd
+      })
+      
+      let uploadData = null
+      try {
+        uploadData = await uploadRes.json()
+      } catch (parseErr) {
+        if (uploadRes.ok) {
+          // 2xx 但无法解析 JSON，尝试作为文本处理
+          const text = await uploadRes.text()
+          uploadData = { raw: text }
+        } else {
+          // 如果是字段名错误，尝试下一个字段名
+          if (uploadRes.status === 500) {
+            const text = await uploadRes.text()
+            if (text.includes('Unexpected field')) {
+              console.log(`[creation] 字段名 '${fieldName}' 不正确，尝试下一个字段名`)
+              continue
+            }
+          }
+          throw new Error(`上传失败: HTTP ${uploadRes.status}`)
+        }
+      }
+      
+      if (!uploadRes.ok) {
+        const errorMsg = uploadData?.message || uploadData?.error || `上传失败: HTTP ${uploadRes.status}`
+        // 特别处理认证失败的情况
+        if (uploadRes.status === 401) {
+          throw new Error('认证失败，请重新登录')
+        }
+        // 如果是字段名错误，尝试下一个字段名
+        if (uploadRes.status === 500 && String(errorMsg).includes('Unexpected field')) {
+          console.log(`[creation] 字段名 '${fieldName}' 不正确，尝试下一个字段名`)
+          continue
+        }
+        throw new Error(errorMsg)
+      }
+      
+      console.log('[creation] uploadAudioCover 上传成功 (Web)', uploadData)
+      return uploadData
+    } catch (err) {
+      console.error(`[creation] uploadAudioCover 使用字段名 '${fieldName}' 失败 (Web)`, err)
+      // 如果是最后一个字段名，抛出错误
+      if (fieldName === fieldNames[fieldNames.length - 1]) {
+        throw err
+      }
+      // 否则继续尝试下一个字段名
+    }
+  }
+  
+  // 如果所有字段名都尝试过了都没有成功，抛出错误
+  throw new Error('上传失败：所有可能的字段名都尝试过了')
+}
+
+// 上传音频图标功能
+async function uploadCoverImage() {
+  // 检查用户是否登录
+  const auth = getAuthLocal()
+  const loggedIn = Boolean(
+    !auth?.guest &&
+    !auth?.user?.guest &&
+    (
+      auth?.id ||
+      auth?.user?.id ||
+      auth?.userId ||
+      auth?.user?.userId ||
+      auth?.token ||
+      auth?.access_token
+    )
+  )
+  
+  if (!loggedIn) {
+    uni.showToast({
+      title: '请先登录',
+      icon: 'none',
+      duration: 2000
+    })
+    // 跳转到登录页面
+    setTimeout(() => {
+      uni.navigateTo({
+        url: '/pages/auth/Login'
+      })
+    }, 1500)
+    return
+  }
+  
+  // 选择图片文件
+  uni.chooseImage({
+    count: 1,
+    sizeType: ['compressed'],
+    sourceType: ['album', 'camera'],
+    success: async (res) => {
+      const tempFilePath = res.tempFilePaths[0]
+      
+      uni.showLoading({
+        title: '上传中...'
+      })
+      
+      try {
+        // 使用新的专门用于上传音频图标的函数
+        const uploadResult = await apiAudios.uploadFile(tempFilePath)
+        
+        // 获取上传后的URL
+        const coverUrl = uploadResult?.url || uploadResult?.data?.url || ''
+        
+        if (!coverUrl) {
+          throw new Error('上传成功但未返回图片URL')
+        }
+        
+        uni.hideLoading()
+        uni.showToast({
+          title: '图标上传成功',
+          icon: 'success',
+          duration: 2000
+        })
+        
+        // 更新创作数据中的封面URL
+        creationData.value.cover_url = coverUrl
+        
+      } catch (error) {
+        uni.hideLoading()
+        console.error('上传图标失败:', error)
+        uni.showToast({
+          title: '上传失败: ' + (error.message || String(error)),
+          icon: 'none',
+          duration: 3000
+        })
+      }
+    },
+    fail: () => {
+      // 用户取消选择图片，不显示错误提示
+      uni.hideLoading()
+    }
+  })
+}
+
 onMounted(() => {
   // 页面加载时的初始化逻辑
 })
@@ -760,6 +1064,79 @@ onMounted(() => {
   font-size: 12px;
   font-weight: 500;
   color: var(--fg, #333);
+}
+
+/* 上传图标区域 */
+.cover-upload-section {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cover-preview {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.cover-image {
+  width: 100%;
+  height: 100%;
+}
+
+.cover-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.cover-preview:hover .cover-overlay {
+  opacity: 1;
+}
+
+.cover-change-btn {
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.cover-placeholder {
+  width: 120px;
+  height: 120px;
+  border: 2px dashed var(--border, #f0f0f0);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.cover-placeholder:active {
+  border-color: var(--uni-color-primary, #007aff);
+  background: var(--input-bg, #f8f9fa);
+}
+
+.cover-placeholder-icon {
+  font-size: 32px;
+  margin-bottom: 8px;
+}
+
+.cover-placeholder-text {
+  font-size: 14px;
+  color: var(--muted, #666);
 }
 
 /* 录制控制 */
