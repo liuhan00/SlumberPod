@@ -11,7 +11,7 @@
           <input 
             v-model="searchText" 
             class="search-input" 
-            placeholder="搜索白噪音/专辑/作者"
+            :placeholder="queryParams.type === 'community' ? '搜索社区帖子' : '搜索白噪音/专辑/作者'"
             @confirm="handleSearch"
             @input="handleInput"
             focus
@@ -66,7 +66,12 @@
 
       <!-- 搜索结果 -->
       <view v-if="searchText" class="section">
-        <text class="section-title">搜索结果</text>
+        <view class="section-header">
+          <text class="section-title">搜索结果</text>
+          <view v-if="queryParams.type === 'community'" class="back-community" @click="goToCommunity">
+            <text class="back-text">返回社区</text>
+          </view>
+        </view>
         <view class="search-results">
           <view 
             v-for="result in searchResults" 
@@ -103,9 +108,18 @@ import { ref, computed, onMounted } from 'vue'
 import { useGlobalTheme } from '@/composables/useGlobalTheme'
 import { useThemeStore } from '@/stores/theme'
 import * as apiSearch from '@/api/search'
+import * as apiCommunity from '@/api/community'
 
 const themeStore = useThemeStore(); themeStore.load()
 const { bgStyle } = useGlobalTheme()
+
+// 获取页面参数
+const queryParams = defineProps({
+  type: {
+    type: String,
+    default: 'all' // 'all' | 'community' | 'audio'
+  }
+})
 
 // 搜索相关数据
 const searchText = ref('')
@@ -153,26 +167,47 @@ async function doSearch(reset = true){
   errorMsg.value = ''
   try{
     if(reset){ page.value = 1; hasMore.value = true; searchResults.value = [] }
-    const offset = (page.value - 1) * limit.value
-    console.log('[search] doSearch', { q: kw, page: page.value, limit: limit.value, offset })
-    const res = await apiSearch.searchAll({ q: kw, page: page.value, limit: limit.value })
-    console.log('[search] response raw', res)
-    // 兼容返回格式：{audios|posts|items|data[]} 或 {code, data:{ list|items|rows }} 或纯数组
+    
     let list = []
-    const top = (res?.audios ?? res?.posts ?? res?.items ?? res?.data)
-    if(Array.isArray(top)){
-      list = top
-    } else if(Array.isArray(res)){
-      list = res
-    } else if(top && typeof top === 'object'){
-      const inner = top.list ?? top.items ?? top.rows ?? top.data
-      if(Array.isArray(inner)) list = inner
+    // 根据搜索类型调用不同的API
+    if (queryParams.type === 'community') {
+      // 社区帖子搜索
+      const res = await apiCommunity.searchCommunityPosts({ q: kw, page: page.value, limit: limit.value })
+      list = Array.isArray(res) ? res : (res.data || res.items || res.list || [])
+    } else {
+      // 全局搜索
+      const res = await apiSearch.searchAll({ q: kw, page: page.value, limit: limit.value })
+      // 兼容返回格式：{audios|posts|items|data[]} 或 {code, data:{ list|items|rows }} 或纯数组
+      const top = (res?.audios ?? res?.posts ?? res?.items ?? res?.data)
+      if(Array.isArray(top)){
+        list = top
+      } else if(Array.isArray(res)){
+        list = res
+      } else if(top && typeof top === 'object'){
+        const inner = top.list ?? top.items ?? top.rows ?? top.data
+        if(Array.isArray(inner)) list = inner
+      }
     }
-    console.log('[search] parsed list length', Array.isArray(list) ? list.length : 'n/a')
-    const mapped = list.map(it=>({
+    
+    // 过滤掉ID无效的帖子
+    const filteredList = list.filter(it => {
+      // 对于帖子类型，确保有有效的数字ID
+      if (it.type === 'post' || (!it.type && (it.post_id || it.id || it._id))) {
+        const id = it.post_id || it.id || it._id;
+        return id && /^\d+$/.test(String(id));
+      }
+      // 对于其他类型，直接通过
+      return true;
+    });
+    
+    const mapped = filteredList.map(it=>({
       // 支持音频与帖子两类数据
       type: it.type || (it.audio_id || it.duration || it.file_url ? 'audio' : 'post'),
-      id: it.post_id || it.audio_id || it.id || it._id || `${Date.now()}_${Math.random()}`,
+      // 确保ID是有效的数字
+      id: (it.post_id && /^\d+$/.test(String(it.post_id))) ? Number(it.post_id) : 
+          (it.id && /^\d+$/.test(String(it.id))) ? Number(it.id) : 
+          (it._id && /^\d+$/.test(String(it._id))) ? Number(it._id) : 
+          null,
       name: it.title || it.name || it.content?.slice(0, 28) || '-',
       author: it.author || it.user_name || it.username || (it.author?.name) || '用户',
       cover: it.cover || it.cover_url || it.image || it.thumb || '',
@@ -180,14 +215,20 @@ async function doSearch(reset = true){
       favorite_count: it.favorite_count ?? it.like_count ?? it.likes ?? 0,
       comment_count: it.comment_count ?? it.commentCount ?? (Array.isArray(it.comments) ? it.comments.length : 0),
       content: it.content || '',
-    }))
+    })).filter(it => it.type !== 'post' || it.id !== null) // 过滤掉帖子类型但没有有效ID的项
+    
     searchResults.value = reset ? mapped : searchResults.value.concat(mapped)
     hasMore.value = mapped.length >= limit.value
     if(hasMore.value){ page.value += 1 }
   }catch(e){ 
     errorMsg.value = String(e?.message || e)
     console.error('[search] error', e)
-    uni.showToast({ title: errorMsg.value, icon: 'none' })
+    // 如果是后端返回的特定错误，给出更友好的提示
+    if (errorMsg.value.includes('帖子ID格式无效')) {
+      uni.showToast({ title: '搜索结果中包含格式错误的数据，请稍后重试', icon: 'none' })
+    } else {
+      uni.showToast({ title: errorMsg.value, icon: 'none' })
+    }
   } finally { 
     loading.value = false 
   }
@@ -226,7 +267,7 @@ function handleInput() {
       hasMore.value = true
       errorMsg.value = ''
     }
-  }, 400)
+  }, 800) // 增加到800ms，减少请求频率
 }
 
 // 清空搜索
@@ -301,13 +342,25 @@ function playResult(result) {
 }
 
 function openPost(result){
-  const id = (typeof result.id === 'number' || /^\d+$/.test(String(result.id))) ? Number(result.id) : result.post_id
+  // 确保ID是有效的数字
+  let id = null;
+  if (result.id && /^\d+$/.test(String(result.id))) {
+    id = Number(result.id);
+  } else if (result.post_id && /^\d+$/.test(String(result.post_id))) {
+    id = Number(result.post_id);
+  }
+  
   if(id){
     uni.navigateTo({ url: `/pages/community/detail?id=${id}` })
   } else {
     uni.showToast({ title:'帖子ID无效', icon:'none' })
   }
 }
+
+function goToCommunity(){
+  uni.navigateTo({ url: '/pages/community/index' })
+}
+
 </script>
 
 <style scoped>
@@ -438,6 +491,23 @@ function openPost(result){
 }
 
 .clear-text {
+  font-size: 12px;
+  color: var(--muted, #999);
+}
+
+.back-community {
+  padding: 4px 8px;
+  background: var(--input-bg, #f8f9fa);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.back-community:active {
+  transform: scale(0.95);
+}
+
+.back-text {
   font-size: 12px;
   color: var(--muted, #999);
 }

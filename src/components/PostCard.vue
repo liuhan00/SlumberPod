@@ -1,6 +1,6 @@
 <script setup>
-import { ref } from 'vue'
-import { getPlaceholder } from '@/utils/image'
+import { ref, computed } from 'vue'
+import { getPlaceholder, isValidImageUrl } from '@/utils/image'
 
 const props = defineProps({
   post: {
@@ -12,7 +12,11 @@ const props = defineProps({
 const emit = defineEmits(['like', 'comment', 'share'])
 
 const avatarSrc = ref(props.post.author?.avatar || getPlaceholder('avatar'))
-const imageSrc = ref(props.post.image || '')
+
+// 使用utils中的严格图片URL验证函数
+const imageSrc = computed(() => {
+  return isValidImageUrl(props.post.image)
+})
 
 function handleLike() {
   emit('like', props.post.id)
@@ -142,8 +146,11 @@ function handleAvatarError(e) {
 }
 
 function handleImageError(e) {
-  imageSrc.value = getPlaceholder('cover')
+  // 当图片加载失败时，将图片源设置为null，这样就不会显示图片
+  // 注意：这里不能直接设置为占位符，因为我们要完全隐藏无效图片
+  console.log('图片加载失败:', props.post.image)
 }
+
 </script>
 
 <template>
@@ -169,7 +176,7 @@ function handleImageError(e) {
       <text v-if="post.title" class="title">{{ post.title }}</text>
       <text class="content">{{ post.content }}</text>
       <image 
-        v-if="post.image" 
+        v-if="imageSrc" 
         class="cover" 
         :src="imageSrc" 
         mode="aspectFill" 
@@ -269,6 +276,8 @@ function handleImageError(e) {
 /* 内容区域 */
 .content-area {
   margin-bottom: 16px;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .title {
@@ -277,6 +286,8 @@ function handleImageError(e) {
   font-weight: 700;
   color: var(--text-contrast, var(--fg));
   margin-bottom: 8px;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .content {
@@ -285,7 +296,10 @@ function handleImageError(e) {
   line-height: 1.5;
   color: var(--text-contrast, var(--fg));
   margin-bottom: 12px;
-  white-space: pre-wrap;
+  /* 移除 white-space: pre-wrap，改用正常的换行处理 */
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  white-space: normal;
 }
 
 .cover {

@@ -6,6 +6,7 @@ import { ref } from 'vue'
 import { getPlaceholder } from '@/utils/image'
 // 导入上传头像的API
 import { uploadAvatar } from '@/api/users'
+import { logout } from '@/api/auth'
 
 let bgStyle = {}
 try{
@@ -69,24 +70,77 @@ function changeAvatar(){
       const tempFilePath = res.tempFilePaths[0]
       console.log('[Profile Account] Image selected:', tempFilePath)
       try {
+        // 显示上传进度
+        uni.showLoading({
+          title: '上传中...'
+        })
+        
         // 调用上传接口
         console.log('[Profile Account] Calling uploadAvatar API')
         const result = await uploadAvatar(tempFilePath)
         console.log('[Profile Account] Upload result:', result)
+        
+        // 隐藏加载提示
+        uni.hideLoading()
+        
         // 更新用户头像
         user.value.avatar = result.url || result.data?.url || tempFilePath
         uni.showToast({ title: '头像上传成功' })
       } catch (err) {
+        // 隐藏加载提示
+        uni.hideLoading()
+        
         console.error('[Profile Account] 上传头像失败:', err)
-        uni.showToast({ 
-          title: '上传失败: ' + (err.message || '未知错误'), 
-          icon: 'none',
-          duration: 3000
-        })
+        // 根据错误类型提供不同的提示
+        let errorMsg = err.message || '未知错误'
+        
+        // 如果是认证相关的错误，建议用户重新登录
+        if (errorMsg.includes('认证失败') || errorMsg.includes('未登录')) {
+          uni.showModal({
+            title: '上传失败',
+            content: errorMsg + '，请重新登录后再试',
+            showCancel: true,
+            confirmText: '去登录',
+            cancelText: '稍后再说',
+            success: (modalRes) => {
+              if (modalRes.confirm) {
+                // 跳转到登录页面
+                uni.navigateTo({
+                  url: '/pages/auth/Login'
+                })
+              }
+            }
+          })
+        } 
+        // 如果是权限相关的错误，提示联系管理员
+        else if (errorMsg.includes('权限不足')) {
+          uni.showModal({
+            title: '上传失败',
+            content: errorMsg + '，请联系管理员处理',
+            showCancel: false,
+            confirmText: '我知道了'
+          })
+        }
+        // 其他错误直接显示
+        else {
+          uni.showToast({ 
+            title: '上传失败: ' + errorMsg, 
+            icon: 'none',
+            duration: 3000
+          })
+        }
       }
     },
-    fail: () => {
-      uni.showToast({ title: '取消上传', icon: 'none' })
+    fail: (err) => {
+      console.log('[Profile Account] Choose image failed:', err)
+      // 用户取消选择图片时不显示错误提示
+      if (err.errMsg && !err.errMsg.includes('cancel')) {
+        uni.showToast({ 
+          title: '选择图片失败', 
+          icon: 'none',
+          duration: 2000
+        })
+      }
     }
   })
 }
@@ -100,7 +154,7 @@ function editBio(){
 }
 
 function editGender(){
-  // 去掉“保密”选项，避免重复取消按钮
+  // 去掉"保密"选项，避免重复取消按钮
   uni.showActionSheet({ itemList:['男','女'], success(res){ if(res.tapIndex < 0) return; const g=['男','女']; user.value.gender = g[res.tapIndex]; uni.showToast({ title:'性别已更新' }) } })
 }
 
@@ -121,16 +175,30 @@ function openThirdParty(){
   uni.showToast({ title:'第三方绑定设置', icon:'none' })
 }
 
-function logout(){
-  uni.showModal({ title:'退出登录', content:'确定要退出当前账号吗？', success(res){ if(res.confirm){ // 清除用户状态示例
-    user.value = {};
-    uni.reLaunch({ url:'/pages/login/index' })
-  } } })
+// 完善退出登录逻辑
+async function logoutHandler(){
+  uni.showModal({ 
+    title:'退出登录', 
+    content:'确定要退出当前账号吗？', 
+    success: async (res) => { 
+      if(res.confirm){ 
+        try {
+          // 调用登出API
+          await logout()
+          // 清除用户状态
+          user.value = {}
+          // 跳转到登录页面
+          uni.reLaunch({ url:'/pages/auth/Login' })
+        } catch (e) {
+          console.error('Logout error:', e)
+          uni.showToast({ title: '退出登录失败', icon: 'none' })
+        }
+      } 
+    } 
+  })
 }
 
-function deleteAccount(){
-  uni.showModal({ title:'注销账号', content:'注销后数据无法恢复，确定继续吗？', success(res){ if(res.confirm){ uni.showToast({ title:'已提交注销申请', icon:'none' }) } } })
-}
+// 删除注销账号函数
 
 // picker refs for uni-app H5 compatibility
 const refs = { birthdayPicker }
@@ -191,8 +259,8 @@ const refs = { birthdayPicker }
       <!-- 注：已删除手机号/第三方应用卡片 -->
 
       <view class="actions-block">
-        <button class="btn logout" @click="logout">退出登录</button>
-        <button class="btn delete" @click="deleteAccount">注销账号</button>
+        <button class="btn logout" @click="logoutHandler">退出登录</button>
+        <!-- 已删除注销账号按钮 -->
       </view>
 
     </scroll-view>
@@ -224,9 +292,8 @@ scroll-view.container{ flex:1 }
 .bg-thumb{ width:22vw; max-width:80px; height:calc(22vw * 0.65); border-radius:6px }
 
 .actions-block{ padding:0 18px; display:flex; flex-direction:column; gap:12px }
-.btn{ padding:14px 12px; border-radius:10px; border:none; font-weight:600 }
-.btn.logout{ background:linear-gradient(180deg,#2b2b4a,#1b1b2a); color:#9fb0ff }
-.btn.delete{ background:linear-gradient(180deg,#3b1a1a,#260909); color:#ff9fb0 }
+.btn{ padding:14px 12px; border-radius:10px; border:none; font-weight:600; width: calc(100% - 36px); margin-left: 18px; margin-right: 18px; }
+.btn.logout{ background: #ADD8E6; color: #000000; }
 
 /* safe area bottom padding */
 .page::after{ content:''; height:env(safe-area-inset-bottom); display:block }

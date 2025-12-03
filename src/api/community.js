@@ -102,6 +102,25 @@ export async function getCommunityDetail(id){
   }catch(e){ throw e }
 }
 
+// 获取热门帖子（按点赞数排序）：/api/community/hot
+export async function getHotPosts(){
+  const url = BASE + '/api/community/hot'
+  try{
+    if (typeof fetch === 'function'){
+      const res = await fetch(url, { method:'GET', headers: buildHeaders() })
+      let j = null
+      try{ j = await res.json() }catch(e){ j = res }
+      if(!res.ok) throw new Error(j?.message || j?.error || 'fetch hot posts failed')
+      return j
+    }
+    return await new Promise((resolve, reject)=>{
+      try{
+        uni.request({ url, method:'GET', header: buildHeaders(), success(r){ resolve(r.data) }, fail(err){ reject(err) } })
+      }catch(e){ reject(e) }
+    })
+  }catch(e){ throw e }
+}
+
 // 获取用户点赞/收藏的帖子：/api/community/:userId/like
 export async function listLikedPosts(userId){
   if(userId === undefined || userId === null) throw new Error('missing userId')
@@ -124,4 +143,159 @@ export async function listLikedPosts(userId){
     if(e?.status === 404) return []
     throw e 
   }
+}
+
+// 获取帖子评论：/api/community/:postId/comments
+export async function getComments({ postId, page = 1, limit = 20 } = {}){
+  if(!postId && postId !== 0) throw new Error('missing postId')
+  const url = BASE + '/api/community/' + encodeURIComponent(postId) + '/comments?page=' + encodeURIComponent(page) + '&limit=' + encodeURIComponent(limit)
+  try{
+    if (typeof fetch === 'function'){
+      const res = await fetch(url, { method:'GET', headers: buildHeaders() })
+      let j = null
+      try{ j = await res.json() }catch(e){ j = res }
+      if(!res.ok) throw new Error(j?.message || j?.error || 'fetch comments failed')
+      return j?.data || j || []
+    }
+    return await new Promise((resolve, reject)=>{
+      try{
+        uni.request({ url, method:'GET', header: buildHeaders(), success(r){ resolve(r.data?.data || r.data || []) }, fail(err){ reject(err) } })
+      }catch(e){ reject(e) }
+    })
+  }catch(e){ 
+    throw e 
+  }
+}
+
+// 创建评论：/api/community/:postId/comments
+export async function createComment({ postId, content }, token){
+  if(!postId && postId !== 0) throw new Error('missing postId')
+  if(!content) throw new Error('missing content')
+  const url = BASE + '/api/community/' + encodeURIComponent(postId) + '/comments'
+  const body = JSON.stringify({ content })
+  try{
+    if (typeof fetch === 'function'){
+      const res = await fetch(url, { method:'POST', headers: buildHeaders(token), body })
+      let j = null
+      try{ j = await res.json() }catch(e){ j = res }
+      if(!res.ok) throw new Error(j?.message || j?.error || 'create comment failed')
+      return j
+    }
+    return await new Promise((resolve, reject)=>{
+      try{
+        uni.request({ url, method:'POST', header: buildHeaders(token), data: JSON.parse(body), success(r){ resolve(r.data) }, fail(err){ reject(err) } })
+      }catch(e){ reject(e) }
+    })
+  }catch(e){ 
+    throw e 
+  }
+}
+
+// 点赞帖子：/api/community/:postId/like
+export async function likePost({ postId }, token){
+  if(!postId && postId !== 0) throw new Error('missing postId')
+  const url = BASE + '/api/community/' + encodeURIComponent(postId) + '/like'
+  try{
+    if (typeof fetch === 'function'){
+      const res = await fetch(url, { method:'POST', headers: buildHeaders(token) })
+      let j = null
+      try{ j = await res.json() }catch(e){ j = res }
+      if(!res.ok) throw new Error(j?.message || j?.error || 'like post failed')
+      return j
+    }
+    return await new Promise((resolve, reject)=>{
+      try{
+        uni.request({ url, method:'POST', header: buildHeaders(token), success(r){ resolve(r.data) }, fail(err){ reject(err) } })
+      }catch(e){ reject(e) }
+    })
+  }catch(e){ 
+    throw e 
+  }
+}
+
+// 获取用户发布的帖子：/api/community/user/posts
+export async function getUserPosts(token){
+  const url = BASE + '/api/community/user/posts'
+  try{
+    if (typeof fetch === 'function'){
+      const res = await fetch(url, { method:'GET', headers: buildHeaders(token) })
+      let j = null
+      try{ j = await res.json() }catch(e){ j = res }
+      if(!res.ok) throw new Error(j?.message || j?.error || 'fetch user posts failed')
+      return j
+    }
+    return await new Promise((resolve, reject)=>{
+      try{
+        uni.request({ url, method:'GET', header: buildHeaders(token), success(r){ resolve(r.data) }, fail(err){ reject(err) } })
+      }catch(e){ reject(e) }
+    })
+  }catch(e){ throw e }
+}
+
+// 删除帖子：/api/community/:id
+export async function deletePost({ postId }, token){
+  if(!postId && postId !== 0) throw new Error('missing postId')
+  const url = BASE + '/api/community/' + encodeURIComponent(postId)
+  try{
+    if (typeof fetch === 'function'){
+      const res = await fetch(url, { method:'DELETE', headers: buildHeaders(token) })
+      let j = null
+      try{ j = await res.json() }catch(e){ j = res }
+      if(!res.ok) throw new Error(j?.message || j?.error || 'delete post failed')
+      return j
+    }
+    return await new Promise((resolve, reject)=>{
+      try{
+        uni.request({ url, method:'DELETE', header: buildHeaders(token), success(r){ resolve(r.data) }, fail(err){ reject(err) } })
+      }catch(e){ reject(e) }
+    })
+  }catch(e){ throw e }
+}
+
+// 搜索帖子：/api/community/search?q=&page=&limit=
+export async function searchCommunityPosts({ q, page = 1, limit = 20 } = {}){
+  if(!q || !String(q).trim()) throw new Error('搜索关键词不能为空')
+  // WeChat 小程序无 URLSearchParams，这里手动构建查询字符串
+  const queryObj = { q: String(q).trim(), page, limit }
+  const qs = Object.keys(queryObj)
+    .filter(k => queryObj[k] !== undefined && queryObj[k] !== null && queryObj[k] !== '')
+    .map(k => `${encodeURIComponent(k)}=${encodeURIComponent(String(queryObj[k]))}`)
+    .join('&')
+  const url = BASE + '/api/community/search' + (qs ? ('?' + qs) : '')
+  console.log('[community] GET search posts', url)
+
+  if (typeof fetch === 'function'){
+    const res = await fetch(url, { method:'GET', headers: buildHeaders() })
+    let j = null
+    try{ j = await res.json() }catch(e){ j = res }
+    console.log('[community] search posts response', res.status, j)
+    if(!res.ok) {
+      // 更详细的错误信息
+      const errorMsg = j?.message || j?.error || `search posts failed with status ${res.status}`
+      console.error('[community] search posts error', errorMsg, j)
+      throw new Error(errorMsg)
+    }
+    return j ?? []
+  }
+
+  return await new Promise((resolve, reject)=>{
+    try{
+      uni.request({ url, method:'GET', header: buildHeaders(), success(r){ 
+        console.log('[community] search posts response', r.statusCode, r.data)
+        if(r.statusCode >= 200 && r.statusCode < 300){
+          resolve(r.data ?? [])
+        } else {
+          const errorMsg = r.data?.message || r.data?.error || `search posts failed with status ${r.statusCode}`
+          console.error('[community] search posts error', errorMsg, r.data)
+          reject(new Error(errorMsg))
+        }
+      }, fail(err){ 
+        console.error('[community] search posts network error', err)
+        reject(new Error('网络请求失败'))
+      } })
+    }catch(e){ 
+      console.error('[community] search posts exception', e)
+      reject(e) 
+    }
+  })
 }

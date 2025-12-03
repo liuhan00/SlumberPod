@@ -9,12 +9,11 @@
         <text class="header-title">创作白噪音</text>
       </view>
       <view class="header-right">
-        <view class="save-btn" @click="saveCreation" :class="{ disabled: !isValid }" :disabled="!isValid">
-          <text class="save-text">保存</text>
+        <view class="save-btn" @click="createNoise" :class="{ disabled: !canCreate }" :disabled="!canCreate">
+          <text class="save-text">创作</text>
         </view>
       </view>
     </view>
-
     <!-- 创作内容 -->
     <scroll-view class="creation-content" scroll-y>
       <!-- 创作基本信息 -->
@@ -93,13 +92,8 @@
                   <text class="file-icon">📁</text>
                   <text class="file-text">{{ selectedFile ? selectedFile.name : '选择音频文件' }}</text>
                 </view>
-                <view class="upload-btn" @click="uploadSelectedFile" :class="{ disabled: !selectedFile }">
-                  <text class="upload-icon">{{ selectedFile ? '📤' : '🚫' }}</text>
-                  <text class="upload-text">{{ selectedFile ? '上传音频文件' : '请先选择文件' }}</text>
-                </view>
                 <text v-if="uploadProgress>0" class="progress-text">上传进度：{{ Math.round(uploadProgress) }}%</text>
-              </view>
-              
+              </view>              
               <view class="audio-preview" v-if="audioUrl">
                 <text class="preview-title">录制/上传预览</text>
                 <view class="audio-player">
@@ -113,12 +107,12 @@
             </view>
             
             <view class="recording-tips">
-              <text class="tip-text">💡 录制提示：</text>
-              <text class="tip-desc">• 在安静的环境下录制</text>
+              <text class="tip-text">💡 创作提示：</text>
+              <text class="tip-desc">• 上传图标和音频文件后点击顶部"创作"按钮</text>
+              <text class="tip-desc">• 在安静的环境下录制音频</text>
               <text class="tip-desc">• 保持设备稳定</text>
-              <text class="tip-desc">• 录制时长建议30秒-5分钟</text>
-            </view>
-          </view>
+              <text class="tip-desc">• 音频时长建议30秒-5分钟</text>
+            </view>          </view>
         </view>
 
         <!-- 音效混合 -->
@@ -289,13 +283,162 @@ creationData.value.tags = creationData.value.tags || []
 function addTag(t){ if(!t) return; creationData.value.tags.push(t) }
 function removeTag(i){ creationData.value.tags.splice(i,1) }
 
-// 验证表单
+// 验证表单（更新验证逻辑，移除对音频URL的检查）
 const isValid = computed(() => {
   return creationData.value.name.trim() && 
-         creationData.value.category && 
-         (audioUrl.value || creationData.value.file_url || creationData.value.audio_id || creationData.value.audioId)
+         creationData.value.category
 })
 
+// 检查是否可以创作（需要名称、分类、图标和音频文件）
+const canCreate = computed(() => {
+  return creationData.value.name.trim() && 
+         creationData.value.category && 
+         creationData.value.cover_url &&
+         (selectedFile.value || isRecording.value)
+})
+
+// 新的创作函数，同时上传图标和音频文件
+async function createNoise() {
+  if (!canCreate.value) {
+    if (!creationData.value.name.trim()) {
+      return uni.showToast({ title: '请输入作品名称', icon: 'none' })
+    }
+    if (!creationData.value.category) {
+      return uni.showToast({ title: '请选择作品分类', icon: 'none' })
+    }
+    if (!creationData.value.cover_url) {
+      return uni.showToast({ title: '请上传作品图标', icon: 'none' })
+    }
+    if (!selectedFile.value && !isRecording.value) {
+      return uni.showToast({ title: '请选择或录制音频文件', icon: 'none' })
+    }
+    return
+  }
+  
+  uni.showLoading({ title: '创作中...' })
+  
+  try {
+    // 检查必填字段
+    if (!creationData.value.name.trim()) {
+      throw new Error('请输入作品名称')
+    }
+    
+    if (!creationData.value.category) {
+      throw new Error('请选择作品分类')
+    }
+    
+    // 检查文件大小限制（50MB）
+    if (selectedFile.value && selectedFile.value.size > 50 * 1024 * 1024) {
+      throw new Error('文件大小不能超过50MB')
+    }
+    
+    // 检查文件类型
+    if (selectedFile.value) {
+      const fileName = selectedFile.value.name.toLowerCase()
+      const allowedExtensions = ['.mp3', '.wav', '.m4a', '.aac', '.ogg', '.flac']
+      const hasValidExtension = allowedExtensions.some(ext => fileName.endsWith(ext))
+      
+      if (!hasValidExtension) {
+        throw new Error('请上传音频文件（支持MP3、WAV、M4A、AAC、OGG、FLAC格式）')
+      }
+    }
+    
+    // 使用新的两步上传流程：先上传到 /api/audio/upload，然后创建记录
+    // 将 category_id 转换为 categoryIds 数组格式
+    const categoryIds = creationData.value.category ? [creationData.value.category] : []
+    
+    // 准备上传数据
+    const uploadData = {
+      file: selectedFile.value,
+      title: creationData.value.name,
+      description: creationData.value.description || '',
+      coverUrl: creationData.value.cover_url || '',
+      durationSeconds: duration.value || 0,
+      categoryIds: categoryIds,
+      isPublic: creationData.value.isPublic ? 1 : 0,
+      isFree: creationData.value.allowDownload ? 1 : 0
+    }
+    
+    // 如果正在录制，则使用模拟的音频数据
+    if (isRecording.value) {
+      // 在实际应用中，这里应该是真实的录制文件
+      // 为了演示目的，我们使用一个模拟的文件对象
+      uploadData.file = {
+        name: 'recorded_audio.mp3',
+        size: 5000000, // 5MB
+        // 在实际应用中，这里应该是真实的文件路径
+        tempFilePath: 'recorded_audio_temp_path'
+      }
+    }
+    
+    console.log('[creation] 开始上传音频文件和图标')
+    const uploadPromise = apiAudios.uploadAudioToStorage(uploadData)
+    
+    // 显示上传进度
+    uploadProgress.value = 10
+    const progressInterval = setInterval(() => {
+      if (uploadProgress.value < 90) {
+        uploadProgress.value += 10
+      }
+    }, 500)
+    
+    const resp = await uploadPromise
+    clearInterval(progressInterval)
+    uploadProgress.value = 100
+    
+    console.log('[creation] 上传响应:', resp)
+    
+    // 优先获取音频ID；兼容不同返回结构
+    const audioIdCandidate = resp?.data?.audioId ?? resp?.data?.id ?? resp?.audioId ?? resp?.id
+    if (audioIdCandidate != null) {
+      creationData.value.audio_id = String(audioIdCandidate)
+      uni.hideLoading()
+      uni.showToast({ 
+        title: '创作成功', 
+        icon: 'success',
+        duration: 2000
+      })
+      
+      // 清空已选文件
+      selectedFile.value = null
+      
+      // 如果设置了分享到社区，则跳转到分享页面
+      if (creationData.value.shareToCommunity) {
+        setTimeout(() => {
+          uni.navigateTo({ 
+            url: '/pages/creation/share?id=' + (resp.data?.id || resp.id || Date.now()) 
+          })
+        }, 800)
+      } else {
+        // 否则返回上一页
+        setTimeout(() => goBack(), 800)
+      }
+    } else {
+      throw new Error('上传成功但未获取到音频ID，响应：' + JSON.stringify(resp))
+    }
+  } catch (e) {
+    console.error('[creation] 创作失败详情:', e)
+    uni.hideLoading()
+    
+    // 更详细的错误信息
+    let errorMessage = '创作失败'
+    if (e.message && e.message.includes('Network')) {
+      errorMessage = '网络连接失败，请检查网络设置'
+    } else if (e.message && e.message.includes('Failed to fetch')) {
+      errorMessage = '服务器连接失败，请稍后重试'
+    } else if (e.message) {
+      errorMessage = e.message
+    }
+    
+    uni.showToast({ 
+      title: errorMessage, 
+      icon: 'none',
+      duration: 3000
+    })
+  } finally {
+    setTimeout(() => { uploadProgress.value = 0 }, 2000)
+  }
+}
 // 返回上一页
 function goBack() {
   try {
@@ -304,41 +447,6 @@ function goBack() {
     if(typeof location !== 'undefined') location.hash = '#/pages/noise/Free'
   }
 }
-
-// 保存创作
-function saveCreation() {
-  if (!isValid.value) return
-  
-  uni.showLoading({ title: '保存中...' })
-  
-  // 上传到后端（如果 file_url 或录音存在）
-  ;(async ()=>{
-    try{
-      const authModule = await import('@/store/auth')
-      const auth = authModule.getAuthLocal ? authModule.getAuthLocal() : (authModule.default && authModule.default.getAuthLocal ? authModule.default.getAuthLocal() : null)
-      const author_id = auth?.user?.id || auth?.id || null
-      // 改为使用社区发帖接口，按后端字段发送：title、content、cover image、audio id
-      const res = await apiCommunity.createPost({
-        title: creationData.value.name || '',
-        content: creationData.value.description || '',
-        coverImage: creationData.value.cover_url || '',
-        audioId: creationData.value.audio_id || creationData.value.audioId || undefined
-      })
-      uni.hideLoading()
-      uni.showToast({ title: '上传成功', icon: 'success' })
-      if(creationData.value.shareToCommunity){
-        setTimeout(()=> uni.navigateTo({ url:'/pages/creation/share?id=' + (res.data?.id || res.id || Date.now()) }), 800)
-      } else {
-        setTimeout(()=> goBack(), 800)
-      }
-    }catch(e){
-      console.error('upload failed', e)
-      uni.hideLoading()
-      uni.showToast({ title: '保存失败：'+(e.message||String(e)), icon:'none' })
-    }
-  })()
-}
-
 
 // 切换录制状态
 function toggleRecording() {
@@ -384,7 +492,7 @@ async function selectAudioFile() {
       })
       return
     }
-
+  
     if (res && res.tempFiles && res.tempFiles.length > 0) {
       selectedFile.value = res.tempFiles[0]
       uni.showToast({ title: '文件选择成功', icon: 'success', duration: 1500 })
@@ -395,132 +503,8 @@ async function selectAudioFile() {
   }
 }
 
-async function uploadSelectedFile(){
-  if(!selectedFile.value) return uni.showToast({ title:'请选择文件', icon:'none' })
-  
-  // 检查必填字段
-  if(!creationData.value.name.trim()) {
-    return uni.showToast({ title:'请先填写作品名称', icon:'none' })
-  }
-  
-  if(!creationData.value.category) {
-    return uni.showToast({ title:'请先选择作品分类', icon:'none' })
-  }
-  
-  uni.showLoading({ title: '上传中...', mask: true })
-  
-  try{
-    uploadProgress.value = 10
-    
-    // 检查文件大小限制（50MB）
-    if(selectedFile.value.size > 50 * 1024 * 1024) {
-      throw new Error('文件大小不能超过50MB')
-    }
-    
-    // 检查文件类型 - 放宽限制，因为uni.chooseFile返回的文件可能没有type属性
-    const fileName = selectedFile.value.name.toLowerCase()
-    const allowedExtensions = ['.mp3', '.wav', '.m4a', '.aac', '.ogg', '.flac']
-    const hasValidExtension = allowedExtensions.some(ext => fileName.endsWith(ext))
-    
-    if(!hasValidExtension) {
-      throw new Error('请上传音频文件（支持MP3、WAV、M4A、AAC、OGG、FLAC格式）')
-    }
-    
-    uploadProgress.value = 30
-    
-    // 使用新的两步上传流程：先上传到 /api/audio/upload，然后创建记录
-    // 将 category_id 转换为 categoryIds 数组格式
-    const categoryIds = creationData.value.category ? [creationData.value.category] : []
-    
-    const uploadPromise = apiAudios.uploadAudioToStorage({ 
-      file: selectedFile.value, 
-      title: creationData.value.name, 
-      description: creationData.value.description || '',
-      coverUrl: creationData.value.cover_url || '',
-      durationSeconds: duration.value || 0,
-      categoryIds: categoryIds,
-      isPublic: 1,
-      isFree: 0
-    })
-    
-    // 模拟上传进度
-    const progressInterval = setInterval(() => {
-      if(uploadProgress.value < 90) {
-        uploadProgress.value += 10
-      }
-    }, 500)
-    
-    const resp = await uploadPromise
-    clearInterval(progressInterval)
-    uploadProgress.value = 100
-    
-    console.log('上传响应:', resp)
-    
-    // 优先获取音频ID；兼容不同返回结构
-    const audioIdCandidate = resp?.data?.audioId ?? resp?.data?.id ?? resp?.audioId ?? resp?.id
-    if (audioIdCandidate != null) {
-      creationData.value.audio_id = String(audioIdCandidate)
-      uni.hideLoading()
-      uni.showToast({ 
-        title:'上传成功，已获取音频ID', 
-        icon:'success',
-        duration: 2000
-      })
-      // 清空已选文件
-      selectedFile.value = null
-    } else {
-      // 兼容仅返回URL的情况：先保存URL以便回显，但提示缺少音频ID
-      let fileUrl = ''
-      if(resp.data) {
-        fileUrl = resp.data.audio_url || resp.data.file_url || resp.data.url || ''
-      } else {
-        fileUrl = resp.audio_url || resp.file_url || resp.url || ''
-      }
-      if(fileUrl) {
-        creationData.value.file_url = fileUrl
-        uni.hideLoading()
-        uni.showToast({ 
-          title:'上传成功，但未返回音频ID', 
-          icon:'none',
-          duration: 2500
-        })
-        // 清空已选文件
-        selectedFile.value = null
-      } else {
-        throw new Error('上传成功但未获取到音频ID或URL，响应：' + JSON.stringify(resp))
-      }
-    }
-    
-    // 自动设置音频时长（如果后端有返回）
-    if(!duration.value && (resp.data?.duration || resp.duration)) {
-      duration.value = resp.data?.duration || resp.duration
-    }
-    
-  }catch(e){ 
-    console.error('上传失败详情:', e)
-    uni.hideLoading()
-    
-    // 更详细的错误信息
-    let errorMessage = '上传失败'
-    if(e.message && e.message.includes('Network')) {
-      errorMessage = '网络连接失败，请检查网络设置'
-    } else if(e.message && e.message.includes('Failed to fetch')) {
-      errorMessage = '服务器连接失败，请稍后重试'
-    } else if(e.message) {
-      errorMessage = e.message
-    }
-    
-    uni.showToast({ 
-      title: errorMessage, 
-      icon:'none',
-      duration: 3000
-    }) 
-  } finally {
-    setTimeout(() => { uploadProgress.value = 0 }, 2000)
-  }
-}
-
-
+// 已移除不再使用的 uploadSelectedFile 函数
+// 现在使用 createNoise 函数统一处理图标和音频文件的上传
 // 切换播放状态
 function togglePlayback() {
   if (isPlaying.value) {

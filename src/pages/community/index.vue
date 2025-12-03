@@ -67,7 +67,7 @@ import { ref, computed, onMounted } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { getAuthLocal } from '@/store/auth'
 import { useGlobalTheme } from '@/composables/useGlobalTheme'
-import { getPlaceholder, safeImageUrl } from '@/utils/image'
+import { getPlaceholder, safeImageUrl, isValidImageUrl } from '@/utils/image'
 import PostCard from '@/components/PostCard.vue'
 import * as apiPosts from '@/api/posts'
 import * as apiCommunity from '@/api/community'
@@ -90,7 +90,8 @@ function normalizeList(list){
     time: item.time || item.created_at || item.createdAt || '刚刚',
     title: item.title || '',
     content: item.content || item.body || '',
-    image: (item.imageUrls && item.imageUrls[0]) || item.image || '',
+    // 使用严格检查的图片URL
+    image: isValidImageUrl((item.imageUrls && item.imageUrls[0]) || item.image || ''),
     // 使用数据库中的真实点赞和评论数量
     favorite_count: item.favorite_count ?? item.like_count ?? item.likes ?? 0,
     comment_count: item.comment_count ?? item.commentCount ?? (Array.isArray(item.comments) ? item.comments.length : 0),
@@ -103,27 +104,20 @@ function normalizeList(list){
 // 加载"最新"与"热门"
 async function loadLatest(){
   try {
-    const r = await apiPosts.getLatest()
-    const list = r.data || r.items || r.list || r || []
-    posts.value = normalizeList(Array.isArray(list) ? list : [])
+    // 直接使用社区列表作为默认加载方法
+    const result = await apiCommunity.getCommunityList({ page: 1, limit: 20 })
+    const list = result.data || result.items || result || []
+    if (Array.isArray(list) && list.length > 0) {
+      posts.value = normalizeList(list)
+    }
   } catch(e) {
     console.warn('load latest posts failed', e)
     // 失败时保持现有数据，不抛出错误
-    // 尝试使用社区列表作为后备
-    try {
-      const result = await apiCommunity.getCommunityList({ page: 1, limit: 20 })
-      const list = result.data || result.items || result || []
-      if (Array.isArray(list) && list.length > 0) {
-        posts.value = normalizeList(list)
-      }
-    } catch(e2) {
-      console.warn('fallback community list failed', e2)
-    }
   }
 }
 async function loadHot(){
   try {
-    const r = await apiPosts.getHot()
+    const r = await apiCommunity.getHotPosts()
     const list = r.data || r.items || r.list || r || []
     posts.value = normalizeList(Array.isArray(list) ? list : [])
   } catch(e) {
@@ -176,10 +170,12 @@ const filteredPosts = computed(() => {
 })
 
 function showSearch() {
-  uni.showToast({
-    title: '搜索功能开发中',
-    icon: 'none'
-  })
+  // 跳转到搜索页面
+  try {
+    uni.navigateTo({ url: '/pages/search/index?type=community' })
+  } catch(e) {
+    if(typeof location !== 'undefined') location.hash = '#/pages/search/index'
+  }
 }
 
 function showMessages() {

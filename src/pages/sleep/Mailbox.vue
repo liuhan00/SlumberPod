@@ -134,7 +134,8 @@
             class="message-item"
             @click="viewMessageDetail(msg)"
           >
-            <view v-if="!msg.read" class="unread-dot"></view>
+            <!-- 只在"我接收的"分类下显示未读红点 -->
+            <view v-if="!msg.read && mailCategory === 'received'" class="unread-dot"></view>
             <text class="message-preview">{{ msg.content.substring(0, 20) }}...</text>
             <text class="message-date">{{ formatTime(msg.time || msg.created_at || msg.createdAt) }}</text>
           </view>
@@ -160,6 +161,8 @@
       >
         <view class="btn-icon receive-icon">✉</view>
         <text class="btn-text">接收晚安</text>
+        <!-- 接收晚安按钮上的未读红点 -->
+        <view v-if="unreadReceivedCount > 0" class="bottom-unread-dot"></view>
       </view>
       <view 
         :class="['bottom-btn', { active: activeTab === 'mybox' }]"
@@ -167,6 +170,8 @@
       >
         <view class="btn-icon mailbox-icon">📮</view>
         <text class="btn-text">我的信箱</text>
+        <!-- 我的信箱按钮上的未读红点 -->
+        <view v-if="unreadReceivedCount > 0" class="bottom-unread-dot"></view>
       </view>
     </view>
 
@@ -194,23 +199,16 @@
     </view>
 
     <!-- 统计信息弹窗 -->
-    <view v-if="showStatsModal" class="modal-overlay" @click="closeStatsModal">
-      <view class="modal-content stats-modal" @click.stop>
-        <view class="modal-header">
-          <text class="modal-title">信箱统计</text>
-          <button class="modal-close" @click="closeStatsModal">×</button>
-        </view>
+    <view v-if="showStatsModal" class="modal-overlay" @click="handleStatsAction">
+      <view class="modal-content stats-modal compact-stats-modal" @click.stop>
         <view class="stats-content">
           <view class="stat-item">
-            <text class="stat-label">总信件数：</text>
-            <text class="stat-value">{{ mailboxStats.totalCount }}</text>
-          </view>
-          <view class="stat-item">
-            <text class="stat-label">未读信件：</text>
+            <text class="stat-label">您有 </text>
             <text class="stat-value">{{ mailboxStats.unreadCount }}</text>
+            <text class="stat-label"> 封未读信件</text>
           </view>
         </view>
-        <button class="confirm-btn" @click="closeStatsModal">确定</button>
+        <button class="confirm-btn" @click="handleStatsAction">去查看</button>
       </view>
     </view>
 
@@ -257,6 +255,11 @@ const filteredMessages = computed(() => {
   } else {
     return receivedMessages.value
   }
+})
+
+// 计算未读接收消息数量
+const unreadReceivedCount = computed(() => {
+  return receivedMessages.value.filter(msg => !msg.read).length
 })
 
 function goBack() {
@@ -421,6 +424,13 @@ function closeReply() {
 
 function closeStatsModal() {
   showStatsModal.value = false
+}
+
+// 新增处理统计信息弹窗动作的方法
+function handleStatsAction() {
+  // 关闭弹窗并跳转到接收晚安页面
+  closeStatsModal()
+  toggleTab('receive')
 }
 
 async function sendReply() {
@@ -1614,25 +1624,27 @@ onUnmounted(() => {
   box-shadow: 0 0 0 3px rgba(123, 97, 255, 0.1);
 }
 
-/* 统计信息弹窗样式 */
+/* 紧凑型统计信息弹窗样式 */
+.compact-stats-modal {
+  width: 80%;
+  max-width: 300px;
+  padding: 20px;
+  border-radius: 16px;
+}
+
 .stats-modal {
   text-align: center;
 }
 
 .stats-content {
-  margin: 20px 0;
+  margin: 15px 0;
 }
 
 .stat-item {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
-  padding: 12px 0;
-  border-bottom: 1px solid #eee;
-}
-
-.stat-item:last-child {
-  border-bottom: none;
+  padding: 8px 0;
 }
 
 .stat-label {
@@ -1641,14 +1653,15 @@ onUnmounted(() => {
 }
 
 .stat-value {
-  font-size: 18px;
+  font-size: 20px;
   font-weight: bold;
   color: #7B61FF;
+  margin: 0 5px;
 }
 
 .confirm-btn {
   width: 100%;
-  padding: 12px;
+  padding: 10px;
   background: linear-gradient(135deg, #7B61FF 0%, #5D4CE0 100%);
   border: none;
   border-radius: 12px;
@@ -1664,5 +1677,16 @@ onUnmounted(() => {
   box-shadow: 0 6px 16px rgba(123, 97, 255, 0.3);
 }
 
+/* 底部按钮未读红点 */
+.bottom-unread-dot {
+  position: absolute;
+  top: 5px;
+  right: 25px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #FF6B6B;
+  box-shadow: 0 0 4px rgba(255, 107, 107, 0.8);
+  z-index: 101;
+}
 </style>
-
