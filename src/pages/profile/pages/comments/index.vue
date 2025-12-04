@@ -1,59 +1,155 @@
 <template>
-    <scroll-view class="page" scroll-y :style="bgStyle">
+  <scroll-view class="page" scroll-y :style="bgStyle">
     <view class="section">
       <view class="header-row">
         <text class="title">我的评论</text>
-        <text class="count">{{ items.length }} 条</text>
+        <text class="count">{{ comments.length }} 条</text>
       </view>
 
-      <view class="composer">
-        <textarea class="input" v-model="text" placeholder="写点什么..." maxlength="300" auto-height="true" />
-        <view class="row">
-          <text class="hint">最多300字</text>
-          <button class="btn" @click="submit">发布</button>
+      <view class="list" v-if="comments.length">
+        <view class="item" v-for="comment in comments" :key="comment.id">
+          <view class="comment-header">
+            <text class="post-title">评论于：{{ comment.post_title }}</text>
+            <text class="time">{{ formatTime(comment.created_at) }}</text>
+          </view>
+          <text class="content">{{ comment.content }}</text>
+          <view class="comment-footer">
+            <text class="likes">👍 {{ comment.like_count }}</text>
+          </view>
         </view>
       </view>
-
-      <view class="list" v-if="items.length">
-        <view class="item" v-for="it in items" :key="it.id">
-          <text class="content">{{ it.text }}</text>
-          <text class="time">{{ format(it.ts) }}</text>
-          <view class="row small"><button class="btn danger" @click="remove(it.id)">删除</button></view>
-        </view>
-      </view>
-      <view class="empty" v-else>暂无评论，快来发表第一条吧～</view>
+      <view class="empty" v-else>暂无评论</view>
     </view>
   </scroll-view>
 </template>
+
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useGlobalTheme } from '@/composables/useGlobalTheme'
-import { useCommentsStore } from '@/stores/comments'
+import { getAuthLocal } from '@/store/auth'
+import * as apiCommunity from '@/api/community'
+
 const { bgStyle } = useGlobalTheme()
-const store = useCommentsStore(); store.load()
-const items = computed(()=> store.items)
-const text = ref('')
-function submit(){ if(!text.value.trim()){ uni.showToast({ title:'内容不能为空', icon:'none' }); return } store.add(text.value.trim()); text.value='' }
-function remove(id){ store.remove(id) }
-function format(ts){ const d=new Date(ts); return `${d.toLocaleDateString()} ${d.toLocaleTimeString()}` }
+const comments = ref([])
+
+// 格式化时间
+function formatTime(timeStr) {
+  if (!timeStr) return '未知时间'
+  // 简单的时间格式化
+  const date = new Date(timeStr)
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+}
+
+// 加载用户评论
+async function loadComments() {
+  try {
+    const auth = getAuthLocal()
+    if (!auth || !auth.token) {
+      uni.showToast({
+        title: '请先登录',
+        icon: 'none'
+      })
+      setTimeout(() => {
+        uni.navigateTo({ url: '/pages/auth/Login' })
+      }, 1500)
+      return
+    }
+
+    const res = await apiCommunity.getUserComments(auth.token)
+    const data = res?.data || res || []
+    comments.value = Array.isArray(data) ? data : []
+  } catch (e) {
+    console.error('加载评论失败:', e)
+    uni.showToast({
+      title: '加载评论失败',
+      icon: 'none'
+    })
+  }
+}
+
+onMounted(() => {
+  loadComments()
+})
 </script>
+
 <style scoped>
-.page{ min-height:100vh }
-.section{ padding: 18px 16px }
-.header-row{ display:flex; align-items:center; justify-content:space-between; margin-bottom:12px }
-.title{ font-size:18px; font-weight:700; color: var(--fg) }
-.count{ color:var(--muted); font-size:13px }
-.composer{ background: var(--card-bg); color: var(--card-fg); border-radius:12px; padding:12px; box-shadow:0 4px 14px var(--shadow); margin-bottom:18px; box-sizing:border-box; overflow:hidden }
-.input{ width:100%; min-height:110px; background: var(--input-bg); color: var(--fg); border-radius:10px; padding:12px 14px; font-size:15px; box-sizing:border-box; display:block; resize:none; border: none }
-.row{ display:flex; justify-content:flex-end; align-items:center; gap:12px; margin-top:10px }
-.row.small{ margin-top:8px }
-.hint{ color:var(--muted); margin-right:auto; align-self:center }
-.btn{ padding:8px 12px; border-radius:10px; background: var(--input-bg); color: var(--fg); box-sizing:border-box }
-.list{ display:flex; flex-direction:column; gap:12px }
-.item{ background: var(--card-bg); color: var(--card-fg); border-radius:12px; padding:12px; box-shadow:0 4px 14px var(--shadow); }
-.content{ display:block; font-size:15px; line-height:1.6 }
-.time{ display:block; margin-top:8px; font-size:12px; color: var(--muted) }
-.btn{ padding:8px 12px; border-radius:10px; background: var(--input-bg); color: var(--fg) }
-.danger{ background:#fffbfb; color:#c62828; border:1px solid rgba(198,40,40,0.08) }
-.empty{ text-align:center; color: var(--muted); padding:40px 0 }
+.page {
+  min-height: 100vh
+}
+
+.section {
+  padding: 18px 16px
+}
+
+.header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px
+}
+
+.title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--fg)
+}
+
+.count {
+  color: var(--muted);
+  font-size: 13px
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px
+}
+
+.item {
+  background: var(--card-bg);
+  color: var(--card-fg);
+  border-radius: 12px;
+  padding: 12px;
+  box-shadow: 0 4px 14px var(--shadow);
+}
+
+.comment-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.post-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--primary);
+}
+
+.time {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.content {
+  display: block;
+  font-size: 15px;
+  line-height: 1.6;
+  margin-bottom: 8px;
+}
+
+.comment-footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.likes {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.empty {
+  text-align: center;
+  color: var(--muted);
+  padding: 40px 0;
+}
 </style>

@@ -97,42 +97,16 @@ export async function uploadAvatar(file) {
               console.error('[API] 401 Unauthorized - Token might be invalid or expired')
               console.error('[API] Token used:', token.substring(0, 20) + '...')
               console.error('[API] Server response:', responseData)
-              reject(new Error('认证失败，请重新登录'))
-            } 
-            // 处理500错误，提供更友好的错误信息
-            else if (res.statusCode === 500) {
-              console.error('[API] 500 Internal Server Error - Storage service initialization failed')
-              console.error('[API] Server response:', responseData)
-              // 检查是否是存储服务初始化失败的特定错误
-              if (responseData && typeof responseData === 'object' && responseData.error) {
-                if (responseData.error.includes('row-level security policy')) {
-                  reject(new Error('上传失败：权限不足，请联系管理员'))
-                } else if (responseData.error.includes('storage service')) {
-                  reject(new Error('上传失败：服务器存储服务异常，请稍后重试'))
-                } else {
-                  reject(new Error('上传失败：服务器内部错误，请稍后重试'))
-                }
-              } else {
-                reject(new Error('上传失败：服务器内部错误，请稍后重试'))
-              }
             }
-            // 处理其他错误
-            else {
-              const errorMessage = responseData?.message || responseData?.error || `上传失败: ${res.statusCode}`
-              reject(new Error(errorMessage))
-            }
+            
+            const error = new Error(`上传失败: ${res.statusCode}`)
+            console.error('[API] Upload error:', error)
+            reject(error)
           }
         },
         fail: (err) => {
           console.error('[API] Upload fail:', err)
-          // 提供更具体的错误信息
-          if (err.errMsg && err.errMsg.includes('fail url not in domain list')) {
-            reject(new Error('上传失败：服务器配置错误，请联系管理员'))
-          } else if (err.errMsg && err.errMsg.includes('network')) {
-            reject(new Error('上传失败：网络连接异常，请检查网络后重试'))
-          } else {
-            reject(new Error(`上传失败: ${err.errMsg || err.message || JSON.stringify(err)}`))
-          }
+          reject(new Error(`上传失败: ${err.errMsg || err.message || JSON.stringify(err)}`))
         }
       })
     })
@@ -140,12 +114,6 @@ export async function uploadAvatar(file) {
   
   // Web 环境使用 fetch 和 FormData
   console.log('[API] Using fetch with FormData')
-  // 检查 FormData 是否可用
-  if (typeof FormData === 'undefined') {
-    console.error('[API] FormData is not defined')
-    throw new Error('浏览器不支持文件上传功能，请升级浏览器')
-  }
-  
   // 创建 FormData 对象
   const formData = new FormData()
   formData.append('avatar', file)
@@ -161,16 +129,6 @@ export async function uploadAvatar(file) {
   console.log('[API] Fetch result:', result)
   
   if (!res.ok) {
-    // 处理特定的错误情况
-    if (res.status === 500) {
-      if (result.error && result.error.includes('row-level security policy')) {
-        throw new Error('上传失败：权限不足，请联系管理员')
-      } else if (result.error && result.error.includes('storage service')) {
-        throw new Error('上传失败：服务器存储服务异常，请稍后重试')
-      } else {
-        throw new Error('上传失败：服务器内部错误，请稍后重试')
-      }
-    }
     const error = new Error(result.message || '上传头像失败')
     console.error('[API] Fetch error:', error)
     throw error

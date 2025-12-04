@@ -62,7 +62,35 @@ async function loadComments(postId) {
   try {
     const res = await apiCommunity.getComments({ postId })
     const data = res?.data || res
-    comments.value = Array.isArray(data) ? data : (data?.items || data?.comments || [])
+    let commentsData = Array.isArray(data) ? data : (data?.items || data?.comments || [])
+    
+    // 确保每条评论都有 id 字段
+    commentsData = commentsData.map(comment => {
+      // 如果评论没有 id 字段，尝试从其他字段获取
+      if (!comment.id) {
+        if (comment.comment_id) {
+          comment.id = comment.comment_id
+        } else if (comment._id) {
+          comment.id = comment._id
+        } else {
+          // 如果还是没有 id，生成一个临时的
+          comment.id = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+        }
+      }
+      
+      // 确保评论有点赞相关字段
+      if (comment.like_count === undefined) {
+        comment.like_count = comment.likes || comment.likeCount || 0
+      }
+      
+      if (comment.user_liked === undefined) {
+        comment.user_liked = comment.liked || false
+      }
+      
+      return comment
+    })
+    
+    comments.value = commentsData
   } catch(e) {
     console.error('[community.detail] load comments failed', e)
     comments.value = []
@@ -201,15 +229,25 @@ async function submitComment() {
     
     // 更新本地数据
     const commentData = result?.data || {}
-    comments.value.unshift({
-      id: commentData.id || `c${Date.now()}`,
+    
+    // 获取当前用户信息
+    const currentUser = {
+      id: auth.id || auth.userId || auth.user?.id || auth.user?.userId || null,
+      name: auth.name || auth.user?.name || auth.nickname || auth.user?.nickname || '我',
+      avatar: auth.avatar || auth.user?.avatar || getPlaceholder('avatar')
+    }
+    
+    // 确保评论有正确的结构
+    const newCommentObj = {
+      id: commentData.id || commentData.comment_id || `c${Date.now()}`,
       content: newComment.value,
       created_at: '刚刚',
-      author: {
-        name: '我',
-        avatar: getPlaceholder('avatar')
-      }
-    })
+      author: currentUser,
+      like_count: 0,
+      user_liked: false
+    }
+    
+    comments.value.unshift(newCommentObj)
     
     // 清空输入框
     newComment.value = ''
@@ -280,6 +318,158 @@ function formatTime(timeStr) {
   if (!timeStr) return '未知时间'
   return timeStr
 }
+
+// 检查评论是否由当前用户发布
+function isCommentAuthor(comment) {
+  const auth = getAuthLocal()
+  // 检查认证信息和评论作者信息是否存在
+  if (!auth || !comment.author) {
+    console.log('[community.detail] Auth or comment author missing', { auth: !!auth, commentAuthor: !!comment.author })
+    return false
+  }
+  
+  // 获取当前用户ID（支持多种格式）
+  const currentUserId = auth.id || auth.userId || auth.user?.id || auth.user?.userId || null
+  if (!currentUserId) {
+    console.log('[community.detail] Current user ID not found', auth)
+    return false
+  }
+  
+  // 获取评论作者ID（支持多种格式）
+  const commentAuthorId = comment.author.id || comment.author.userId || comment.author._id || null
+  if (!commentAuthorId) {
+    console.log('[community.detail] Comment author ID not found', comment.author)
+    return false
+  }
+  
+  // 比较ID是否相同（转换为字符串比较）
+  const isAuthor = String(currentUserId) === String(commentAuthorId)
+  console.log('[community.detail] Author check', { currentUserId, commentAuthorId, isAuthor })
+  return isAuthor
+}
+
+// 删除评论
+async function deleteComment(comment) {
+  // 显示确认对话框
+  uni.showModal({
+    title: '确认删除',
+    content: '确定要删除这条评论吗？删除后不可恢复。',
+    success: async (res) => {
+      if (res.confirm) {
+        try {
+          // 检查用户是否登录
+          const auth = getAuthLocal()
+          if (!auth || !auth.token) {
+            uni.showToast({
+              title: '请先登录',
+              icon: 'none'
+            })
+            setTimeout(() => {
+              uni.navigateTo({ url: '/pages/auth/Login' })
+            }, 1500)
+            return
+          }
+          
+          // 调用删除评论API
+          await apiCommunity.deleteComment({ commentId: comment.id }, auth.token)
+          
+          // 更新本地数据
+          comments.value = comments.value.filter(c => c.id !== comment.id)
+          
+          // 更新帖子的评论数
+          post.value.comment_count = (post.value.comment_count || 0) - 1
+          
+          uni.showToast({ title: '评论已删除', icon: 'success' })
+        } catch(e) {
+          console.error('[community.detail] delete comment failed', e)
+          uni.showToast({ title: '删除评论失败', icon: 'none' })
+        }
+      }
+    }
+  })
+}
+
+// 点赞/取消点赞评论
+async function likeComment(comment) {
+  try {
+    // 添加调试信息
+    console.log('[community.detail] likeComment called with comment:', comment);
+    
+    // 验证评论ID
+    if (!comment || !comment.id) {
+      console.error('[community.detail] Invalid comment or missing comment.id:', comment);
+      uni.showToast({ title: '评论信息不完整', icon: 'none' });
+      return;
+    }
+    
+    // 检查用户是否登录
+    const auth = getAuthLocal()
+    if (!auth || !auth.token) {
+      uni.showToast({
+        title: '请先登录',
+        icon: 'none'
+      })
+      setTimeout(() => {
+        uni.navigateTo({ url: '/pages/auth/Login' })
+      }, 1500)
+      return
+    }
+    
+    // 保存当前状态以便回滚
+    const originalComments = [...comments.value];
+    
+    // 先更新本地数据（乐观更新）
+    const updatedComments = comments.value.map(c => {
+      if (c.id === comment.id) {
+        // 创建新的评论对象，避免直接修改响应式数据
+        const updatedComment = { ...c }
+        // 切换点赞状态
+        if (updatedComment.user_liked) {
+          // 当前已点赞，现在取消点赞
+          updatedComment.like_count = Math.max(0, (updatedComment.like_count || 0) - 1)
+          updatedComment.user_liked = false
+        } else {
+          // 当前未点赞，现在点赞
+          updatedComment.like_count = (updatedComment.like_count || 0) + 1
+          updatedComment.user_liked = true
+        }
+        return updatedComment
+      }
+      return c
+    })
+    
+    // 更新评论列表
+    comments.value = updatedComments
+    
+    // 调用点赞评论API
+    const result = await apiCommunity.likeComment({ commentId: comment.id }, auth.token)
+    
+    // 如果API返回了新的状态，使用API返回的状态更新本地数据
+    if (result && typeof result === 'object' && result.liked !== undefined) {
+      const finalComments = comments.value.map(c => {
+        if (c.id === comment.id) {
+          const finalComment = { ...c }
+          finalComment.like_count = result.like_count || finalComment.like_count || 0
+          finalComment.user_liked = result.liked
+          return finalComment
+        }
+        return c
+      })
+      comments.value = finalComments
+    }
+    
+    // 显示相应的提示信息
+    const targetComment = comments.value.find(c => c.id === comment.id)
+    const message = targetComment?.user_liked ? '点赞成功' : '已取消点赞'
+    uni.showToast({ title: message, icon: 'success' })
+  } catch(e) {
+    console.error('[community.detail] like comment failed', e)
+    // 回滚到原始状态
+    comments.value = originalComments
+    uni.showToast({ title: '点赞操作失败: ' + (e.message || '未知错误'), icon: 'none' })
+  }
+}
+
 </script>
 
 <template>
@@ -291,8 +481,12 @@ function formatTime(timeStr) {
     
     <!-- Topbar -->
     <view class="topbar">
-      <button class="tb-btn tb-back" @click="goBack">←</button>
-      <button class="tb-btn tb-menu" @click="openActions">⋯</button>
+      <view class="topbar-left">
+        <button class="tb-btn tb-back" @click="goBack">←</button>
+      </view>
+      <view class="topbar-right">
+        <button class="tb-btn tb-menu" @click="openActions">⋯</button>
+      </view>
     </view>
 
     <scroll-view class="content" scroll-y>
@@ -358,6 +552,22 @@ function formatTime(timeStr) {
                 <text class="comment-time">{{ comment.created_at || '刚刚' }}</text>
               </view>
               <text class="comment-text">{{ comment.content }}</text>
+              <!-- 评论操作区域 -->
+              <view class="comment-footer">
+                <!-- 点赞按钮 -->
+                <view class="comment-like" @click="likeComment(comment)">
+                  <text class="like-icon" :class="{ liked: comment.user_liked }">👍</text>
+                  <text class="like-count">{{ comment.like_count || 0 }}</text>
+                </view>
+                <!-- 删除评论按钮（仅作者可见） -->
+                <button 
+                  v-if="isCommentAuthor(comment)" 
+                  class="delete-comment-btn" 
+                  @click="deleteComment(comment)"
+                >
+                  删除
+                </button>
+              </view>
             </view>
           </view>
         </view>
@@ -408,19 +618,42 @@ function formatTime(timeStr) {
   top:0; 
   display:flex; 
   align-items:center; 
-  justify-content:space-between; 
+  justify-content:space-between;
   padding:10px 14px;
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(10px);
+  background: #ffffff;
   border-bottom: 1px solid #f0f0f0;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
   z-index: 100;
 }
-.tb-btn{ background:transparent; border:none; font-size:18px; color: var(--card-fg, #13303f) }
-.tb-back{ }
+
+.topbar-left {
+  flex: 1;
+  display: flex;
+  justify-content: flex-start;
+}
+
+.topbar-right {
+  flex: 1;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.tb-btn{ 
+  background:transparent; 
+  border:none; 
+  font-size:18px; 
+  color: var(--card-fg, #13303f);
+  padding: 8px 12px; /* 增加点击区域 */
+}
+
+.tb-back {
+  margin-left: -8px; /* 微调位置使按钮更靠近屏幕边缘 */
+}
+
 .tb-menu{ }
 .tb-title{ font-size:16px; font-weight:700; color: var(--card-fg, #13303f) }
 .content{ flex:1; margin-top: 10px; }
-.content { flex: 1; padding-bottom: 60px; } /* 为评论输入框留出空间 */
+.content { flex: 1; padding-bottom: 60px; }
 
 /* Card - glass style to match app */
 .card{ 
@@ -501,6 +734,45 @@ function formatTime(timeStr) {
 .comment-author{ font-weight: 500; font-size: 14px; color: #333; }
 .comment-time{ font-size: 12px; color: #999; }
 .comment-text{ font-size: 14px; color: #666; line-height: 1.4; }
+.comment-footer { display: flex; justify-content: flex-end; margin-top: 5px; align-items: center; }
+
+/* 删除评论按钮 */
+.delete-comment-btn {
+  margin-top: 5px;
+  padding: 4px 8px;
+  background: #ff4d4f;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  align-self: flex-end;
+  display: inline-block; /* 确保按钮可见 */
+  cursor: pointer;
+  min-width: 40px; /* 确保按钮有足够的宽度 */
+  text-align: center;
+}
+
+/* 评论点赞样式 */
+.comment-like {
+  display: flex;
+  align-items: center;
+  margin-right: 10px;
+  cursor: pointer;
+}
+
+.like-icon {
+  font-size: 14px;
+  margin-right: 4px;
+}
+
+.like-icon.liked {
+  color: #007aff;
+}
+
+.like-count {
+  font-size: 12px;
+  color: #666;
+}
 
 /* 评论输入框容器 */
 .comment-input-container {

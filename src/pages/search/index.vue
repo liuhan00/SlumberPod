@@ -610,6 +610,8 @@ function goToCommunity(){
   border-radius: 12px;
   cursor: pointer;
   transition: all 0.2s;
+  max-width: 100%; /* 添加最大宽度限制 */
+  box-sizing: border-box; /* 确保padding包含在宽度内 */
 }
 
 .result-item:active {
@@ -622,6 +624,7 @@ function goToCommunity(){
   height: 48px;
   border-radius: 8px;
   margin-right: 12px;
+  flex-shrink: 0; /* 防止图片被压缩 */
 }
 
 .result-info {
@@ -629,17 +632,24 @@ function goToCommunity(){
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0; /* 允许子元素收缩以适应容器 */
 }
 
 .result-name {
   font-size: 16px;
   font-weight: 600;
   color: var(--fg, #333);
+  white-space: nowrap; /* 防止换行 */
+  overflow: hidden; /* 隐藏溢出内容 */
+  text-overflow: ellipsis; /* 显示省略号 */
 }
 
 .result-author {
   font-size: 14px;
   color: var(--muted, #666);
+  white-space: nowrap; /* 防止换行 */
+  overflow: hidden; /* 隐藏溢出内容 */
+  text-overflow: ellipsis; /* 显示省略号 */
 }
 
 .post-stats {

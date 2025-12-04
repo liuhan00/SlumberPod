@@ -85,7 +85,6 @@ function openRegister(){ try{ uni.navigateTo({ url:'/pages/auth/Register' }) }ca
 const settings = [
   { key:'favorites', label:'我喜欢的' },
   { key:'history', label:'播放历史' },
-  { key:'comments', label:'我的评论' },
   { key:'community', label:'社区动态' },
   { key:'account', label:'账号资料' },
   { key:'help', label:'帮助与客服' },
@@ -100,7 +99,6 @@ function onSetting(key){
   console.log('[profile] onSetting:', key)
   if(key==='favorites') go('../../favorites/index')
   else if(key==='history') { showHistory.value = true; loadHistory() }
-  else if(key==='comments') go('../../comments/index')
   else if(key==='community') go('./pages/creations/index') // 导航到社区动态页面
   else if(key==='account') go('pages/account/index')
   else if(key==='help') go('../../help/index')

@@ -9,7 +9,8 @@ function buildHeaders(){
   return headers
 }
 
-// Unified search for audios and posts: GET /api/search?q=&page=&limit=&type=audio|post (type optional)
+// Unified search for audios and posts: GET /api/community/search?q=&page=&limit=&type=audio|post (type optional)
+// 注意：已按照要求修改搜索接口路径，不再使用 /api/search
 export async function searchAll({ q, page = 1, limit = 20, type = null } = {}){
   if(!q || !String(q).trim()) throw new Error('搜索关键词不能为空')
   // WeChat 小程序无 URLSearchParams，这里手动构建查询字符串
@@ -18,7 +19,8 @@ export async function searchAll({ q, page = 1, limit = 20, type = null } = {}){
     .filter(k => queryObj[k] !== undefined && queryObj[k] !== null && queryObj[k] !== '')
     .map(k => `${encodeURIComponent(k)}=${encodeURIComponent(String(queryObj[k]))}`)
     .join('&')
-  const url = BASE + '/api/search' + (qs ? ('?' + qs) : '')
+  // 修改搜索路径为社区搜索接口
+  const url = BASE + '/api/community/search' + (qs ? ('?' + qs) : '')
   console.log('[search] GET', url)
 
   if (typeof fetch === 'function'){
@@ -36,9 +38,11 @@ export async function searchAll({ q, page = 1, limit = 20, type = null } = {}){
   })
 }
 
-// 获取热门搜索: GET /api/search/hot
+// 获取热门搜索: GET /api/community/search/hot
+// 注意：已按照要求修改热门搜索接口路径，不再使用 /api/search/hot
 export async function getHotSearch(){
-  const url = BASE + '/api/search/hot'
+  // 修改热门搜索路径为社区搜索热门接口
+  const url = BASE + '/api/community/search/hot'
   console.log('[search] GET hot search', url)
 
   if (typeof fetch === 'function'){
@@ -56,9 +60,11 @@ export async function getHotSearch(){
   })
 }
 
-// 获取用户搜索历史: GET /api/search
+// 获取用户搜索历史: GET /api/community/search/history
+// 注意：已按照要求修改搜索历史接口路径，不再使用 /api/search
 export async function getSearchHistory(){
-  const url = BASE + '/api/search'
+  // 修改搜索历史路径为社区搜索历史接口
+  const url = BASE + '/api/community/search/history'
   console.log('[search] GET search history', url)
 
   if (typeof fetch === 'function'){
@@ -76,9 +82,11 @@ export async function getSearchHistory(){
   })
 }
 
-// 记录搜索行为: POST /api/search
+// 记录搜索行为: POST /api/community/search/history
+// 注意：已按照要求修改记录搜索接口路径，不再使用 /api/search
 export async function recordSearch(query){
-  const url = BASE + '/api/search'
+  // 修改记录搜索路径为社区搜索历史接口
+  const url = BASE + '/api/community/search/history'
   console.log('[search] POST record search', url, query)
 
   const body = JSON.stringify({ query })
@@ -98,9 +106,11 @@ export async function recordSearch(query){
   })
 }
 
-// 清空搜索历史: DELETE /api/search
+// 清空搜索历史: DELETE /api/community/search/history
+// 注意：已按照要求修改清空搜索历史接口路径，不再使用 /api/search
 export async function clearSearchHistory(){
-  const url = BASE + '/api/search'
+  // 修改清空搜索历史路径为社区搜索历史接口
+  const url = BASE + '/api/community/search/history'
   console.log('[search] DELETE clear search history', url)
 
   if (typeof fetch === 'function'){

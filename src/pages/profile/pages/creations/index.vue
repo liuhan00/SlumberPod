@@ -73,10 +73,10 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useGlobalTheme } from '@/composables/useGlobalTheme'
 import { getAuthLocal } from '@/store/auth'
-import { getPlaceholder, isValidImageUrl } from '@/utils/image'
+import { getPlaceholder } from '@/utils/image'
 import * as apiCommunity from '@/api/community'
 import PostCard from '@/components/PostCard.vue'
 
@@ -102,20 +102,16 @@ async function loadPosts() {
     const list = res?.data || res?.items || res?.list || []
     
     // 处理帖子数据
-    posts.value = Array.isArray(list) ? list.map(item => {
-      const imageUrl = item.imageUrls?.[0] || item.image || item.cover_image || ''
-      
-      return {
-        id: item.post_id || item.id || item._id,
-        time: item.time || item.created_at || item.createdAt || '未知时间',
-        title: item.title || '',
-        content: item.content || item.body || '',
-        image: isValidImageUrl(imageUrl), // 使用严格检查的图片URL
-        favorite_count: item.favorite_count || item.like_count || item.likes || 0,
-        comment_count: item.comment_count || item.commentCount || (Array.isArray(item.comments) ? item.comments.length : 0),
-        author: item.author || { name: item.userName || item.user_name || '用户' }
-      }
-    }) : []
+    posts.value = Array.isArray(list) ? list.map(item => ({
+      id: item.post_id || item.id || item._id,
+      time: item.time || item.created_at || item.createdAt || '未知时间',
+      title: item.title || '',
+      content: item.content || item.body || '',
+      image: item.imageUrls?.[0] || item.image || item.cover_image || '',
+      favorite_count: item.favorite_count || item.like_count || item.likes || 0,
+      comment_count: item.comment_count || item.commentCount || (Array.isArray(item.comments) ? item.comments.length : 0),
+      author: item.author || { name: item.userName || item.user_name || '用户' }
+    })) : []
   } catch (e) {
     console.error('[profile.community] load posts failed', e)
     error.value = e?.message || '加载失败'

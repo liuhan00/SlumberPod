@@ -123,13 +123,24 @@
       <view class="playlist-content" @click.stop>
         <view class="playlist-header">
           <text class="playlist-title">播放列表</text>
+          <!-- 随便听听开关移到右上角 -->
+          <view class="smart-recommend-toggle" @click.stop>
+            <switch 
+              class="smart-switch small" 
+              :checked="smartRecommend" 
+              @change="toggleSmartRecommend"
+              color="#007aff"
+            />
+          </view>
           <button class="playlist-close" @click="hidePlaylist">×</button>
-        </view>
-        
-        <scroll-view class="playlist-scroll" scroll-y>
+        </view>        
+        <!-- 智能推荐提示 -->
+        <view v-if="smartRecommend" class="smart-recommend-hint">
+          <text class="hint-text">已开启随机推荐</text>
+        </view>        <scroll-view class="playlist-scroll" scroll-y>
           <view class="playlist-list">
             <view 
-              v-for="track in store.playlist" 
+              v-for="track in displayedPlaylist" 
               :key="track.id" 
               :class="['playlist-item', { active: track.id === store.currentTrack?.id }]"
               @click="playTrack(track)"
@@ -144,21 +155,19 @@
               </view>
             </view>
             
-            <view v-if="store.playlist.length === 0" class="playlist-empty">
+            <view v-if="displayedPlaylist.length === 0" class="playlist-empty">
               <text class="empty-icon">🎵</text>
               <text class="empty-text">播放列表为空</text>
               <button class="empty-btn" @click="goToHome">去首页添加</button>
             </view>
           </view>
-        </scroll-view>
-        
+        </scroll-view>        
         <view class="playlist-footer">
-          <text class="playlist-count">共 {{ store.playlist.length }} 首</text>
+          <text class="playlist-count">共 {{ displayedPlaylist.length }} 首</text>
           <button class="playlist-clear" @click="clearPlaylist">清空列表</button>
         </view>
       </view>
     </view>
-
     <!-- 播放设置半屏弹窗 -->
     <view class="settings-overlay" v-if="showSettingsModal" @click="closeSettings">
       <view class="settings-content" @click.stop>
@@ -314,6 +323,80 @@ const isFav = computed(()=>{
   return favStore.items.some(x=> x.id === numericMeta)
 })
 
+// 智能推荐开关状态
+const smartRecommend = ref(false)
+// 随机推荐的音频列表
+const randomAudios = ref([])
+
+// 初始化时从本地存储读取设置
+onMounted(() => {
+  const savedSetting = uni.getStorageSync('smartRecommend')
+  if (savedSetting !== '') {
+    smartRecommend.value = savedSetting
+    // 如果开启了智能推荐，加载随机音频
+    if (smartRecommend.value) {
+      loadRandomAudios()
+    }
+  }
+})
+
+// 切换智能推荐
+function toggleSmartRecommend(e) {
+  smartRecommend.value = e.detail.value
+  uni.setStorageSync('smartRecommend', smartRecommend.value)
+  
+  if (smartRecommend.value) {
+    uni.showToast({
+      title: '已开启智能推荐',
+      icon: 'success'
+    })
+    // 加载随机音频
+    loadRandomAudios()
+  } else {
+    uni.showToast({
+      title: '已关闭智能推荐',
+      icon: 'none'
+    })
+  }
+}
+
+// 加载随机推荐音频
+async function loadRandomAudios() {
+  try {
+    const res = await apiAudios.getRandomAudios({ limit: 10 })
+    console.log('[Player] 随机音频API返回数据:', res)
+    const rawData = res?.data || res || []
+    console.log('[Player] 处理前的数据:', rawData)
+    
+    // 确保数据是数组格式，并且每个元素都有必要的属性
+    let processedData = []
+    if (Array.isArray(rawData)) {
+      processedData = rawData.map(item => ({
+        id: item.id || item._id || Date.now() + Math.random(),
+        name: item.name || item.title || item.audioName || '未知音频',
+        author: item.author || item.creator || item.username || '未知作者',
+        cover: item.cover || item.coverUrl || item.image || '/static/default_cover.png',
+        src: item.src || item.url || item.audioUrl || ''
+      }))
+    }
+    
+    console.log('[Player] 处理后的数据:', processedData)
+    randomAudios.value = processedData
+    console.log('[Player] randomAudios.value:', randomAudios.value)
+  } catch (e) {
+    console.error('加载随机推荐音频失败:', e)
+    uni.showToast({
+      title: '加载推荐失败',
+      icon: 'none'
+    })
+  }
+}// 显示的播放列表（根据智能推荐开关决定显示原始列表还是随机推荐列表）
+const displayedPlaylist = computed(() => {
+  if (smartRecommend.value && randomAudios.value.length > 0) {
+    return randomAudios.value
+  }
+  return store.playlist
+})
 async function toggleFav(){ 
   if(!track.value) return; 
   
@@ -1932,4 +2015,19 @@ function openCozeChat(){
   .small-btn{ width:30px; height:30px }
 }
 
+/* 随便听听开关 - 位于右上角的小开关 */
+.smart-recommend-toggle {
+  position: absolute;
+  right: 50px; /* 在关闭按钮左侧 */
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.smart-switch.small {
+  transform: scale(0.7);
+  min-width: 40px;
+} 
 </style>

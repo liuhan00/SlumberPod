@@ -1518,3 +1518,44 @@ export async function incrementPlay(audioId){
     }
   })
 }
+
+// 获取随机推荐音频
+export async function getRandomAudios({ limit = 10 } = {}){
+  const url = BASE + '/api/audios/random' + (limit ? `?limit=${encodeURIComponent(String(limit))}` : '')
+  console.log('[api/audios] getRandomAudios', url)
+
+  // 如果 fetch 可用则使用 fetch，否则使用 uni.request
+  if (typeof fetch === 'function'){
+    const res = await fetch(url, { method: 'GET', headers: buildHeaders() })
+    let j = null
+    try{ j = await res.json() }catch(e){ console.warn('[api/audios] getRandomAudios parse json failed', e) }
+    if(!res.ok) throw new Error((j && (j.message || j.error)) || '获取随机音频失败')
+    console.log('[api/audios] getRandomAudios response', j)
+    return j
+  }
+
+  // fallback to uni.request for WeChat mini program environment
+  return new Promise((resolve, reject) => {
+    try{
+      uni.request({
+        url,
+        method: 'GET',
+        header: buildHeaders(),
+        success(res){
+          console.log('[api/audios] getRandomAudios uni.request success', res)
+          if(res && res.statusCode && (res.statusCode < 200 || res.statusCode >= 300)){
+            return reject(new Error('getRandomAudios request failed: ' + res.statusCode))
+          }
+          resolve(res.data)
+        },
+        fail(err){
+          console.warn('[api/audios] getRandomAudios uni.request fail', err)
+          reject(err)
+        }
+      })
+    }catch(e){
+      console.warn('[api/audios] getRandomAudios uni.request throw', e)
+      reject(e)
+    }
+  })
+}

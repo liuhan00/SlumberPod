@@ -7,6 +7,7 @@ import { getPlaceholder } from '@/utils/image'
 // 导入上传头像的API
 import { uploadAvatar } from '@/api/users'
 import { logout } from '@/api/auth'
+import { setAuthLocal } from '@/store/auth'
 
 let bgStyle = {}
 try{
@@ -70,77 +71,47 @@ function changeAvatar(){
       const tempFilePath = res.tempFilePaths[0]
       console.log('[Profile Account] Image selected:', tempFilePath)
       try {
-        // 显示上传进度
-        uni.showLoading({
-          title: '上传中...'
-        })
-        
         // 调用上传接口
         console.log('[Profile Account] Calling uploadAvatar API')
         const result = await uploadAvatar(tempFilePath)
         console.log('[Profile Account] Upload result:', result)
         
-        // 隐藏加载提示
-        uni.hideLoading()
+        // 从响应中提取头像URL
+        const avatarUrl = result.data?.avatar_url || result.avatar_url || result.url || result.data?.url || tempFilePath
         
         // 更新用户头像
-        user.value.avatar = result.url || result.data?.url || tempFilePath
+        user.value.avatar = avatarUrl
+        
+        // 更新全局用户状态
+        if (userStore) {
+          userStore.updateAvatar(avatarUrl)
+        }
+        
+        // 更新本地存储的认证信息
+        const auth = uni.getStorageSync('auth')
+        if (auth) {
+          // 更新认证对象中的用户信息
+          if (auth.user) {
+            auth.user.avatar = avatarUrl
+          } else if (auth.user_metadata) {
+            auth.user_metadata.avatar = avatarUrl
+          }
+          // 保存更新后的认证信息
+          setAuthLocal(auth)
+        }
+        
         uni.showToast({ title: '头像上传成功' })
       } catch (err) {
-        // 隐藏加载提示
-        uni.hideLoading()
-        
         console.error('[Profile Account] 上传头像失败:', err)
-        // 根据错误类型提供不同的提示
-        let errorMsg = err.message || '未知错误'
-        
-        // 如果是认证相关的错误，建议用户重新登录
-        if (errorMsg.includes('认证失败') || errorMsg.includes('未登录')) {
-          uni.showModal({
-            title: '上传失败',
-            content: errorMsg + '，请重新登录后再试',
-            showCancel: true,
-            confirmText: '去登录',
-            cancelText: '稍后再说',
-            success: (modalRes) => {
-              if (modalRes.confirm) {
-                // 跳转到登录页面
-                uni.navigateTo({
-                  url: '/pages/auth/Login'
-                })
-              }
-            }
-          })
-        } 
-        // 如果是权限相关的错误，提示联系管理员
-        else if (errorMsg.includes('权限不足')) {
-          uni.showModal({
-            title: '上传失败',
-            content: errorMsg + '，请联系管理员处理',
-            showCancel: false,
-            confirmText: '我知道了'
-          })
-        }
-        // 其他错误直接显示
-        else {
-          uni.showToast({ 
-            title: '上传失败: ' + errorMsg, 
-            icon: 'none',
-            duration: 3000
-          })
-        }
-      }
-    },
-    fail: (err) => {
-      console.log('[Profile Account] Choose image failed:', err)
-      // 用户取消选择图片时不显示错误提示
-      if (err.errMsg && !err.errMsg.includes('cancel')) {
         uni.showToast({ 
-          title: '选择图片失败', 
+          title: '上传失败: ' + (err.message || '未知错误'), 
           icon: 'none',
-          duration: 2000
+          duration: 3000
         })
       }
+    },
+    fail: () => {
+      uni.showToast({ title: '取消上传', icon: 'none' })
     }
   })
 }

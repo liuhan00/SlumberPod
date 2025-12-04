@@ -152,6 +152,21 @@ export function validateJwtToken(token) {
   }
 }
 
+// 设置认证信息到本地存储
+export function setAuthLocal(authData) {
+  try {
+    // #ifdef MP-WEIXIN
+    uni.setStorageSync(AUTH_KEY, authData)
+    // #endif
+
+    // #ifndef MP-WEIXIN
+    localStorage.setItem(AUTH_KEY, JSON.stringify(authData))
+    // #endif
+  } catch (e) {
+    console.error('[Auth] setAuthLocal error:', e)
+  }
+}
+
 // utilities to integrate with Supabase client elsewhere
 export function applySession(session){
   try{

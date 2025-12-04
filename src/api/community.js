@@ -191,6 +191,69 @@ export async function createComment({ postId, content }, token){
   }
 }
 
+// 删除评论：/api/community/comments/:commentId
+export async function deleteComment({ commentId }, token){
+  if(!commentId && commentId !== 0) throw new Error('missing commentId')
+  const url = BASE + '/api/community/comments/' + encodeURIComponent(commentId)
+  try{
+    if (typeof fetch === 'function'){
+      const res = await fetch(url, { method:'DELETE', headers: buildHeaders(token) })
+      let j = null
+      try{ j = await res.json() }catch(e){ j = res }
+      if(!res.ok) throw new Error(j?.message || j?.error || 'delete comment failed')
+      return j
+    }
+    return await new Promise((resolve, reject)=>{
+      try{
+        uni.request({ url, method:'DELETE', header: buildHeaders(token), success(r){ resolve(r.data) }, fail(err){ reject(err) } })
+      }catch(e){ reject(e) }
+    })
+  }catch(e){ throw e }
+}
+
+// 点赞/取消点赞评论：/api/community/comments/:commentId/like
+export async function likeComment({ commentId }, token){
+  if(!commentId && commentId !== 0) throw new Error('missing commentId')
+  const url = BASE + '/api/community/comments/' + encodeURIComponent(commentId) + '/like'
+  try{
+    if (typeof fetch === 'function'){
+      const res = await fetch(url, { method:'POST', headers: buildHeaders(token) })
+      let j = null
+      try{ j = await res.json() }catch(e){ j = res }
+      if(!res.ok) throw new Error(j?.message || j?.error || 'like comment failed')
+      return j
+    }
+    return await new Promise((resolve, reject)=>{
+      try{
+        uni.request({ 
+          url, 
+          method:'POST', 
+          header: buildHeaders(token), 
+          success(r){ 
+            // 检查HTTP状态码
+            if(r.statusCode >= 200 && r.statusCode < 300){
+              resolve(r.data)
+            } else {
+              // 解析错误信息
+              let errorMsg = 'like comment failed'
+              try {
+                const errorData = typeof r.data === 'string' ? JSON.parse(r.data) : r.data
+                errorMsg = errorData?.message || errorData?.error || `like comment failed with status ${r.statusCode}`
+              } catch(e) {
+                errorMsg = r.data?.message || r.data?.error || `like comment failed with status ${r.statusCode}`
+              }
+              reject(new Error(errorMsg))
+            }
+          }, 
+          fail(err){ reject(err) } 
+        })
+      }catch(e){ reject(e) }
+    })
+  }catch(e){ 
+    throw e 
+  }
+}
+
 // 点赞帖子：/api/community/:postId/like
 export async function likePost({ postId }, token){
   if(!postId && postId !== 0) throw new Error('missing postId')
@@ -222,6 +285,26 @@ export async function getUserPosts(token){
       let j = null
       try{ j = await res.json() }catch(e){ j = res }
       if(!res.ok) throw new Error(j?.message || j?.error || 'fetch user posts failed')
+      return j
+    }
+    return await new Promise((resolve, reject)=>{
+      try{
+        uni.request({ url, method:'GET', header: buildHeaders(token), success(r){ resolve(r.data) }, fail(err){ reject(err) } })
+      }catch(e){ reject(e) }
+    })
+  }catch(e){ throw e }
+}
+
+// 获取用户发布的评论：/api/community/user/comments
+export async function getUserComments(token){
+  // 需要根据后端实际接口进行调整
+  const url = BASE + '/api/community/user/comments'
+  try{
+    if (typeof fetch === 'function'){
+      const res = await fetch(url, { method:'GET', headers: buildHeaders(token) })
+      let j = null
+      try{ j = await res.json() }catch(e){ j = res }
+      if(!res.ok) throw new Error(j?.message || j?.error || 'fetch user comments failed')
       return j
     }
     return await new Promise((resolve, reject)=>{

@@ -75,36 +75,3 @@ export async function getPosts({ page = 1, limit = 10 } = {}){
   })
 }
 
-// 获取热门帖子列表：/api/hot
-export async function getHot(){
-  const url = BASE + '/api/hot'
-  const headers = buildHeaders()
-  
-  // 兼容小程序环境：优先使用 fetch，否则使用 uni.request
-  if (typeof fetch === 'function'){
-    const res = await fetch(url, { method:'GET', headers })
-    let j = null
-    try{ j = await res.json() }catch(e){ j = res }
-    if(!res.ok) throw new Error(j?.message || j?.error || 'fetch hot posts failed')
-    return j
-  }
-  
-  // fallback to uni.request for WeChat mini program environment
-  return new Promise((resolve, reject) => {
-    uni.request({
-      url,
-      method: 'GET',
-      header: headers,
-      success(res){
-        if(res && res.statusCode && (res.statusCode < 200 || res.statusCode >= 300)){
-          const errorMsg = res.data?.message || res.data?.error || 'fetch hot posts failed'
-          return reject(new Error(errorMsg))
-        }
-        resolve(res.data)
-      },
-      fail(err){
-        reject(err)
-      }
-    })
-  })
-}

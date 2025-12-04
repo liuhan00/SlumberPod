@@ -11,27 +11,6 @@ const AVATAR_PLACEHOLDER = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZW
 const COVER_PLACEHOLDER = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAwIiBoZWlnaHQ9IjQwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iODAwIiBoZWlnaHQ9IjQwMCIgZmlsbD0iI2Y1ZjVmNSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LXNpemU9IjI0IiBmaWxsPSIjOTk5IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+5Zu+54mH5Zyo5pyJ6ZKxPC90ZXh0Pjwvc3ZnPg=='
 
 /**
- * 严格的图片URL有效性检查
- * @param {string} url - 图片 URL
- * @returns {string|null} 有效的图片URL或null
- */
-export function isValidImageUrl(url) {
-  // 检查图片URL是否有效
-  if (url && typeof url === 'string' && url.trim()) {
-    // 过滤掉明显的无效URL
-    const trimmedUrl = url.trim()
-    if (trimmedUrl.length > 0 && 
-        !trimmedUrl.includes('example.com') && 
-        !trimmedUrl.includes('undefined') && 
-        !trimmedUrl.includes('null') &&
-        (trimmedUrl.startsWith('http://') || trimmedUrl.startsWith('https://'))) {
-      return trimmedUrl
-    }
-  }
-  return null // 返回null表示没有有效图片
-}
-
-/**
  * 获取默认占位图
  * @param {string} type - 占位图类型: 'avatar' | 'cover' | 'default'
  * @returns {string} 占位图 URL
@@ -54,9 +33,7 @@ export function getPlaceholder(type = 'default') {
  * @returns {string} 处理后的图片 URL
  */
 export function safeImageUrl(url, type = 'default') {
-  // 使用严格的URL验证
-  const validUrl = isValidImageUrl(url)
-  if (!validUrl) {
+  if (!url || typeof url !== 'string' || url.trim() === '') {
     return getPlaceholder(type)
   }
   
@@ -68,7 +45,7 @@ export function safeImageUrl(url, type = 'default') {
     return url
   }
   
-  return validUrl
+  return url
 }
 
 /**
@@ -87,3 +64,29 @@ export function createImageErrorHandler(type = 'default') {
     }
   }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

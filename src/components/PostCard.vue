@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { getPlaceholder, isValidImageUrl } from '@/utils/image'
+import { getPlaceholder } from '@/utils/image'
 
 const props = defineProps({
   post: {
@@ -13,9 +13,14 @@ const emit = defineEmits(['like', 'comment', 'share'])
 
 const avatarSrc = ref(props.post.author?.avatar || getPlaceholder('avatar'))
 
-// 使用utils中的严格图片URL验证函数
+// 只有在图片URL有效时才设置图片源
 const imageSrc = computed(() => {
-  return isValidImageUrl(props.post.image)
+  const imgUrl = props.post.image
+  // 检查图片URL是否有效（非空且不是默认的占位符URL）
+  if (imgUrl && imgUrl.trim() && !imgUrl.includes('example.com')) {
+    return imgUrl
+  }
+  return null // 返回null表示没有有效图片
 })
 
 function handleLike() {
@@ -276,8 +281,6 @@ function handleImageError(e) {
 /* 内容区域 */
 .content-area {
   margin-bottom: 16px;
-  word-wrap: break-word;
-  overflow-wrap: break-word;
 }
 
 .title {
@@ -286,8 +289,6 @@ function handleImageError(e) {
   font-weight: 700;
   color: var(--text-contrast, var(--fg));
   margin-bottom: 8px;
-  word-wrap: break-word;
-  overflow-wrap: break-word;
 }
 
 .content {
@@ -296,10 +297,7 @@ function handleImageError(e) {
   line-height: 1.5;
   color: var(--text-contrast, var(--fg));
   margin-bottom: 12px;
-  /* 移除 white-space: pre-wrap，改用正常的换行处理 */
-  word-wrap: break-word;
-  overflow-wrap: break-word;
-  white-space: normal;
+  white-space: pre-wrap;
 }
 
 .cover {
