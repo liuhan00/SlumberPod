@@ -29,6 +29,7 @@
     { "path": "pages/profile/pages/account/index", "style": { "navigationBarTitleText": "账号资料" } },
     { "path": "pages/profile/pages/history/index", "style": { "navigationBarTitleText": "历史" } },
     { "path": "pages/profile/pages/comments/index", "style": { "navigationBarTitleText": "我的评论" } },
+    { "path": "pages/profile/pages/study/index", "style": { "navigationBarTitleText": "我的学习" } },
     { "path": "pages/profile/pages/help/index", "style": { "navigationBarTitleText": "帮助与客服" } },
     { "path": "pages/profile/pages/about/index", "style": { "navigationBarTitleText": "关于 星眠坞" } },
     { "path": "pages/player/index", "style": { "navigationBarTitleText": "播放" } },

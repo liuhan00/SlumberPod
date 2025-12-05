@@ -2,7 +2,7 @@
   <view class="container">
     <view class="close" @click="goBack">✕</view>
     <view class="audio-card">
-      <image class="cover" :src="audio.cover || 'static/default_cover.png'" @error="onCoverError" mode="aspectFill" />
+      <image class="cover" :src="audio.cover || ''" @error="onCoverError" mode="aspectFill" />
       <view class="meta">
         <text class="title">{{audio.title}}</text>
         <text class="subtitle">{{audio.subtitle}}</text>

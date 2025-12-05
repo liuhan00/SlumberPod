@@ -30,12 +30,13 @@
         <text class="section-title">热门搜索</text>
         <view class="hot-tags">
           <view 
-            v-for="tag in hotTags" 
-            :key="tag" 
+            v-for="(tag, index) in hotTags" 
+            :key="typeof tag === 'object' ? tag.keyword : index" 
             class="tag"
-            @click="searchByTag(tag)"
+            @click="searchByHotTag(tag)"
           >
-            <text class="tag-text">{{ tag }}</text>
+            <text class="tag-text">{{ getHotTagKeyword(tag) }}</text>
+            <text v-if="getHotTagCount(tag)" class="tag-count">{{ getHotTagCount(tag) }}</text>
           </view>
         </view>
       </view>
@@ -50,13 +51,19 @@
         </view>
         <view class="history-list">
           <view 
-            v-for="item in searchHistory" 
-            :key="item" 
+            v-for="(item, index) in searchHistory" 
+            :key="typeof item === 'object' ? item.id : index" 
             class="history-item"
-            @click="searchByTag(item)"
+            @click="searchByHistoryItem(item)"
           >
             <text class="history-icon">🕒</text>
-            <text class="history-text">{{ item }}</text>
+            <view class="history-content">
+              <text class="history-text">{{ getHistoryDisplayInfo(item).keyword }}</text>
+              <view class="history-meta">
+                <text v-if="getHistoryDisplayInfo(item).targetType" class="history-type">{{ getHistoryDisplayInfo(item).targetType }}</text>
+                <text v-if="getHistoryDisplayInfo(item).createdAt" class="history-time">{{ getHistoryDisplayInfo(item).createdAt }}</text>
+              </view>
+            </view>
             <view class="delete-btn" @click.stop="deleteHistoryItem(item)">
               <text class="delete-icon">×</text>
             </view>
@@ -141,7 +148,12 @@ onMounted(async () => {
   try {
     // 获取热门搜索
     const hotRes = await apiSearch.getHotSearch()
-    hotTags.value = Array.isArray(hotRes) ? hotRes : (hotRes.data || hotRes.items || ['海浪', '雨声', '自然声', '睡眠'])
+    hotTags.value = Array.isArray(hotRes) ? hotRes : (hotRes.data || hotRes.items || [])
+    
+    // 如果没有获取到热门搜索数据，使用默认值
+    if (hotTags.value.length === 0) {
+      hotTags.value = ['海浪', '雨声', '自然声', '睡眠']
+    }
     
     // 获取搜索历史
     const historyRes = await apiSearch.getSearchHistory()
@@ -286,6 +298,121 @@ async function searchByTag(tag) {
   doSearch(true)
 }
 
+// 通过热门标签搜索
+function searchByHotTag(tag) {
+  let query = '';
+  if (typeof tag === 'string') {
+    query = tag;
+  } else if (typeof tag === 'object') {
+    query = tag.keyword || tag.query || tag.content || tag.name || '';
+  }
+  
+  if (query) {
+    searchText.value = query;
+    addToHistory(query);
+    doSearch(true);
+  }
+}
+
+// 获取热门标签的关键词
+function getHotTagKeyword(tag) {
+  if (typeof tag === 'string') {
+    return tag;
+  } else if (typeof tag === 'object') {
+    return tag.keyword || tag.query || tag.content || tag.name || '';
+  }
+  return '';
+}
+
+// 获取热门标签的搜索次数
+function getHotTagCount(tag) {
+  if (typeof tag === 'object' && tag.search_count) {
+    return tag.search_count;
+  }
+  return '';
+}
+
+// 通过历史记录项搜索
+function searchByHistoryItem(item) {
+  let query = '';
+  if (typeof item === 'string') {
+    query = item;
+  } else if (typeof item === 'object') {
+    query = item.keyword || item.query || item.content || item.name || '';
+  }
+  
+  if (query) {
+    searchText.value = query;
+    addToHistory(query);
+    doSearch(true);
+  }
+}
+
+// 获取历史记录中的关键词
+function getHistoryKeyword(item) {
+  if (typeof item === 'string') {
+    return item;
+  } else if (typeof item === 'object') {
+    return item.keyword || item.query || item.content || item.name || '';
+  }
+  return '';
+}
+
+// 获取历史记录中的目标类型
+function getHistoryTargetType(item) {
+  if (typeof item === 'object' && item.target_type) {
+    const typeMap = {
+      'post': '帖子',
+      'audio': '音频',
+      'user': '用户'
+    };
+    return typeMap[item.target_type] || item.target_type;
+  }
+  return '';
+}
+
+// 获取历史记录的详细信息用于显示
+function getHistoryDisplayInfo(item) {
+  if (typeof item === 'string') {
+    return {
+      keyword: item,
+      targetType: '',
+      createdAt: ''
+    };
+  } else if (typeof item === 'object') {
+    const typeMap = {
+      'post': '帖子',
+      'audio': '音频',
+      'user': '用户'
+    };
+    
+    // 格式化创建时间
+    let createdAt = '';
+    if (item.created_at || item.createdAt) {
+      const dateStr = item.created_at || item.createdAt;
+      const date = new Date(dateStr);
+      if (!isNaN(date.getTime())) {
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        createdAt = `${month}-${day} ${hours}:${minutes}`;
+      }
+    }
+    
+    return {
+      keyword: item.keyword || item.query || item.content || item.name || '',
+      targetType: item.target_type ? (typeMap[item.target_type] || item.target_type) : '',
+      createdAt: createdAt
+    };
+  }
+  return {
+    keyword: '',
+    targetType: '',
+    createdAt: ''
+  };
+}
+
 // 添加到搜索历史
 async function addToHistory(query) {
   if (!query.trim()) return
@@ -299,20 +426,52 @@ async function addToHistory(query) {
   
   // 更新本地搜索历史
   // 移除重复项
-  searchHistory.value = searchHistory.value.filter(item => item !== query)
+  searchHistory.value = searchHistory.value.filter(item => {
+    if (typeof item === 'string') {
+      return item !== query;
+    } else if (typeof item === 'object') {
+      return (item.keyword || item.query || item.content || item.name || '') !== query;
+    }
+    return true;
+  });
   
-  // 添加到开头
-  searchHistory.value.unshift(query)
+  // 添加到开头（作为字符串添加，保持简洁）
+  searchHistory.value.unshift(query);
   
   // 限制历史记录数量
   if (searchHistory.value.length > 10) {
-    searchHistory.value = searchHistory.value.slice(0, 10)
+    searchHistory.value = searchHistory.value.slice(0, 10);
   }
 }
 
 // 删除单个历史记录
-function deleteHistoryItem(item) {
-  searchHistory.value = searchHistory.value.filter(history => history !== item)
+async function deleteHistoryItem(item) {
+  try {
+    // 如果搜索历史记录是对象且包含ID，则调用API删除
+    if (typeof item === 'object' && item.id) {
+      await apiSearch.deleteSearchHistoryRecord(item.id);
+    }
+    
+    // 更新本地搜索历史
+    if (typeof item === 'object' && item.id) {
+      searchHistory.value = searchHistory.value.filter(history => 
+        !(typeof history === 'object' && history.id === item.id)
+      );
+    } else {
+      const query = typeof item === 'string' ? item : (item.keyword || item.query || item.content || item.name || '');
+      searchHistory.value = searchHistory.value.filter(history => {
+        if (typeof history === 'string') {
+          return history !== query;
+        } else if (typeof history === 'object') {
+          return (history.keyword || history.query || history.content || history.name || '') !== query;
+        }
+        return true;
+      });
+    }
+  } catch (e) {
+    console.error('[search] delete history item failed', e);
+    uni.showToast({ title: '删除失败', icon: 'none' });
+  }
 }
 
 // 清空历史记录
@@ -525,6 +684,9 @@ function goToCommunity(){
   border-radius: 16px;
   cursor: pointer;
   transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .tag:active {
@@ -539,6 +701,14 @@ function goToCommunity(){
 .tag-text {
   font-size: 14px;
   color: var(--fg, #333);
+}
+
+.tag-count {
+  font-size: 12px;
+  color: var(--muted, #999);
+  background: var(--card-bg, #ffffff);
+  padding: 2px 6px;
+  border-radius: 10px;
 }
 
 /* 搜索历史 */
@@ -567,10 +737,35 @@ function goToCommunity(){
   color: var(--muted, #999);
 }
 
-.history-text {
+.history-content {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.history-text {
   font-size: 14px;
   color: var(--fg, #333);
+}
+
+.history-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.history-type {
+  font-size: 12px;
+  color: var(--uni-color-primary, #007aff);
+  background: var(--input-bg, #f8f9fa);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.history-time {
+  font-size: 12px;
+  color: var(--muted, #999);
 }
 
 .delete-btn {

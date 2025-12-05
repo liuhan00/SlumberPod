@@ -127,3 +127,24 @@ export async function clearSearchHistory(){
     }catch(e){ reject(e) }
   })
 }
+
+// 删除单条搜索历史记录: DELETE /api/community/search/history/:recordId
+export async function deleteSearchHistoryRecord(recordId){
+  if(!recordId) throw new Error('missing recordId')
+  const url = BASE + '/api/community/search/history/' + encodeURIComponent(recordId)
+  console.log('[search] DELETE search history record', url)
+
+  if (typeof fetch === 'function'){
+    const res = await fetch(url, { method:'DELETE', headers: buildHeaders() })
+    let j = null
+    try{ j = await res.json() }catch(e){ j = null }
+    if(!res.ok) throw new Error(j?.message || j?.error || 'delete search history record failed')
+    return j ?? {}
+  }
+
+  return await new Promise((resolve, reject)=>{
+    try{
+      uni.request({ url, method:'DELETE', header: buildHeaders(), success(r){ resolve(r.data) }, fail(err){ reject(err) } })
+    }catch(e){ reject(e) }
+  })
+}

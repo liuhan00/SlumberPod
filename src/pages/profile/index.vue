@@ -85,27 +85,32 @@ function openRegister(){ try{ uni.navigateTo({ url:'/pages/auth/Register' }) }ca
 const settings = [
   { key:'favorites', label:'我喜欢的' },
   { key:'history', label:'播放历史' },
+  { key:'study', label:'我的学习' },
   { key:'community', label:'社区动态' },
   { key:'account', label:'账号资料' },
   { key:'help', label:'帮助与客服' },
   { key:'about', label:'关于 星眠坞' },
 ]
+
 function go(url){
   if(typeof location !== 'undefined') location.hash = `#/${url}`
   try { uni.navigateTo({ url }) }
   catch(e){ try { uni.navigateTo({ url: url.startsWith('/')? url.replace('/','') : `/${url}` }) } catch(err){} }
 }
+
 function onSetting(key){
   console.log('[profile] onSetting:', key)
-  if(key==='favorites') go('../../favorites/index')
+  if(key==='favorites') go('/pages/favorites/index')
   else if(key==='history') { showHistory.value = true; loadHistory() }
-  else if(key==='community') go('./pages/creations/index') // 导航到社区动态页面
-  else if(key==='account') go('pages/account/index')
-  else if(key==='help') go('../../help/index')
-  else if(key==='about') go('../../about/index')
-  else if(key==='queue') go('../../queue/index')
+  else if(key==='study') go('/pages/profile/pages/study/index')
+  else if(key==='community') go('/pages/profile/pages/creations/index') // 导航到社区动态页面
+  else if(key==='account') go('/pages/profile/pages/account/index')
+  else if(key==='help') go('/pages/help/index')
+  else if(key==='about') go('/pages/about/index')
+  else if(key==='queue') go('/pages/queue/index')
   else if(key==='nickname') uni.showToast({ title:'请在后续版本中支持修改昵称', icon:'none' })
 }
+
 function closeHistory(){ showHistory.value = false; list.value = [] }
 </script>
 

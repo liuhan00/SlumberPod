@@ -810,8 +810,8 @@ async function uploadCoverImage() {
       })
       
       try {
-        // 使用新的专门用于上传音频图标的函数
-        const uploadResult = await apiAudios.uploadFile(tempFilePath)
+        // 使用新的图标上传接口
+        const uploadResult = await apiAudios.uploadIcon(tempFilePath)
         
         // 获取上传后的URL
         const coverUrl = uploadResult?.url || uploadResult?.data?.url || ''

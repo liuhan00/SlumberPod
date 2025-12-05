@@ -396,6 +396,13 @@ export async function createAudioByUrl({ title, description, audioUrl, coverUrl 
               errorMsg = `请求参数错误 (400): ${errorMsg}。请检查：1) 字段名是否正确 2) 字段类型是否匹配 3) 必填字段是否完整`
             } else if(r.statusCode === 401) {
               errorMsg = '认证失败，请重新登录'
+            } else if(r.statusCode === 500) {
+              // 特别处理500错误，提供更多有用信息
+              if(errorMsg && errorMsg.includes('uploadService.uploadAudioToSupabase is not a function')) {
+                errorMsg = '服务器内部错误 (500)：上传服务暂时不可用，请联系管理员或稍后重试。';
+              } else {
+                errorMsg = `服务器内部错误 (500)：${errorMsg || '未知错误'}`;
+              }
             }
             console.error('[api/audios] createAudioByUrl 失败:', errorMsg, r.data)
             reject(new Error(errorMsg))
@@ -678,7 +685,12 @@ export async function uploadAudioToStorage({ file, title, description = '', cove
                   if(uploadRes.statusCode === 401 || String(errorMsg).includes('未授权') || String(errorMsg).includes('token')) {
                     errorMsg = '认证失败，请重新登录'
                   } else if(uploadRes.statusCode === 500) {
-                    errorMsg = `服务器内部错误 (500)。请检查：1) 文件格式是否正确 2) 文件大小是否超限 3) 服务器日志。响应: ${JSON.stringify(uploadData)}`
+                    // 特别处理500错误，提供更多有用信息
+                    if(String(errorMsg).includes('uploadService.uploadAudioToSupabase is not a function')) {
+                      errorMsg = '服务器内部错误 (500)：上传服务暂时不可用，请联系管理员或稍后重试。'
+                    } else {
+                      errorMsg = `服务器内部错误 (500)。请检查：1) 文件格式是否正确 2) 文件大小是否超限 3) 服务器日志。响应: ${JSON.stringify(uploadData)}`
+                    }
                   }
                   reject(new Error(errorMsg))
                 }
@@ -755,6 +767,10 @@ export async function uploadAudioToStorage({ file, title, description = '', cove
     
     if(!uploadRes.ok) {
       const errorMsg = uploadData?.message || uploadData?.error || `上传失败: HTTP ${uploadRes.status}`
+      // 特别处理500错误，提供更多有用信息
+      if(uploadRes.status === 500 && errorMsg && errorMsg.includes('uploadService.uploadAudioToSupabase is not a function')) {
+        throw new Error('服务器内部错误 (500)：上传服务暂时不可用，请联系管理员或稍后重试。');
+      }
       throw new Error(errorMsg)
     }
     
@@ -1244,57 +1260,37 @@ export async function uploadAudioCover(audioId, file) {
             console.log('[api/audios] uploadAudioCover 响应状态码:', uploadRes.statusCode)
             console.log('[api/audios] uploadAudioCover 响应数据:', uploadRes.data)
             
+            // 尝试解析响应数据
+            let uploadData = null
             try {
-              let uploadData = uploadRes.data
-              if (typeof uploadData === 'string') {
-                try {
-                  uploadData = JSON.parse(uploadData)
-                } catch (parseErr) {
-                  console.warn('[api/audios] uploadAudioCover 解析响应失败', parseErr, '原始数据:', uploadData)
-                  // 如果解析失败但状态码是 2xx，尝试直接使用原始数据
-                  if (uploadRes.statusCode >= 200 && uploadRes.statusCode < 300) {
-                    uploadData = { raw: uploadRes.data }
-                  } else {
-                    // 尝试提取错误信息
-                    let errorMsg = '上传失败'
-                    try {
-                      const errorObj = JSON.parse(uploadData)
-                      errorMsg = errorObj?.message || errorObj?.error || errorMsg
-                    } catch (_) {
-                      if (uploadData && typeof uploadData === 'string') {
-                        errorMsg = uploadData
-                      }
-                    }
-                    return reject(new Error(`上传失败 (${uploadRes.statusCode}): ${errorMsg}`))
-                  }
+              uploadData = JSON.parse(uploadRes.data)
+            } catch (parseErr) {
+              console.warn('[api/audios] uploadAudioCover 解析响应失败', parseErr, '原始数据:', uploadRes.data)
+              // 如果解析失败但状态码是成功的，创建一个包含原始数据的对象
+              if(uploadRes.statusCode >= 200 && uploadRes.statusCode < 300){
+                uploadData = { raw: uploadRes.data }
+              }
+            }
+            
+            if(uploadRes.statusCode >= 200 && uploadRes.statusCode < 300) {
+              resolve(uploadData)
+            } else {
+              // 尝试提取错误信息
+              let errorMsg = '上传失败'
+              try {
+                const errorObj = JSON.parse(uploadData)
+                errorMsg = errorObj?.message || errorObj?.error || errorMsg
+              } catch (_) {
+                if(uploadData && typeof uploadData === 'string') {
+                  errorMsg = uploadData
                 }
               }
-              
-              if (uploadRes.statusCode >= 200 && uploadRes.statusCode < 300) {
-                resolve(uploadData)
-              } else {
-                let errorMsg = uploadData?.message || uploadData?.error || `上传失败 (HTTP ${uploadRes.statusCode})`
-                if (uploadRes.statusCode === 401 || String(errorMsg).includes('未授权') || String(errorMsg).includes('token')) {
-                  errorMsg = '认证失败，请重新登录'
-                } else if (uploadRes.statusCode === 500) {
-                  errorMsg = `服务器内部错误 (500)。请检查：1) 文件格式是否正确 2) 文件大小是否超限 3) 服务器日志。响应: ${JSON.stringify(uploadData)}`
-                }
-                reject(new Error(errorMsg))
-              }
-            } catch (e) {
-              console.error('[api/audios] uploadAudioCover 处理响应失败', e)
-              reject(new Error('处理上传响应失败: ' + e.message))
+              return reject(new Error(`上传失败 (${uploadRes.statusCode}): ${errorMsg}`))
             }
           },
           fail(err) {
-            console.error('[api/audios] uploadAudioCover 上传失败', err)
-            let errorMsg = err.errMsg || err.message || '上传失败'
-            if (String(errorMsg).includes('timeout') || String(errorMsg).includes('超时')) {
-              errorMsg = '上传超时，请检查网络连接或尝试较小的文件'
-            } else if (String(errorMsg).includes('fail') && String(errorMsg).includes('500')) {
-              errorMsg = '服务器内部错误 (500)，请稍后重试或联系管理员'
-            }
-            reject(new Error(errorMsg))
+            console.error('[api/audios] uploadAudioCover 网络请求失败', err)
+            reject(new Error(`网络请求失败: ${err.errMsg || err.message || JSON.stringify(err)}`))
           }
         })
       } catch (e) {
@@ -1304,44 +1300,236 @@ export async function uploadAudioCover(audioId, file) {
     })
   }
   
-  // Web 环境使用 FormData + fetch
-  const fd = new FormData()
-  fd.append('file', file)
-  
-  const headers = buildHeaders()
-  
+  // Web 环境使用 fetch 和 FormData
   try {
-    console.log('[api/audios] uploadAudioCover 上传到 /api/audios/:id/cover/upload (Web)')
-    const uploadRes = await fetch(url, {
+    const formData = new FormData()
+    formData.append('file', file)
+    
+    const res = await fetch(url, {
       method: 'POST',
-      headers,
-      body: fd
+      headers: buildHeaders(),
+      body: formData
     })
     
-    let uploadData = null
-    try {
-      uploadData = await uploadRes.json()
-    } catch (parseErr) {
-      if (uploadRes.ok) {
-        // 2xx 但无法解析 JSON，尝试作为文本处理
-        const text = await uploadRes.text()
-        uploadData = { raw: text }
-      } else {
-        throw new Error(`上传失败: HTTP ${uploadRes.status}`)
-      }
-    }
+    const result = await res.json()
     
-    if (!uploadRes.ok) {
-      const errorMsg = uploadData?.message || uploadData?.error || `上传失败: HTTP ${uploadRes.status}`
+    if (!res.ok) {
+      const errorMsg = result?.message || result?.error || `上传失败: ${res.status} ${res.statusText}`
       throw new Error(errorMsg)
     }
     
-    console.log('[api/audios] uploadAudioCover 上传成功 (Web)', uploadData)
-    return uploadData
-  } catch (err) {
-    console.error('[api/audios] uploadAudioCover 失败 (Web)', err)
-    throw err
+    return result
+  } catch (e) {
+    console.error('[api/audios] uploadAudioCover fetch 错误', e)
+    throw e
   }
+}
+
+// 通用图标上传接口 - 用于上传图标到 /api/icons/upload
+export async function uploadIcon(file) {
+  const url = BASE + '/api/icons/upload'
+  
+  // 检测是否为小程序环境
+  const isMiniProgram = typeof uni !== 'undefined' && uni.uploadFile
+  
+  if (isMiniProgram) {
+    // 小程序环境使用 uni.uploadFile
+    return new Promise((resolve, reject) => {
+      try {
+        const auth = getAuthLocal()
+        const token = auth?.token || auth?.access_token || null
+        
+        // 检查是否已登录
+        if (!token) {
+          return reject(new Error('未登录，无法上传图标'))
+        }
+        
+        // 获取文件路径
+        let filePath = file
+        if (typeof file === 'object') {
+          filePath = file.tempFilePath || file.path || file.uri || file.url || ''
+        }
+        
+        if (!filePath) {
+          return reject(new Error('文件路径为空，请重新选择文件'))
+        }
+        
+        console.log('[api/audios] uploadIcon 上传到 /api/icons/upload')
+        console.log('[api/audios] filePath:', filePath)
+        
+        // 构建请求头
+        const header = {
+          Authorization: `Bearer ${token}`
+        }
+        
+        // 尝试使用不同的字段名
+        const fieldNames = ['icon', 'file', 'image', 'cover']
+        
+        const tryUpload = (fieldName, fieldIndex) => {
+          uni.uploadFile({
+            url: url,
+            filePath: filePath,
+            name: fieldName,
+            header: header,
+            success(uploadRes) {
+              console.log(`[api/audios] uploadIcon 使用字段名 '${fieldName}' 响应状态码:`, uploadRes.statusCode)
+              console.log(`[api/audios] uploadIcon 使用字段名 '${fieldName}' 响应数据:`, uploadRes.data)
+              
+              try {
+                let uploadData = uploadRes.data
+                if (typeof uploadData === 'string') {
+                  try {
+                    uploadData = JSON.parse(uploadData)
+                  } catch (parseErr) {
+                    console.warn('[api/audios] uploadIcon 解析响应失败', parseErr, '原始数据:', uploadData)
+                    // 如果解析失败但状态码是 2xx，尝试直接使用原始数据
+                    if (uploadRes.statusCode >= 200 && uploadRes.statusCode < 300) {
+                      uploadData = { raw: uploadRes.data }
+                    } else {
+                      // 尝试提取错误信息
+                      let errorMsg = '上传失败'
+                      try {
+                        const errorObj = JSON.parse(uploadData)
+                        errorMsg = errorObj?.message || errorObj?.error || errorMsg
+                      } catch (_) {
+                        if (uploadData && typeof uploadData === 'string') {
+                          errorMsg = uploadData
+                        }
+                      }
+                      // 如果是字段名错误，尝试下一个字段名
+                      if (uploadRes.statusCode === 500 && String(errorMsg).includes('Unexpected field')) {
+                        if (fieldIndex < fieldNames.length - 1) {
+                          console.log(`[api/audios] 字段名 '${fieldName}' 不正确，尝试下一个字段名`)
+                          return tryUpload(fieldNames[fieldIndex + 1], fieldIndex + 1)
+                        }
+                      }
+                      return reject(new Error(`上传失败 (${uploadRes.statusCode}): ${errorMsg}`))
+                    }
+                  }
+                }
+                
+                if (uploadRes.statusCode >= 200 && uploadRes.statusCode < 300) {
+                  resolve(uploadData)
+                } else {
+                  let errorMsg = uploadData?.message || uploadData?.error || `上传失败 (HTTP ${uploadRes.statusCode})`
+                  // 特别处理认证失败的情况
+                  if (uploadRes.statusCode === 401) {
+                    errorMsg = '认证失败，请重新登录'
+                  }
+                  // 如果是字段名错误，尝试下一个字段名
+                  if (uploadRes.statusCode === 500 && String(errorMsg).includes('Unexpected field')) {
+                    if (fieldIndex < fieldNames.length - 1) {
+                      console.log(`[api/audios] 字段名 '${fieldName}' 不正确，尝试下一个字段名`)
+                      return tryUpload(fieldNames[fieldIndex + 1], fieldIndex + 1)
+                    }
+                  }
+                  reject(new Error(errorMsg))
+                }
+              } catch (e) {
+                console.error('[api/audios] uploadIcon 处理响应失败', e)
+                reject(new Error('处理上传响应失败: ' + e.message))
+              }
+            },
+            fail(err) {
+              console.error('[api/audios] uploadIcon 上传失败', err)
+              let errorMsg = err.errMsg || err.message || '上传失败'
+              if (String(errorMsg).includes('timeout') || String(errorMsg).includes('超时')) {
+                errorMsg = '上传超时，请检查网络连接或尝试较小的文件'
+              } else if (String(errorMsg).includes('fail') && String(errorMsg).includes('500')) {
+                errorMsg = '服务器内部错误 (500)，请稍后重试或联系管理员'
+              }
+              reject(new Error(errorMsg))
+            }
+          })
+        }
+        
+        // 开始尝试上传，先使用第一个字段名
+        tryUpload(fieldNames[0], 0)
+      } catch (e) {
+        console.error('[api/audios] uploadIcon 异常', e)
+        reject(e)
+      }
+    })
+  }
+  
+  // Web 环境使用 FormData + fetch
+  // 尝试不同的字段名
+  const fieldNames = ['icon', 'file', 'image', 'cover']
+  
+  for (const fieldName of fieldNames) {
+    const fd = new FormData()
+    fd.append(fieldName, file)
+    
+    // 检查是否已登录
+    const auth = getAuthLocal()
+    const token = auth?.token || auth?.access_token || null
+    
+    if (!token) {
+      throw new Error('未登录，无法上传图标')
+    }
+    
+    // 构建请求头
+    const headers = {
+      Authorization: `Bearer ${token}`
+    }
+    
+    try {
+      console.log(`[api/audios] uploadIcon 使用字段名 '${fieldName}' 上传到 /api/icons/upload (Web)`)
+      const uploadRes = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: fd
+      })
+      
+      let uploadData = null
+      try {
+        uploadData = await uploadRes.json()
+      } catch (parseErr) {
+        if (uploadRes.ok) {
+          // 2xx 但无法解析 JSON，尝试作为文本处理
+          const text = await uploadRes.text()
+          uploadData = { raw: text }
+        } else {
+          // 如果是字段名错误，尝试下一个字段名
+          if (uploadRes.status === 500) {
+            const text = await uploadRes.text()
+            if (text.includes('Unexpected field')) {
+              console.log(`[api/audios] 字段名 '${fieldName}' 不正确，尝试下一个字段名`)
+              continue
+            }
+          }
+          throw new Error(`上传失败: HTTP ${uploadRes.status}`)
+        }
+      }
+      
+      if (!uploadRes.ok) {
+        const errorMsg = uploadData?.message || uploadData?.error || `上传失败: HTTP ${uploadRes.status}`
+        // 特别处理认证失败的情况
+        if (uploadRes.status === 401) {
+          throw new Error('认证失败，请重新登录')
+        }
+        // 如果是字段名错误，尝试下一个字段名
+        if (uploadRes.status === 500 && String(errorMsg).includes('Unexpected field')) {
+          console.log(`[api/audios] 字段名 '${fieldName}' 不正确，尝试下一个字段名`)
+          continue
+        }
+        throw new Error(errorMsg)
+      }
+      
+      console.log('[api/audios] uploadIcon 上传成功 (Web)', uploadData)
+      return uploadData
+    } catch (err) {
+      console.error(`[api/audios] uploadIcon 使用字段名 '${fieldName}' 失败 (Web)`, err)
+      // 如果是最后一个字段名，抛出错误
+      if (fieldName === fieldNames[fieldNames.length - 1]) {
+        throw err
+      }
+      // 否则继续尝试下一个字段名
+    }
+  }
+  
+  // 如果所有字段名都尝试过了都没有成功，抛出错误
+  throw new Error('上传失败：所有可能的字段名都尝试过了')
 }
 
 // 获取当前用户的创作列表
