@@ -1,5 +1,5 @@
 import { getAuthLocal } from '@/store/auth'
-const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.135:3003'
+const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.162:3003'
 
 function buildHeaders(token){
   const headers = { 'Content-Type': 'application/json' }
@@ -31,6 +31,41 @@ export async function createPost({ userId, title='', content='', imageUrls = [] 
       success(res){
         if(res && res.statusCode && (res.statusCode < 200 || res.statusCode >= 300)){
           const errorMsg = res.data?.message || res.data?.error || 'create post failed'
+          return reject(new Error(errorMsg))
+        }
+        resolve(res.data)
+      },
+      fail(err){
+        reject(err)
+      }
+    })
+  })
+}
+
+// 获取最新帖子
+export async function getLatest({ limit = 20, offset = 0 } = {}){
+  const url = BASE + '/api/posts/latest' + 
+    '?limit=' + encodeURIComponent(String(limit)) + 
+    '&offset=' + encodeURIComponent(String(offset))
+  const headers = buildHeaders()
+  
+  // 兼容小程序环境：优先使用 fetch，否则使用 uni.request
+  if (typeof fetch === 'function'){
+    const res = await fetch(url, { method: 'GET', headers })
+    const j = await res.json()
+    if(!res.ok) throw new Error(j.message || j.error || 'fetch latest posts failed')
+    return j
+  }
+  
+  // fallback to uni.request for WeChat mini program environment
+  return new Promise((resolve, reject) => {
+    uni.request({
+      url,
+      method: 'GET',
+      header: headers,
+      success(res){
+        if(res && res.statusCode && (res.statusCode < 200 || res.statusCode >= 300)){
+          const errorMsg = res.data?.message || res.data?.error || 'fetch latest posts failed'
           return reject(new Error(errorMsg))
         }
         resolve(res.data)
@@ -74,4 +109,3 @@ export async function getPosts({ page = 1, limit = 10 } = {}){
     })
   })
 }
-

@@ -1,4 +1,4 @@
-const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.135:3003'
+const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.162:3003'
 
 // 简单 http helper compatible with uni.request
 async function http(path, { method = 'GET', body, headers = {} } = {}){

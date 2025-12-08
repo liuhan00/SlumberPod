@@ -201,7 +201,7 @@ function handleImageError(e) {
       <!-- 评论数 -->
       <view class="stat-item" @click="handleComment">
         <text class="icon">💬</text>
-        <text class="count">{{ post.comment_count || post.comments?.length || 0 }}</text>
+        <text class="count">{{ post.comment_count || 0 }}</text>
       </view>
       
       <!-- 分享 -->

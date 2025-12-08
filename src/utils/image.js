@@ -45,6 +45,15 @@ export function safeImageUrl(url, type = 'default') {
     return url
   }
   
+  // 对于音频图标，如果 URL 不是完整的 URL，则尝试构建完整 URL
+  if (type === 'noise' && !url.startsWith('http')) {
+    // 如果是相对路径，尝试补全基础 URL
+    const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.162:3003'
+    if (url.startsWith('/')) {
+      return BASE + url
+    }
+  }
+  
   return url
 }
 

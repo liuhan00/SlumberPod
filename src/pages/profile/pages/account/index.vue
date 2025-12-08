@@ -2,25 +2,74 @@
 import { useUserStore } from '@/stores/user'
 import { storeToRefs } from 'pinia'
 import { useGlobalTheme } from '@/composables/useGlobalTheme'
-import { ref } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import { getPlaceholder } from '@/utils/image'
 // 导入上传头像的API
 import { uploadAvatar } from '@/api/users'
 import { logout } from '@/api/auth'
 import { setAuthLocal } from '@/store/auth'
 
-let bgStyle = {}
-try{
-  const themeApi = useGlobalTheme()
-  bgStyle = themeApi?.bgStyle || {}
-  console.log('[useGlobalTheme] bgStyle:', bgStyle)
-}catch(e){ console.warn('useGlobalTheme failed', e); bgStyle = {} }
+// 初始化背景样式
+const bgStyle = ref({})
 
-let userStore, user
-try{
-  userStore = useUserStore()
-  ({ user } = storeToRefs(userStore))
-}catch(e){ console.warn('useUserStore failed', e); user = ref({}) }
+// 在组件挂载后初始化主题
+onMounted(() => {
+  try {
+    const themeApi = useGlobalTheme()
+    if (themeApi && themeApi.bgStyle && typeof themeApi.bgStyle === 'object') {
+      // 如果 bgStyle 是一个 ref，我们需要获取它的值
+      if (themeApi.bgStyle.value) {
+        bgStyle.value = { ...themeApi.bgStyle.value }
+      } else {
+        bgStyle.value = { ...themeApi.bgStyle }
+      }
+    }
+    console.log('[useGlobalTheme] bgStyle:', bgStyle.value)
+  } catch(e) { 
+    console.warn('useGlobalTheme failed', e)
+  }
+})
+
+const userStore = useUserStore()
+// 正确解构 store 中的属性
+const { userId, nickname, avatar, bio, gender, birthday, location, phone } = storeToRefs(userStore)
+
+// 创建本地用户引用，用于响应式更新
+const user = ref({
+  userId: '',
+  nickname: '眠友9177',
+  avatar: getPlaceholder('avatar'),
+  bio: '',
+  gender: '',
+  birthday: '',
+  location: '',
+  phone: '19800009177',
+  background: getPlaceholder('banner')
+})
+
+// 初始化用户数据
+onMounted(() => {
+  user.value.userId = userId.value || ''
+  user.value.nickname = nickname.value || '眠友9177'
+  user.value.avatar = avatar.value || getPlaceholder('avatar')
+  user.value.bio = bio.value || ''
+  user.value.gender = gender.value || ''
+  user.value.birthday = birthday.value || ''
+  user.value.location = location.value || ''
+  user.value.phone = phone.value || '19800009177'
+})
+
+// 监听store中用户数据的变化
+watch([userId, nickname, avatar, bio, gender, birthday, location, phone], ([newUserId, newNickname, newAvatar, newBio, newGender, newBirthday, newLocation, newPhone]) => {
+  user.value.userId = newUserId || user.value.userId
+  user.value.nickname = newNickname || user.value.nickname
+  user.value.avatar = newAvatar || user.value.avatar
+  user.value.bio = newBio || user.value.bio
+  user.value.gender = newGender || user.value.gender
+  user.value.birthday = newBirthday || user.value.birthday
+  user.value.location = newLocation || user.value.location
+  user.value.phone = newPhone || user.value.phone
+}, { deep: true })
 
 const birthdayValue = ref('1995-01-01')
 const birthdayPicker = ref(null)
@@ -41,20 +90,6 @@ function onBirthdayChange(e){
 function openBirthdayPicker(){
   try{ birthdayPicker.value?.$el?.open ? birthdayPicker.value.$el.open() : birthdayPicker.value && birthdayPicker.value.$el }catch(e){ }
   uni.showToast({ title:'使用顶部年份滚轮选择生日（平台特性）', icon:'none' })
-}
-
-if (!user.value || !user.value.userId) {
-  user.value = {
-    userId: '117820224',
-    nickname: '眠友9177',
-    avatar: getPlaceholder('avatar'),
-    bio: '',
-    gender: '',
-    birthday: '',
-    location: '',
-    phone: '19800009177',
-    background: getPlaceholder('banner')
-  }
 }
 
 function goBack(){
@@ -168,11 +203,6 @@ async function logoutHandler(){
     } 
   })
 }
-
-// 删除注销账号函数
-
-// picker refs for uni-app H5 compatibility
-const refs = { birthdayPicker }
 </script>
 
 <template>

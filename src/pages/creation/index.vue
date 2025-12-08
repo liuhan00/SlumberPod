@@ -426,6 +426,8 @@ async function createNoise() {
       errorMessage = '网络连接失败，请检查网络设置'
     } else if (e.message && e.message.includes('Failed to fetch')) {
       errorMessage = '服务器连接失败，请稍后重试'
+    } else if (e.message && e.message.includes('uploadService.uploadAudioToSupabase is not a function')) {
+      errorMessage = '服务器内部错误：上传服务暂时不可用，请联系管理员或稍后重试。'
     } else if (e.message) {
       errorMessage = e.message
     }

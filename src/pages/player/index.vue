@@ -148,7 +148,6 @@
               <image class="playlist-cover" :src="track.cover" mode="aspectFill" />
               <view class="playlist-info">
                 <text class="playlist-name">{{ track.name }}</text>
-                <text class="playlist-author">{{ track.author }}</text>
               </view>
               <view class="playlist-actions">
                 <button class="playlist-action-btn" @click.stop="removeFromPlaylist(track.id)">×</button>
@@ -886,7 +885,7 @@ function setCustomTimer() {
 
 async function openMetaPopup(id){
   showMeta.value = true; metaLoading.value = true; metaData.value = null; metaMulti.value = []
-  const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.135:3003'
+  const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.162:3003'
   // 构建ID列表：优先参数id；否则从当前播放或混合列表取 metaId/id（最多3个）
   let ids = []
   if(id){ ids = [id] }
@@ -2029,5 +2028,4 @@ function openCozeChat(){
 .smart-switch.small {
   transform: scale(0.7);
   min-width: 40px;
-} 
-</style>
+}</style>

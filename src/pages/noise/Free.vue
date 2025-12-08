@@ -186,7 +186,7 @@ const showArrow = ref(false)
 // load categories from backend
 async function fetchCategories(){
   try{
-    const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.135:3003'
+    const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.162:3003'
     // 小程序运行时可能不支持 new URL，因此使用字符串拼接
     // 添加分页参数以获取所有分类
     const url = BASE + '/api/categories?limit=1000'
@@ -339,8 +339,7 @@ async function loadAudiosForCategory(catId){
       const arr = Array.isArray(raw) ? raw : []
       const seen = new Set(); const deduped = []
       for(const it of arr){ const key = it?.id || it?._id || it?.uuid || null; const uid = key ? String(key) : null; if(uid && seen.has(uid)) continue; if(uid) seen.add(uid); deduped.push(it) }
-      remoteList.value = deduped.map(it => ({ id: it.id || it._id || it.uuid || String(Date.now()), backend_id: (it.id ?? it._id ?? it.uuid ?? it.audio_id ?? null), title: it.title || it.name || it.audioName || '', audio_url: it.file_url || it.audio_url || it.audioUrl || it.url || it.src || '', cover_url: safeImageUrl(it.cover_url || it.coverUrl || ''), duration: it.duration || it.period || it.length || 0, category_id: it.category_id || it.categoryId || 'my_creations' }))
-    }catch(e){ console.warn('load my creations failed', e); remoteList.value = [] }
+      remoteList.value = deduped.map(it => ({ id: it.id || it._id || it.uuid || String(Date.now()), backend_id: (it.id ?? it._id ?? it.uuid ?? it.audio_id ?? null), title: it.title || it.name || it.audioName || '', audio_url: it.file_url || it.audio_url || it.audioUrl || it.url || it.src || '', cover_url: safeImageUrl(it.cover_url || it.coverUrl || it['cover url'] || it.image || it.cover || ''), duration: it.duration || it.period || it.length || 0, category_id: it.category_id || it.categoryId || 'my_creations' }))    }catch(e){ console.warn('load my creations failed', e); remoteList.value = [] }
     finally{ remoteLoading.value = false }
     return 
   }
@@ -371,7 +370,15 @@ async function loadAudiosForCategory(catId){
       deduped.push(it)
     }
     // map to normalized shape
-    remoteList.value = deduped.map(it => ({ id: it.id || it._id || it.uuid || String(Date.now()), backend_id: (it.id ?? it._id ?? it.uuid ?? it.audio_id ?? null), title: it.title || it.name || it.audioName || '', audio_url: it.audio_url || it.audioUrl || it.url || it.src || '', cover_url: safeImageUrl(it.cover_url || it.coverUrl || ''), duration: it.duration || it.period || it.length || 0, category_id: it.category_id || it.categoryId || null }))
+    remoteList.value = deduped.map(it => ({ 
+      id: it.id || it._id || it.uuid || String(Date.now()), 
+      backend_id: (it.id ?? it._id ?? it.uuid ?? it.audio_id ?? null), 
+      title: it.title || it.name || it.audioName || '', 
+      audio_url: it.audio_url || it.audioUrl || it.url || it.src || '', 
+      cover_url: safeImageUrl(it.cover_url || it.coverUrl || it['cover url'] || it.image || it.cover || ''), 
+      duration: it.duration || it.period || it.length || 0, 
+      category_id: it.category_id || it.categoryId || null 
+    }))
     console.log('[Free] remoteList length (deduped)', remoteList.value.length)
     console.log('[Free] deduped ids', remoteList.value.map(i=>({id:i.id})))
   }catch(e){ console.warn('load remote audios failed', e); remoteList.value = []; remoteError.value = e?.message || String(e) }

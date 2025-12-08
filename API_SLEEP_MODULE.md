@@ -1,7 +1,7 @@
 # 小屋模块 API 文档
 
 说明
-- BASE: 前端通过环境变量 `VITE_API_BASE` 配置（示例 `http://192.168.1.135:3003`）。
+- BASE: 前端通过环境变量 `VITE_API_BASE` 配置（示例 `http://192.168.1.162:3003`）。
 - 鉴权: 使用 HTTP Header `Authorization: Bearer <token>`（用户相关接口需鉴权）。
 - 返回格式建议: `{ success?: boolean, data?: ..., items?: ..., total?: number, message?: string }`。前端可容错解析 `{ data }` / `{ items }` / 直接数组。
 - 支持 `application/json` 与 `application/x-www-form-urlencoded`（部分前端以 form 发送，且字段名可能包含空格）。
