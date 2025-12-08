@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import * as apiHistory from '@/api/history'
+import * as apiAudios from '@/api/audios'
 import { getAuthLocal } from '@/store/auth'
 
 export const usePlayerStore = defineStore('player', {
@@ -49,12 +50,42 @@ export const usePlayerStore = defineStore('player', {
         // 后端真实音频ID优先 metaId，其次 id/audio_id
         const rawId = src.metaId ?? src.id ?? src.audio_id ?? src.audioId ?? null
         const hasValidId = rawId !== null && rawId !== undefined && String(rawId).trim() !== ''
-        if (hasToken && hasValidId){
-          apiHistory.addPlayHistory({ audio_id: rawId, play_duration: 0 }).catch(()=>{})
+        
+        // 添加更多的日志以便调试
+        console.log('[player] play track:', { track, src, rawId, hasValidId, hasToken })
+        console.log('[player] auth info:', auth)
+        console.log('[player] src details:', {
+          hasMetaId: !!src.metaId,
+          hasId: !!src.id,
+          hasAudioId: !!src.audio_id,
+          hasAudioIdAlt: !!src.audioId,
+          metaId: src.metaId,
+          id: src.id,
+          audio_id: src.audio_id,
+          audioId: src.audioId
+        })
+        
+        // 添加条件判断的日志
+        if (!hasToken) {
+          console.log('[player] No token, skipping play record')
         }
-      }catch(e){ /* ignore */ }
-    },
-    pause() { this.isPlaying = false },
+        if (!hasValidId) {
+          console.log('[player] No valid ID, skipping play record')
+        }
+        
+        if (hasToken && hasValidId){
+          console.log('[player] Recording play with audio ID:', rawId)
+          // 记录播放历史
+          apiHistory.addPlayHistory({ audio_id: rawId, play_duration: 0 }).catch(()=>{})
+          // 记录播放行为（调用 POST /api/audios/{audioId}/play 接口）
+          apiAudios.incrementPlay(rawId).catch(()=>{})
+        } else {
+          console.log('[player] Skipping play record due to missing token or invalid ID')
+        }
+      }catch(e){ 
+        console.error('[player] play error:', e)
+      }
+    },    pause() { this.isPlaying = false },
     setLoopMode(mode){ this.loopMode = mode },
     next() {
       if (!this.currentTrack || this.playlist.length === 0) return

@@ -11,7 +11,7 @@
           <input 
             v-model="searchText" 
             class="search-input" 
-            :placeholder="queryParams.type === 'community' ? '搜索社区帖子' : '搜索白噪音/专辑/作者'"
+            :placeholder="queryParams.type === 'community' ? '搜索社区帖子' : queryParams.type === 'audio' ? '搜索白噪音/专辑/作者' : '搜索白噪音/专辑/作者'"
             @confirm="handleSearch"
             @input="handleInput"
             focus
@@ -86,7 +86,6 @@
             class="result-item"
             @click="result.type==='audio' ? playResult(result) : openPost(result)"
           >
-            <image v-if="result.cover" class="result-cover" :src="result.cover" mode="aspectFill" />
             <view class="result-info">
               <text class="result-name">{{ result.name }}</text>
               <text class="result-author">{{ result.author }}</text>
@@ -116,6 +115,7 @@ import { useGlobalTheme } from '@/composables/useGlobalTheme'
 import { useThemeStore } from '@/stores/theme'
 import * as apiSearch from '@/api/search'
 import * as apiCommunity from '@/api/community'
+import * as apiNoiseSearch from '@/api/noiseSearch'
 
 const themeStore = useThemeStore(); themeStore.load()
 const { bgStyle } = useGlobalTheme()
@@ -131,6 +131,7 @@ const queryParams = defineProps({
 // 搜索相关数据
 const searchText = ref('')
 const searchHistory = ref([])
+const lastSearchKeyword = ref('')
 
 // 热门搜索标签
 const hotTags = ref([])
@@ -146,8 +147,15 @@ const errorMsg = ref('')
 // 页面加载时获取热门搜索和搜索历史
 onMounted(async () => {
   try {
-    // 获取热门搜索
-    const hotRes = await apiSearch.getHotSearch()
+    // 根据搜索类型获取热门搜索
+    let hotRes = []
+    if (queryParams.type === 'audio') {
+      // 白噪音热门搜索
+      hotRes = await apiNoiseSearch.getHotSearch()
+    } else {
+      // 社区热门搜索
+      hotRes = await apiSearch.getHotSearch()
+    }
     hotTags.value = Array.isArray(hotRes) ? hotRes : (hotRes.data || hotRes.items || [])
     
     // 如果没有获取到热门搜索数据，使用默认值
@@ -155,8 +163,15 @@ onMounted(async () => {
       hotTags.value = ['海浪', '雨声', '自然声', '睡眠']
     }
     
-    // 获取搜索历史
-    const historyRes = await apiSearch.getSearchHistory()
+    // 根据搜索类型获取搜索历史
+    let historyRes = []
+    if (queryParams.type === 'audio') {
+      // 白噪音搜索历史
+      historyRes = await apiNoiseSearch.getSearchHistory()
+    } else {
+      // 社区搜索历史
+      historyRes = await apiSearch.getSearchHistory()
+    }
     searchHistory.value = Array.isArray(historyRes) ? historyRes : (historyRes.data || historyRes.items || [])
   } catch (e) {
     console.error('[search] init failed', e)
@@ -185,6 +200,10 @@ async function doSearch(reset = true){
     if (queryParams.type === 'community') {
       // 社区帖子搜索
       const res = await apiCommunity.searchCommunityPosts({ q: kw, page: page.value, limit: limit.value })
+      list = Array.isArray(res) ? res : (res.data || res.items || res.list || [])
+    } else if (queryParams.type === 'audio') {
+      // 白噪音搜索
+      const res = await apiNoiseSearch.searchNoises({ keyword: kw, limit: limit.value, offset: (page.value - 1) * limit.value })
       list = Array.isArray(res) ? res : (res.data || res.items || res.list || [])
     } else {
       // 全局搜索
@@ -261,6 +280,11 @@ function goBack() {
 async function handleSearch() {
   const kw = searchText.value.trim()
   if (!kw) return
+  // 清除输入防抖定时器，避免重复搜索
+  if(inputTimer) {
+    clearTimeout(inputTimer)
+    inputTimer = null
+  }
   await addToHistory(kw)
   doSearch(true)
 }
@@ -269,9 +293,13 @@ async function handleSearch() {
 let inputTimer = null
 function handleInput() {
   if(inputTimer) clearTimeout(inputTimer)
-  inputTimer = setTimeout(()=>{
+  inputTimer = setTimeout(async ()=>{
     const kw = searchText.value.trim()
     if(kw){
+      // 检查是否与上一次搜索相同，避免重复请求
+      if (lastSearchKeyword.value === kw) return
+      lastSearchKeyword.value = kw
+      await addToHistory(kw)
       doSearch(true)
     } else {
       searchResults.value = []
@@ -294,6 +322,8 @@ function clearSearch() {
 // 通过标签搜索
 async function searchByTag(tag) {
   searchText.value = tag
+  // 更新最后搜索关键词
+  lastSearchKeyword.value = tag
   await addToHistory(tag)
   doSearch(true)
 }
@@ -309,6 +339,8 @@ function searchByHotTag(tag) {
   
   if (query) {
     searchText.value = query;
+    // 更新最后搜索关键词
+    lastSearchKeyword.value = query;
     addToHistory(query);
     doSearch(true);
   }
@@ -343,6 +375,8 @@ function searchByHistoryItem(item) {
   
   if (query) {
     searchText.value = query;
+    // 更新最后搜索关键词
+    lastSearchKeyword.value = query;
     addToHistory(query);
     doSearch(true);
   }
@@ -418,8 +452,14 @@ async function addToHistory(query) {
   if (!query.trim()) return
   
   try {
-    // 调用API记录搜索行为
-    await apiSearch.recordSearch(query)
+    // 根据搜索类型调用不同的API记录搜索行为
+    if (queryParams.type === 'audio') {
+      // 白噪音搜索记录
+      await apiNoiseSearch.recordSearch(query)
+    } else {
+      // 社区搜索记录
+      await apiSearch.recordSearch(query)
+    }
   } catch (e) {
     console.warn('[search] record search failed', e)
   }
@@ -482,8 +522,14 @@ function clearHistory() {
     success: async (res) => {
       if (res.confirm) {
         try {
-          // 调用API清空搜索历史
-          await apiSearch.clearSearchHistory()
+          // 根据搜索类型调用不同的API清空搜索历史
+          if (queryParams.type === 'audio') {
+            // 白噪音搜索历史清空
+            await apiNoiseSearch.clearSearchHistory()
+          } else {
+            // 社区搜索历史清空
+            await apiSearch.clearSearchHistory()
+          }
           searchHistory.value = []
         } catch (e) {
           console.error('[search] clear history failed', e)

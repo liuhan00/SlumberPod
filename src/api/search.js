@@ -89,7 +89,7 @@ export async function recordSearch(query){
   const url = BASE + '/api/community/search/history'
   console.log('[search] POST record search', url, query)
 
-  const body = JSON.stringify({ query })
+  const body = JSON.stringify({ query: query })
 
   if (typeof fetch === 'function'){
     const res = await fetch(url, { method:'POST', headers: buildHeaders(), body })
@@ -99,9 +99,16 @@ export async function recordSearch(query){
     return j ?? {}
   }
 
+  // 构建包含Content-Type的headers
+  const headers = buildHeaders()
+  headers['Content-Type'] = 'application/json'
+  
+  // 将数据序列化为JSON字符串
+  const data = JSON.stringify({ query: query })
+  
   return await new Promise((resolve, reject)=>{
     try{
-      uni.request({ url, method:'POST', header: buildHeaders(), data: { query }, success(r){ resolve(r.data) }, fail(err){ reject(err) } })
+      uni.request({ url, method:'POST', header: headers, data: data, success(r){ resolve(r.data) }, fail(err){ reject(err) } })
     }catch(e){ reject(e) }
   })
 }

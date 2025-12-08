@@ -481,10 +481,35 @@ function toggleMini(noise){
   } else {
     miniPlaying.value.add(id)
     // add to player playlist if not exists
-    const track = { id, metaId: (noise.backend_id ?? noise.id ?? noise._id ?? noise.uuid ?? ''), name: noise.title || noise.name || noise.audioName || '未知', src: noise.audio_url || noise.audioUrl || noise.url || noise.src || '' }
+    // 添加调试日志
+    console.log('[Free] noise object:', noise)
+    console.log('[Free] noise backend_id:', noise.backend_id)
+    console.log('[Free] noise id:', noise.id)
+    console.log('[Free] noise _id:', noise._id)
+    console.log('[Free] noise uuid:', noise.uuid)
+    
+    // 更严格的 metaId 赋值逻辑
+    let metaId = ''
+    if (noise.backend_id && noise.backend_id.trim() !== '') {
+      metaId = noise.backend_id
+    } else if (noise.id && noise.id.trim() !== '') {
+      metaId = noise.id
+    } else if (noise._id && noise._id.trim() !== '') {
+      metaId = noise._id
+    } else if (noise.uuid && noise.uuid.trim() !== '') {
+      metaId = noise.uuid
+    }
+    
+    const track = { 
+      id, 
+      metaId,
+      name: noise.title || noise.name || noise.audioName || '未知', 
+      src: noise.audio_url || noise.audioUrl || noise.url || noise.src || '' 
+    }
+    
+    console.log('[Free] created track:', track)
     player.addToQueue?.(track)
     player.play?.(track)
-    try{ apiAudios.incrementPlay(track.id).catch?.(e=>console.warn('[Free] incrementPlay failed', e)) }catch(e){}
   }
   // update player.title display (joined by |)
   updatePlayerTitleFromMini()
@@ -506,12 +531,38 @@ function openPlayerWithTracks(tracks){
 }
 
 function playRemote(a){
-  const track = { id: a.id || a._id || a.uuid || String(Date.now()), metaId: (a.backend_id ?? a.id ?? a._id ?? a.uuid ?? ''), name: a.title || a.name || a.audioName || '', src: a.audio_url || a.audioUrl || a.url || a.src || '' }
+  // 添加调试日志
+  console.log('[Free] playRemote input:', a)
+  console.log('[Free] playRemote backend_id:', a.backend_id)
+  console.log('[Free] playRemote id:', a.id)
+  console.log('[Free] playRemote _id:', a._id)
+  console.log('[Free] playRemote uuid:', a.uuid)
+  
+  // 更严格的 metaId 赋值逻辑
+  let metaId = ''
+  if (a.backend_id && a.backend_id.trim() !== '') {
+    metaId = a.backend_id
+  } else if (a.id && a.id.trim() !== '') {
+    metaId = a.id
+  } else if (a._id && a._id.trim() !== '') {
+    metaId = a._id
+  } else if (a.uuid && a.uuid.trim() !== '') {
+    metaId = a.uuid
+  }
+  
+  const track = { 
+    id: a.id || a._id || a.uuid || String(Date.now()), 
+    metaId,
+    name: a.title || a.name || a.audioName || '', 
+    src: a.audio_url || a.audioUrl || a.url || a.src || '' 
+  }
+  
+  console.log('[Free] playRemote created track:', track)
+  
   // add to player store and start playing so player page finds currentTrack and src
   try{
     player.addToQueue?.(track)
     player.play?.(track)
-    try{ apiAudios.incrementPlay(track.id).catch?.(e=>console.warn('[Free] incrementPlay failed', e)) }catch(e){}
   }catch(e){ console.warn('player play failed', e) }
   // navigate to player detail and let player page attach to currentTrack
   try{ uni.navigateTo({ url: `/pages/player/index?title=${encodeURIComponent(track.name)}` }) }catch(e){ location.hash = `#/pages/player/index?title=${encodeURIComponent(track.name)}` }
@@ -565,7 +616,7 @@ function setDurationMinutes(m){ durationMinutes.value = m; remainingSeconds.valu
 
 
 function openSearch(){
-  try{ uni.navigateTo({ url: '/pages/search/index' }) }catch(e){ location.hash='#/pages/search/index' }
+  try{ uni.navigateTo({ url: '/pages/search/index?type=audio' }) }catch(e){ location.hash='#/pages/search/index?type=audio' }
 }
 
 // renamed to avoid conflict: openPlayerDetail
@@ -1095,4 +1146,3 @@ function openAgent(){
 /* override: mini-player names should be light on dark background */
 .mini-player .mini-name{ color: rgba(255,255,255,0.86) !important }
 .mini-player .mini-name.on{ color: #D8FFE7 !important; font-weight:700 }
-</style>
