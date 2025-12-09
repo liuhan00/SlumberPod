@@ -307,6 +307,7 @@ import { allNoises } from '@/data/noises'
 import { getAuthLocal } from '@/store/auth'
 import { useGlobalTheme } from '@/composables/useGlobalTheme'
 import * as apiAudios from '@/api/audios'
+import * as apiWhiteNoise from '@/api/whiteNoise'
 
 const { bgStyle } = useGlobalTheme()
 const store = usePlayerStore()
@@ -403,107 +404,79 @@ async function toggleFav(){
   const auth = getAuthLocal()
   console.log('[Auth] toggleFav auth value:', auth)
   const loggedIn = Boolean(
-    // 游客登录有 guest: true，需要排除
     !auth?.guest &&
     !auth?.user?.guest &&
     (
-      auth?.id ||
-      auth?.user?.id ||
-      auth?.userId ||
-      auth?.user?.userId ||
-      auth?.token ||
-      auth?.access_token
+      auth?.id || auth?.user?.id || auth?.userId || auth?.user?.userId || auth?.token || auth?.access_token
     )
   )
   if(!loggedIn){
-    uni.showToast({
-      title: '请先登录',
-      icon: 'none',
-      duration: 2000
-    })
-    // 跳转到登录页面
-    setTimeout(() => {
-      uni.navigateTo({
-        url: '/pages/auth/Login'
-      })
-    }, 1500)
+    uni.showToast({ title: '请先登录', icon: 'none', duration: 2000 })
+    setTimeout(() => { uni.navigateTo({ url: '/pages/auth/Login' }) }, 1500)
     return
   }
   
-  // 仅允许使用后端真实ID metaId
-  const metaId = track.value?.metaId
-  const isNumericMeta = metaId != null && /^\d+$/.test(String(metaId))
-  if(!isNumericMeta){
-    uni.showToast({ title: '该音频暂不支持收藏', icon: 'none', duration: 1800 })
+  // 组合ID（最多3个，取纯数字 metaId）
+  const trio = (Array.isArray(store.playlist) ? store.playlist.slice(0,3) : []).filter(Boolean)
+  const comboIds = trio.map(t=> t.metaId).filter(x=> x!=null && /^\d+$/.test(String(x))).map(Number)
+  console.log('[toggleFav] 组合ID:', comboIds)
+  if(comboIds.length === 0){
+    uni.showToast({ title: '该组合暂不支持收藏', icon: 'none' })
     return
   }
-
-  const wasFav = isFav.value
-  // 单曲收藏：直接切换收藏与计数；组合(≥3)才弹出命名
-  if(!wasFav){
-    const isCombo = Array.isArray(store.playlist) && store.playlist.length >= 3
-    if(!isCombo){
-      try{
-        await favStore.toggle(track.value)
-        updateFavoriteCount(+1)
-        uni.showToast({ title:'已收藏', icon:'success', duration:800 })
-      }catch(e){ uni.showToast({ title:'收藏失败', icon:'none' }) }
-      return
+  
+  // 获取当前选中的音频ID（播放的音频）
+  const selectedIds = []
+  if (store.currentTrack?.metaId) {
+    const currentMetaId = Number(store.currentTrack.metaId)
+    if (!Number.isNaN(currentMetaId)) {
+      selectedIds.push(currentMetaId)
     }
   }
-  
-  // 如果是收藏，弹出命名输入框
-  if (!wasFav) {
+  console.log('[toggleFav] 选中的音频ID:', selectedIds)  // 检查当前是否已收藏（简单依赖本地，服务端以组合为准，建议后续在进入页面时同步组合收藏列表）
+  const wasFav = isFav.value // 仍用于单曲指示；组合层面统一走接口
+
+  // 新增组合收藏：弹出命名
+  if(!wasFav){
     uni.showModal({
       title: '收藏组合',
       editable: true,
       placeholderText: '请输入组合名称（1-12字）',
       success: async (res) => {
         if (res.confirm) {
-          const combName = res.content?.trim() || '白噪音组合'
-          if (combName.length > 12) {
-            uni.showToast({ title: '名称不能超过12字', icon: 'none' })
-            return
-          }
-  try {
-    await favStore.toggle(track.value)
-            // TODO: 保存组合名称到后端
-    uni.showToast({
-              title: '组合收藏成功',
-      icon: 'success',
-      duration: 1000
-    })
-            // 更新收藏数量
-            updateFavoriteCount()
-  } catch (error) {
-    console.error('收藏操作失败:', error)
-    uni.showToast({
-      title: '操作失败，请重试',
-      icon: 'none',
-      duration: 2000
-    })
+          const combName = String(res.content || '').trim().slice(0, 12) || '白噪音组合'
+          try{
+            // 使用新的API，支持selected_audio_ids参数
+            await apiWhiteNoise.toggleFavoriteWhiteNoiseCombo({ 
+              audio_ids: comboIds, 
+              selected_audio_ids: selectedIds,
+              action: 'add', 
+              name: combName 
+            })
+            uni.showToast({ title: '组合收藏成功', icon: 'success', duration: 1000 })
+          }catch(error){
+            console.error('组合收藏失败:', error)
+            uni.showToast({ title: '操作失败，请重试', icon: 'none', duration: 2000 })
           }
         }
       }
     })
   } else {
-    // 取消收藏
-    try {
-      await favStore.toggle(track.value)
-      updateFavoriteCount(-1)
-      uni.showToast({ title:'已取消收藏', icon:'success', duration:800 })
-    } catch (error) {
-      console.error('收藏操作失败:', error)
-      uni.showToast({
-        title: '操作失败，请重试',
-        icon: 'none',
-        duration: 2000
+    // 取消组合收藏
+    try{
+      // 使用新的API，支持selected_audio_ids参数
+      await apiWhiteNoise.toggleFavoriteWhiteNoiseCombo({ 
+        audio_ids: comboIds, 
+        selected_audio_ids: selectedIds,
+        action: 'remove' 
       })
+      uni.showToast({ title:'已取消收藏', icon:'success', duration:800 })
+    }catch(error){
+      console.error('组合取消收藏失败:', error)
+      uni.showToast({ title: '操作失败，请重试', icon: 'none', duration: 2000 })
     }
   }
-}
-
-// 更新收藏数量
+}// 更新收藏数量
 function updateFavoriteCount(delta = 0) {
   // 优先用后端元数据；若没有则在前端做微调，给用户即时反馈
   const current = Number(liveFavoriteCount.value) || 0
@@ -1035,7 +1008,7 @@ onLoad((query)=>{
   let tracks = (Array.isArray(store.playlist) && store.playlist.length>0) ? store.playlist.slice(0,3) : (store.currentTrack ? [store.currentTrack] : [])
   if(tracks.length === 0) tracks = allNoises.slice(0,3)
   // normalize tracks to include src and enabled
-  const normalized = tracks.map((t,i)=> ({ id: t.id || `t${i}`, name: t.name || t.title || `音轨 ${i+1}`, src: t.src || t.url || '', volume: (t.volume || store.volume || 0.8), enabled: true }))
+  const normalized = tracks.map((t,i)=> ({ id: t.id || `t${i}`, name: t.name || t.title || `音轨 ${i+1}`, src: t.src || t.url || '', volume: (t.volume || store.volume || 0.8), enabled: (i===0) }))
   audioTracks.value = normalized
 
   // create audio contexts for each track and autoplay
@@ -1411,13 +1384,14 @@ function openCozeChat(){
 }
 </script>
 <style scoped>
-.page{ min-height:100vh; padding-bottom: 24px; position:relative; /* use theme background from bgStyle */ }
-.topbar{ display:flex; justify-content:space-between; align-items:center; padding:12px 16px; position:relative }
+.page{ min-height:100vh; padding-bottom: 32px; position:relative; overflow:hidden; background: linear-gradient(180deg, rgba(255,255,255,0.02) 0%, transparent 100%); }
+.topbar{ display:flex; justify-content:space-between; align-items:center; padding:16px 20px; position:relative; z-index:100 }
 .page button::after{ border:none }
-.collapse, .share{ background:transparent; border:none; color:inherit; font-size:18px }
-.collapse{ position:absolute; left:12px; top:12px }
-.share{ position:absolute; right:12px; top:12px }
-.share-hit{ position:absolute; right:8px; top:8px; width:48px; height:48px; z-index:1600; background:transparent; border:none; padding:0; margin:0; border-radius:999px }
+.collapse, .share{ background:rgba(255,255,255,0.12); backdrop-filter:blur(10px); border:none; color:inherit; font-size:20px; width:40px; height:40px; border-radius:20px; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 12px rgba(0,0,0,0.08); transition:all 0.2s ease }
+.collapse:active, .share:active{ transform:scale(0.95); background:rgba(255,255,255,0.18) }
+.collapse{ position:absolute; left:16px; top:16px }
+.share{ position:absolute; right:16px; top:16px }
+.share-hit{ position:absolute; right:12px; top:12px; width:48px; height:48px; z-index:1600; background:transparent; border:none; padding:0; margin:0; border-radius:999px }
 
 .nav{ display:flex; justify-content:space-between; align-items:center; padding: 0 16px }
 .btn{ padding:6px 10px; border-radius:6px; background:#f2f3f5 }
@@ -1494,10 +1468,10 @@ function openCozeChat(){
 .triangles .tri3{ fill:rgba(255,255,255,0.24); stroke:rgba(255,255,255,0.1); stroke-width:1 }
 .icons-row{ display:flex; justify-content:space-between; padding:12px 36px }
 .icon-left, .icon-right{ color:#fff; opacity:0.8 }
-.meta{ padding: 18px 16px }
-.title-row{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-.fixed-label{ font-size:24px; font-weight:800; color: var(--text-primary); }
-.author{ margin-top:6px; color: var(--text-primary) }
+.meta{ padding: 24px 20px 16px 20px; background:rgba(255,255,255,0.04); backdrop-filter:blur(8px); border-radius:20px; margin:20px 16px 12px 16px; box-shadow:0 8px 24px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.08) }
+.title-row{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.fixed-label{ font-size:26px; font-weight:800; color: var(--text-primary); letter-spacing:-0.5px; text-shadow:0 2px 4px rgba(0,0,0,0.08) }
+.author{ margin-top:8px; color: var(--text-primary); font-size:15px; opacity:0.85; letter-spacing:0.2px }
 .name{ font-size:20px; color:#fff; font-weight:700 }
 .meta-actions{
   display:flex;
@@ -1505,7 +1479,7 @@ function openCozeChat(){
   gap:12px;
   margin-right: 4px;
 }
-.favorite-wrapper { position:relative; width:28px; height:24px; }
+.favorite-wrapper { position:relative; width:32px; height:28px; }
 .favorite-btn{ color:#0f172a; 
   position:relative;
   border:none;
@@ -1514,35 +1488,30 @@ function openCozeChat(){
   display:flex;
   align-items:center;
   justify-content:center;
-  width:32px;
-  height:32px;
+  width:36px;
+  height:36px;
   color:inherit;
-  transition:opacity 0.15s ease;
+  transition:all 0.2s ease;
 }
-.favorite-btn:active{ opacity:0.8; }
-.heart-shape{ position:relative; width:28px; height:26px; color:#0f172a; }
-.heart-shape .heart-l, .heart-shape .heart-r{ position:absolute; width:14px; height:14px; background: currentColor; border-radius: 50%; top:0 }
-.heart-shape .heart-l{ left:0 }
-.heart-shape .heart-r{ right:0 }
-.heart-shape .heart-c{ position:absolute; width:18px; height:18px; background: currentColor; left:5px; top:7px; transform: rotate(45deg) }
-.favorite-btn.active .heart-shape{ color:#ff346c }
-.favorite-btn.active{ color:#ff346c; }
-.badge-anchor{ position:relative; width:24px; height:24px; display:flex; align-items:center; justify-content:center }
+.favorite-btn:active{ opacity:0.85; transform:scale(0.95) }
+.heart-text{ font-size:24px; filter:drop-shadow(0 2px 6px rgba(0,0,0,0.1)) }
+.badge-anchor{ position:relative; width:28px; height:28px; display:flex; align-items:center; justify-content:center }
 .favorite-badge{
   position:absolute;
   right:0;
   top:0;
   transform: translate(60%,-40%);
-  font-size:12px;
-  font-weight:700;
-  color:#111111;
+  font-size:11px;
+  font-weight:800;
+  color:#0a0a0a;
   z-index:6;
-  background: #fff;
-  padding: 2px 6px;
-  border-radius: 10px;
-  box-shadow: 0 6px 14px rgba(0,0,0,0.06);
+  background: linear-gradient(135deg, #ffffff, rgba(255,255,255,0.92));
+  padding: 3px 7px;
+  border-radius: 12px;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.8);
+  letter-spacing: -0.2px;
 }
-.favorite-btn.active .favorite-badge{ color:#ff3b6a; background: #fff0f2 }
+.favorite-btn.active .favorite-badge{ color:#ff2d55; background: linear-gradient(135deg, #fff0f4, #ffe8ed); box-shadow: 0 6px 16px rgba(255,45,85,0.2), inset 0 1px 0 rgba(255,255,255,0.9) }
 .share-btn{ background: transparent; border: none; font-size: 20px; padding: 8px; }
 
 
@@ -1556,12 +1525,15 @@ function openCozeChat(){
   font-family: 'Courier New', monospace;
 }
 .author{ margin-top:6px; color: var(--text-primary) }
-.tags{ display:flex; gap:12px; padding:8px 16px; align-items:center; justify-content:space-evenly }
-.tag{ background:var(--card-bg, #ffffff); color: var(--card-fg, #13303f); padding:8px 12px; border-radius:12px; box-shadow: 0 6px 18px rgba(0,0,0,0.06); opacity:1; font-size:14px; min-width:72px; text-align:center; display:inline-flex; align-items:center; justify-content:center; border:1px solid rgba(19,48,63,0.06) }
-.controls{ display:flex; align-items:center; justify-content:space-around; padding:18px 36px }
-.play-btn{ width:64px; height:64px; border-radius:32px; background:#fff; color: var(--text-primary); display:flex; align-items:center; justify-content:center; font-size:22px; box-shadow: 0 8px 24px rgba(0,0,0,0.10) }
-.ctrl{ background:transparent; border:none; color:#fff; font-size:18px }
-.settings-btn{ background: var(--input-bg, #f1f8ff); color: var(--card-fg, #13303f); border-radius:8px; padding:8px; }
+.tags{ display:flex; gap:14px; padding:8px 16px 4px 16px; align-items:center; justify-content:space-evenly }
+.tag{ background:rgba(255,255,255,0.1); backdrop-filter:blur(10px); color: var(--text-primary); padding:10px 16px; border-radius:16px; box-shadow: 0 6px 20px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.12); opacity:1; font-size:14px; min-width:80px; text-align:center; display:inline-flex; align-items:center; justify-content:center; border:1px solid rgba(255,255,255,0.06); font-weight:600; transition:all 0.2s ease }
+.tag:active{ transform:translateY(1px); opacity:0.9 }
+.controls{ display:flex; align-items:center; justify-content:space-around; padding:8px 36px 16px 36px }
+.play-btn{ width:72px; height:72px; border-radius:36px; background:linear-gradient(135deg, #ffffff 0%, rgba(245,248,255,0.95) 100%); color: var(--text-primary); display:flex; align-items:center; justify-content:center; font-size:24px; box-shadow: 0 12px 32px rgba(0,0,0,0.14), inset 0 2px 4px rgba(255,255,255,0.4); transition:all 0.2s ease }
+.play-btn:active{ transform:scale(0.96); box-shadow: 0 8px 24px rgba(0,0,0,0.12) }
+.ctrl{ background:rgba(255,255,255,0.08); backdrop-filter:blur(8px); border:1px solid rgba(255,255,255,0.08); color:var(--text-primary); font-size:20px; width:48px; height:48px; border-radius:24px; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 12px rgba(0,0,0,0.08); transition:all 0.2s ease }
+.ctrl:active{ transform:scale(0.94); background:rgba(255,255,255,0.12) }
+.settings-btn{ background: rgba(255,255,255,0.1); backdrop-filter:blur(8px); color: var(--text-primary); border-radius:10px; padding:10px; border:1px solid rgba(255,255,255,0.08) }
 
 /* Playlist Modal */
 .playlist-modal {
@@ -1940,23 +1912,24 @@ function openCozeChat(){
 
 
 /* Vinyl turntable styles */
-.vinyl{ position:relative; width:78vw; max-width:380px; height:78vw; max-height:380px; display:flex; align-items:center; justify-content:center }
-.vinyl-shadow{ position:absolute; inset:-10px; border-radius:50%; box-shadow:0 30px 60px rgba(0,0,0,0.20), inset 0 8px 22px rgba(255,255,255,0.06) }
-.disk{ position:relative; width:86%; height:86%; border-radius:50%; background:#0b0b0b; box-shadow: inset 0 0 0 10px #121212, inset 0 0 0 22px #0e0e0e, inset 0 0 0 36px #101010; display:flex; align-items:center; justify-content:center; animation: spin 12s linear infinite; animation-play-state: paused }
+.vinyl{ position:relative; width:78vw; max-width:380px; height:78vw; max-height:380px; display:flex; align-items:center; justify-content:center; margin:0 auto }
+.vinyl-shadow{ position:absolute; inset:-16px; border-radius:50%; background:radial-gradient(circle at 30% 30%, rgba(255,255,255,0.08), transparent 60%); box-shadow:0 32px 72px rgba(0,0,0,0.28), inset 0 8px 24px rgba(255,255,255,0.08) }
+.disk{ position:relative; width:88%; height:88%; border-radius:50%; background:linear-gradient(135deg, #0a0a0a 0%, #141414 100%); box-shadow: inset 0 0 0 12px #151515, inset 0 0 0 24px #0d0d0d, inset 0 0 0 38px #111111, 0 16px 40px rgba(0,0,0,0.4); display:flex; align-items:center; justify-content:center; animation: spin 12s linear infinite; animation-play-state: paused; transform-style: preserve-3d }
 .disk.spinning{ animation-play-state: running }
-.grooves{ position:absolute; inset:0; border-radius:50%; background: repeating-radial-gradient(circle at 50% 50%, rgba(255,255,255,0.06) 0px, rgba(255,255,255,0.06) 1px, transparent 2px, transparent 4px); opacity:0.15; pointer-events:none }
-.label{ width:62%; height:62%; border-radius:50%; box-shadow:0 8px 20px rgba(0,0,0,0.25), inset 0 0 0 6px rgba(255,255,255,0.06); display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg, rgba(255,255,255,0.98), rgba(240,244,255,0.9)); color:#13303f; text-align:center }
-.label text{ font-size: 56px; line-height: 1; font-weight: 800 }
+.grooves{ position:absolute; inset:0; border-radius:50%; background: repeating-radial-gradient(circle at 50% 50%, rgba(255,255,255,0.08) 0px, rgba(255,255,255,0.08) 1px, transparent 2px, transparent 4px); opacity:0.18; pointer-events:none; mix-blend-mode:overlay }
+.label{ width:64%; height:64%; border-radius:50%; box-shadow:0 10px 24px rgba(0,0,0,0.35), inset 0 0 0 8px rgba(255,255,255,0.08); display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg, rgba(255,255,255,0.98) 0%, rgba(245,248,255,0.95) 100%); color:#0f1419; text-align:center; position:relative; overflow:hidden }
+.label::before{ content:''; position:absolute; inset:0; border-radius:50%; background:radial-gradient(circle at 35% 35%, rgba(255,255,255,0.4), transparent 70%); pointer-events:none }
+.label text{ font-size: 64px; line-height: 1; font-weight: 800; position:relative; z-index:1; filter:drop-shadow(0 2px 4px rgba(0,0,0,0.06)) }
 
 /* Tonearm */
-.tonearm{ position:absolute; right:-6%; top:-6%; width:56%; height:56%; pointer-events:none; transform-origin: 12% 12%; transform: rotate(-28deg); transition: transform 420ms cubic-bezier(0.34, 1.56, 0.64, 1), filter 300ms ease }
-.tonearm.on{ transform: rotate(4deg); filter: drop-shadow(0 6px 12px rgba(0,0,0,0.12)) }
-.pivot{ position:absolute; left:10%; top:10%; width:22px; height:22px; border-radius:50%; background:var(--card-bg,#fff); box-shadow:0 6px 14px rgba(0,0,0,0.18) }
-.arm{ position:absolute; left:11%; top:11%; width:58%; height:6px; background:var(--card-bg,#fff); border-radius:3px; transform-origin:left center; transform: rotate(24deg); box-shadow:0 2px 6px rgba(0,0,0,0.12) }
-.head{ position:absolute; right:12%; bottom:18%; width:34px; height:14px; background:var(--card-bg,#fff); border-radius:4px }
+.tonearm{ position:absolute; right:-8%; top:-8%; width:58%; height:58%; pointer-events:none; transform-origin: 14% 14%; transform: rotate(-32deg); transition: transform 480ms cubic-bezier(0.34, 1.56, 0.64, 1), filter 320ms ease; filter:drop-shadow(0 8px 16px rgba(0,0,0,0.15)) }
+.tonearm.on{ transform: rotate(2deg); filter: drop-shadow(0 6px 14px rgba(0,0,0,0.18)) }
+.pivot{ position:absolute; left:12%; top:12%; width:26px; height:26px; border-radius:50%; background:linear-gradient(135deg, var(--card-bg,#fff) 0%, rgba(240,244,255,0.95) 100%); box-shadow:0 8px 18px rgba(0,0,0,0.22), inset 0 2px 4px rgba(255,255,255,0.5) }
+.arm{ position:absolute; left:13%; top:13%; width:60%; height:8px; background:linear-gradient(90deg, var(--card-bg,#fff) 0%, rgba(240,244,255,0.92) 100%); border-radius:4px; transform-origin:left center; transform: rotate(26deg); box-shadow:0 4px 10px rgba(0,0,0,0.16), inset 0 1px 2px rgba(255,255,255,0.4) }
+.head{ position:absolute; right:10%; bottom:16%; width:38px; height:16px; background:linear-gradient(135deg, var(--card-bg,#fff), rgba(240,244,255,0.95)); border-radius:5px; box-shadow:0 4px 10px rgba(0,0,0,0.18) }
 
 /* Adjust wrapper */
-.timer-wrap{ padding-top:22px; min-height:360px }
+.timer-wrap{ padding-top:28px; min-height:380px; display:flex; flex-direction:column; align-items:center; justify-content:center }
 
 /* Chat FAB */
 .fab-chat{ position:fixed; right:18px; bottom:108px; width:54px; height:54px; border-radius:27px; background: linear-gradient(135deg, #66e6a2, #62c2ff); box-shadow: 0 10px 24px rgba(70,170,220,0.25); display:flex; align-items:center; justify-content:center; font-size:26px; color:#fff; z-index:1200; opacity:0.96 }

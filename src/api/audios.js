@@ -1,5 +1,5 @@
 import { getAuthLocal } from '@/store/auth'
-const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.162:3003'
+const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.128:3003'
 
 function buildHeaders(){
   const auth = getAuthLocal()
@@ -1520,6 +1520,7 @@ export async function searchAudios({ keyword, limit = 20, offset = 0 } = {}){
   
   const pairs = []
   pairs.push('keyword=' + encodeURIComponent(keyword.trim()))
+  pairs.push('search_type=audio')
   pairs.push('limit=' + encodeURIComponent(String(limit)))
   pairs.push('offset=' + encodeURIComponent(String(offset)))
   const q = '?' + pairs.join('&')

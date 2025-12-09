@@ -2,7 +2,7 @@
   <view class="page" :style="bgStyle">
     <!-- 顶部导航栏 -->
     <view class="nav-header">
-      <view class="nav-back" @click="goBack">
+      <view class="nav-back" @click="handleBackClick">
         <text class="back-icon">←</text>
       </view>
       <text class="nav-title">我的学习</text>
@@ -55,6 +55,31 @@
         </view>
       </view>
     </scroll-view>
+    
+    <!-- 计时器设置弹窗：选择退出后是否继续计时 -->
+    <view v-if="showTimerSettings" class="timer-settings-overlay" @click="closeTimerSettings">
+      <view class="timer-settings" @click.stop>
+        <text class="ts-title">退出学习</text>
+        <text class="ts-subtitle">请选择退出方式</text>
+        <view class="ts-option" @click="handleContinueAndReturn">
+          <view class="ts-option-content">
+            <text class="ts-label">继续计时</text>
+            <text class="ts-desc">暂停当前计时，下次进入接着计时</text>
+          </view>
+          <text class="ts-icon">→</text>
+        </view>
+        <view class="ts-option" @click="handleResetAndReturn">
+          <view class="ts-option-content">
+            <text class="ts-label">重新计时</text>
+            <text class="ts-desc">结束本次学习，下次从 00:00 开始</text>
+          </view>
+          <text class="ts-icon">→</text>
+        </view>
+        <view class="ts-actions">
+          <button class="ts-cancel" @click="closeTimerSettings">取消</button>
+        </view>
+      </view>
+    </view>
   </view>
 </template>
 
@@ -70,6 +95,7 @@ const { bgStyle } = useGlobalTheme()
 const studyHistory = ref([])
 const loading = ref(false)
 const error = ref('')
+const showTimerSettings = ref(false)
 
 // 加载学习历史记录
 async function loadStudyHistory() {
@@ -126,14 +152,50 @@ function formatDuration(seconds) {
 }
 
 // 导航函数
-function goBack() {
-  uni.navigateBack()
-}
-
 function goToStudy() {
   uni.switchTab({
     url: '/pages/sleep/index'
   })
+}
+
+// 处理返回按钮点击
+function handleBackClick() {
+  console.log('[Profile Study] 用户点击返回按钮')
+  // 显示计时器设置弹窗
+  showTimerSettings.value = true
+  console.log('[Profile Study] 显示计时器设置弹窗')
+}
+
+// 关闭计时器设置弹窗
+function closeTimerSettings() {
+  console.log('[Profile Study] 关闭计时器设置弹窗')
+  showTimerSettings.value = false
+}
+
+// 继续计时并返回
+function handleContinueAndReturn() {
+  console.log('[Profile Study] 用户选择继续计时')
+  // 保存设置：下次继续计时
+  uni.setStorageSync('studyTimerResumePolicy', { resume: true })
+  
+  // 关闭弹窗并返回
+  closeTimerSettings()
+  setTimeout(() => {
+    uni.navigateBack()
+  }, 300)
+}
+
+// 重新计时并返回
+function handleResetAndReturn() {
+  console.log('[Profile Study] 用户选择重新计时')
+  // 保存设置：下次重新计时
+  uni.setStorageSync('studyTimerResumePolicy', { resume: false })
+  
+  // 关闭弹窗并返回
+  closeTimerSettings()
+  setTimeout(() => {
+    uni.navigateBack()
+  }, 300)
 }
 
 // 页面加载时获取数据
@@ -308,5 +370,92 @@ onMounted(() => {
   font-size: 14px;
   color: var(--fg, #333);
   line-height: 1.4;
+}
+
+/* 计时器设置弹窗样式 */
+.timer-settings-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.timer-settings {
+  background: var(--card-bg, #ffffff);
+  border-radius: 16px;
+  padding: 24px;
+  width: 90%;
+  max-width: 320px;
+  box-sizing: border-box;
+}
+
+.ts-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--fg, #333);
+  text-align: center;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.ts-subtitle {
+  font-size: 14px;
+  color: var(--muted, #999);
+  text-align: center;
+  display: block;
+  margin-bottom: 20px;
+}
+
+.ts-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--input-bg, #f8f9fa);
+  margin-bottom: 12px;
+  cursor: pointer;
+}
+
+.ts-option-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.ts-label {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--fg, #333);
+  margin-bottom: 4px;
+}
+
+.ts-desc {
+  font-size: 12px;
+  color: var(--muted, #999);
+}
+
+.ts-icon {
+  font-size: 16px;
+  color: var(--muted, #999);
+}
+
+.ts-actions {
+  margin-top: 16px;
+  text-align: center;
+}
+
+.ts-cancel {
+  background: none;
+  border: none;
+  color: var(--uni-color-primary, #007aff);
+  font-size: 16px;
+  padding: 8px 16px;
+  cursor: pointer;
 }
 </style>

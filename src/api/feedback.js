@@ -1,5 +1,5 @@
 // feedback API
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.162:3003'
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.128:3003'
 
 export async function sendFeedback(payload, token){
   const headers = { 'Content-Type':'application/json' }

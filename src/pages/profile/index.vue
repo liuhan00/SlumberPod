@@ -2,21 +2,20 @@
   <scroll-view class="page" scroll-y :style="pageStyle">
     <!-- 头像背景主题头图 -->
     <view class="hero">
-      <image class="hero-bg" :src="user.avatar" mode="aspectFill" />
-      <view class="hero-overlay"></view>
+      <view class="hero-bg"></view>
       <view class="hero-content">
-        <ProfileHeader :avatar="user.avatar" :nickname="user.nickname" />
+        <ProfileHeader :avatar="user.avatar || ''" :nickname="user.nickname || ''" />
       </view>
     </view>
 
     <view class="auth-actions" style="padding:12px 16px;">
       <!-- 登录/注册 按钮已移除。若已登录显示用户信息与退出 -->
-      <view v-if="authUser">
+      <view v-if="authUser && (authUser.name || authUser.id)">
         <text>已登录：{{ authUser.name || authUser.id }}</text>
       </view>
     </view>
 
-    <StatsGrid :stats="user.stats" />
+    <StatsGrid :stats="user.stats || { totalSleepHours: 0, totalSessions: 0, favoriteCategory: '' }" />
 
     <view class="section">
       <SettingsList v-if="!showHistory" :settings="settings" @select="onSetting" />
@@ -47,13 +46,45 @@ import StatsGrid from '@/components/StatsGrid.vue'
 import SettingsList from '@/components/SettingsList.vue'
 import { useGlobalTheme } from '@/composables/useGlobalTheme'
 import { getAuthLocal } from '@/store/auth'
-import { ref } from 'vue'
-import { getPlayHistory } from '@/api/history'
+import { ref, computed, onMounted } from 'vue'
+import { getWhiteNoiseHistory } from '@/api/whiteNoise'
+import { getProfile } from '@/api/users'
 const { bgStyle } = useGlobalTheme()
 
 const userStore = useUserStore()
 const { avatar, nickname, stats } = storeToRefs(userStore)
-const user = { avatar: avatar.value, nickname: nickname.value, stats: stats.value }
+
+// 在页面加载时获取最新的用户资料
+onMounted(async () => {
+  try {
+    // 调用后端接口获取最新的用户资料
+    const profileData = await getProfile()
+    console.log('[Profile Page] 获取到的用户资料:', profileData)
+    
+    // 更新用户store中的数据
+    if (profileData && typeof profileData === 'object') {
+      userStore.applyAuth(profileData)
+    }
+  } catch (error) {
+    console.error('[Profile Page] 加载用户资料失败:', error)
+  }
+})
+
+const user = computed(() => {
+  try {
+    return { 
+      avatar: (avatar.value !== undefined) ? avatar.value : '', 
+      nickname: (nickname.value !== undefined) ? nickname.value : '', 
+      stats: (stats.value !== undefined) ? stats.value : { totalSleepHours: 0, totalSessions: 0, favoriteCategory: '' }
+    }
+  } catch (e) {
+    return { 
+      avatar: '', 
+      nickname: '', 
+      stats: { totalSleepHours: 0, totalSessions: 0, favoriteCategory: '' }
+    }
+  }
+})
 
 const pageStyle = bgStyle
 
@@ -66,16 +97,32 @@ const list = ref([])
 const loading = ref(false)
 const error = ref(null)
 
-function formatDate(v){ if(!v) return ''
-  try{ const d = new Date(v); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}` }catch(e){return ''}
-}
-
 async function loadHistory(){
   loading.value = true
+  error.value = null
   try{
-    const data = await getPlayHistory({ page: 1, limit: 100 })
+    // 调用白噪音组合播放历史接口
+    console.log('[Profile] 加载白噪音组合播放历史')
+    const data = await getWhiteNoiseHistory({ offset: 0, limit: 100 })
+    console.log('[Profile] 播放历史数据:', data)
+    
+    // 确保返回的是数组
     list.value = Array.isArray(data) ? data : []
-  }catch(e){ error.value = e.message || String(e); console.error(e) }
+    
+    if(list.value.length === 0){
+      console.log('[Profile] 播放历史为空')
+    }
+  }catch(e){ 
+    error.value = e.message || String(e)
+    console.error('[Profile] 获取播放历史失败:', e)
+    
+    // 显示友好的错误提示
+    uni.showToast({ 
+      title: error.value || '获取播放历史失败', 
+      icon: 'none', 
+      duration: 2000 
+    })
+  }
   finally{ loading.value = false }
 }
 
@@ -112,22 +159,42 @@ function onSetting(key){
 }
 
 function closeHistory(){ showHistory.value = false; list.value = [] }
+
+function formatDate(dateString) {
+  if (!dateString) return '未知时间'
+  // 简单的时间格式化函数
+  const date = new Date(dateString)
+  if (isNaN(date.getTime())) return dateString
+  
+  const now = new Date()
+  const diffMs = now - date
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+  
+  if (diffDays === 0) {
+    return '今天'
+  } else if (diffDays === 1) {
+    return '昨天'
+  } else if (diffDays < 7) {
+    return `${diffDays}天前`
+  } else {
+    return date.toLocaleDateString('zh-CN')
+  }
+}
 </script>
 
 <style scoped>
 .page{ min-height:100vh }
 .section{ padding: 12px 16px }
-.hero{ position:relative; height:160px; overflow:hidden; border-bottom-left-radius:24px; border-bottom-right-radius:24px }
-.hero-bg{ position:absolute; inset:0; width:100%; height:100%; filter: blur(16px) brightness(0.9); transform: scale(1.1) }
-.hero-overlay{ position:absolute; inset:0; background: linear-gradient(180deg, rgba(0,0,0,.25), rgba(0,0,0,.35)) }
+.hero{ position:relative; height:200px; overflow:hidden; border-bottom-left-radius:24px; border-bottom-right-radius:24px }
+.hero-bg{ position:absolute; inset:0; width:100%; height:100%; background: linear-gradient(135deg, #add8e6, #87ceeb); }
 .hero-content{ position:relative }
-
-.header{ padding:8px 0 }
-.title{ font-size:18px; font-weight:700; color:var(--text-primary) }
-.loading{ color:var(--muted) }
-.empty{ color:var(--muted); padding:18px 0 }
-.history-item{ padding:12px 0; border-bottom:1px solid var(--border) }
-.name{ font-size:16px; color:var(--text-primary); font-weight:600 }
-.meta{ font-size:12px; color:var(--text-secondary); margin-top:6px }
-.btn{ padding:14px 12px; border-radius:10px; border:none; font-weight:600; background: var(--card-bg, rgba(255,255,255,0.02)); color: var(--fg, #fff); }
+.header{ display:flex; align-items:center; justify-content:space-between; margin-bottom:16px }
+.title{ font-size:20px; font-weight:700; color: var(--fg) }
+.loading, .empty{ text-align:center; padding:40px 20px; color:var(--muted) }
+.history-item{ display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-bottom:1px solid var(--border) }
+.name{ font-size:16px; color: var(--fg); flex:1 }
+.meta{ font-size:14px; color:var(--muted) }
+.btn{ width:100%; padding:12px; background:var(--input-bg); color:var(--fg); border:none; border-radius:8px; margin-top:16px }
+.footer{ text-align:center; padding:20px 0; color:var(--muted) }
+.copyright, .version{ display:block; font-size:12px; margin:4px 0 }
 </style>

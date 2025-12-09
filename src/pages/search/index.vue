@@ -204,6 +204,13 @@ async function doSearch(reset = true){
     } else if (queryParams.type === 'audio') {
       // 白噪音搜索
       const res = await apiNoiseSearch.searchNoises({ keyword: kw, limit: limit.value, offset: (page.value - 1) * limit.value })
+      console.log('[search] audio search response:', res) // 添加日志查看返回数据格式
+      
+      // 添加错误处理：检查响应状态
+      if (res && res.statusCode >= 400) {
+        throw new Error(`搜索服务错误: ${res.statusCode} ${res.data?.message || res.data?.error || '未知错误'}`)
+      }
+      
       list = Array.isArray(res) ? res : (res.data || res.items || res.list || [])
     } else {
       // 全局搜索
@@ -233,9 +240,12 @@ async function doSearch(reset = true){
     
     const mapped = filteredList.map(it=>({
       // 支持音频与帖子两类数据
-      type: it.type || (it.audio_id || it.duration || it.file_url ? 'audio' : 'post'),
+      // 根据搜索类型来判断数据类型，避免混淆
+      type: queryParams.type === 'audio' ? 'audio' : 
+            (it.type || (it.audio_id || it.duration || it.file_url ? 'audio' : 'post')),
       // 确保ID是有效的数字
       id: (it.post_id && /^\d+$/.test(String(it.post_id))) ? Number(it.post_id) : 
+          (it.audio_id && /^\d+$/.test(String(it.audio_id))) ? Number(it.audio_id) : 
           (it.id && /^\d+$/.test(String(it.id))) ? Number(it.id) : 
           (it._id && /^\d+$/.test(String(it._id))) ? Number(it._id) : 
           null,
@@ -246,19 +256,43 @@ async function doSearch(reset = true){
       favorite_count: it.favorite_count ?? it.like_count ?? it.likes ?? 0,
       comment_count: it.comment_count ?? it.commentCount ?? (Array.isArray(it.comments) ? it.comments.length : 0),
       content: it.content || '',
-    })).filter(it => it.type !== 'post' || it.id !== null) // 过滤掉帖子类型但没有有效ID的项
+    })).filter(it => {
+      // 在音频搜索模式下，只保留音频类型的数据
+      if (queryParams.type === 'audio') {
+        return it.type === 'audio';
+      }
+      // 在社区搜索模式下，过滤掉帖子类型但没有有效ID的项
+      return it.type !== 'post' || it.id !== null;
+    })
     
+    console.log('[search] mapped results:', mapped) // 添加日志查看映射后的数据
     searchResults.value = reset ? mapped : searchResults.value.concat(mapped)
     hasMore.value = mapped.length >= limit.value
     if(hasMore.value){ page.value += 1 }
   }catch(e){ 
     errorMsg.value = String(e?.message || e)
     console.error('[search] error', e)
+    
+    // 尝试解析详细的错误信息
+    let errorMessage = errorMsg.value
+    try {
+      const errorObj = JSON.parse(errorMsg.value)
+      if (errorObj.statusCode) {
+        errorMessage = `搜索服务错误 ${errorObj.statusCode}: ${errorObj.message || '未知错误'}`
+      }
+    } catch (parseError) {
+      // 解析失败，使用原始错误信息
+    }
+    
     // 如果是后端返回的特定错误，给出更友好的提示
-    if (errorMsg.value.includes('帖子ID格式无效')) {
+    if (errorMessage.includes('帖子ID格式无效')) {
       uni.showToast({ title: '搜索结果中包含格式错误的数据，请稍后重试', icon: 'none' })
+    } else if (errorMessage.includes('搜索服务错误')) {
+      uni.showToast({ title: '搜索服务暂时不可用，请稍后重试', icon: 'none' })
+    } else if (errorMessage.includes('Internal Server Error') || errorMessage.includes('500')) {
+      uni.showToast({ title: '服务器开小差了，请稍后重试', icon: 'none' })
     } else {
-      uni.showToast({ title: errorMsg.value, icon: 'none' })
+      uni.showToast({ title: errorMessage, icon: 'none' })
     }
   } finally { 
     loading.value = false 
@@ -456,8 +490,11 @@ async function addToHistory(query) {
     if (queryParams.type === 'audio') {
       // 白噪音搜索记录
       await apiNoiseSearch.recordSearch(query)
-    } else {
+    } else if (queryParams.type === 'community') {
       // 社区搜索记录
+      await apiSearch.recordSearch(query)
+    } else {
+      // 默认使用社区搜索记录
       await apiSearch.recordSearch(query)
     }
   } catch (e) {
@@ -489,7 +526,17 @@ async function deleteHistoryItem(item) {
   try {
     // 如果搜索历史记录是对象且包含ID，则调用API删除
     if (typeof item === 'object' && item.id) {
-      await apiSearch.deleteSearchHistoryRecord(item.id);
+      // 根据搜索类型调用不同的API删除搜索历史记录
+      if (queryParams.type === 'audio') {
+        // 白噪音搜索历史删除
+        await apiNoiseSearch.deleteSearchHistoryRecord(item.id);
+      } else if (queryParams.type === 'community') {
+        // 社区搜索历史删除
+        await apiSearch.deleteSearchHistoryRecord(item.id);
+      } else {
+        // 默认使用社区搜索历史删除
+        await apiSearch.deleteSearchHistoryRecord(item.id);
+      }
     }
     
     // 更新本地搜索历史
@@ -526,8 +573,11 @@ function clearHistory() {
           if (queryParams.type === 'audio') {
             // 白噪音搜索历史清空
             await apiNoiseSearch.clearSearchHistory()
-          } else {
+          } else if (queryParams.type === 'community') {
             // 社区搜索历史清空
+            await apiSearch.clearSearchHistory()
+          } else {
+            // 默认使用社区搜索历史清空
             await apiSearch.clearSearchHistory()
           }
           searchHistory.value = []
@@ -542,11 +592,29 @@ function clearHistory() {
 
 // 播放搜索结果
 function playResult(result) {
-  uni.showToast({ title: `播放：${result.name}`, icon: 'none' })
-  // TODO: 可在此跳转播放器并传入音频ID
+  console.log('[search] playResult called with:', result);
+  
+  // 检查ID是否已在搜索结果映射阶段正确设置
+  let id = null;
+  if (result.id && /^\d+$/.test(String(result.id))) {
+    id = Number(result.id);
+  }
+  
+  console.log('[search] parsed id:', id);
+  
+  if(id){
+    // 跳转到播放器页面并传递音频ID
+    console.log('[search] navigating to player with id:', id);
+    uni.navigateTo({ url: `/pages/player/index?id=${id}` })
+  } else {
+    console.log('[search] invalid audio id, showing toast');
+    uni.showToast({ title:'音频ID无效', icon:'none' })
+  }
 }
 
 function openPost(result){
+  console.log('[search] openPost called with:', result);
+  
   // 确保ID是有效的数字
   let id = null;
   if (result.id && /^\d+$/.test(String(result.id))) {
@@ -555,10 +623,17 @@ function openPost(result){
     id = Number(result.post_id);
   }
   
+  console.log('[search] parsed post id:', id);
+  
   if(id){
     uni.navigateTo({ url: `/pages/community/detail?id=${id}` })
   } else {
-    uni.showToast({ title:'帖子ID无效', icon:'none' })
+    // 提供更具体的错误信息
+    if (queryParams.type === 'audio') {
+      uni.showToast({ title:'搜索结果类型错误，请重新搜索', icon:'none' })
+    } else {
+      uni.showToast({ title:'帖子ID无效', icon:'none' })
+    }
   }
 }
 

@@ -76,7 +76,7 @@
 import { ref, onMounted } from 'vue'
 import { useGlobalTheme } from '@/composables/useGlobalTheme'
 import { getAuthLocal } from '@/store/auth'
-import { getPlaceholder } from '@/utils/image'
+import { getPlaceholder, safeImageUrl } from '@/utils/image'
 import * as apiCommunity from '@/api/community'
 import PostCard from '@/components/PostCard.vue'
 
@@ -110,7 +110,16 @@ async function loadPosts() {
       image: item.imageUrls?.[0] || item.image || item.cover_image || '',
       favorite_count: item.favorite_count || item.like_count || item.likes || 0,
       comment_count: item.comment_count || item.commentCount || (Array.isArray(item.comments) ? item.comments.length : 0),
-      author: item.author || { name: item.userName || item.user_name || '用户' }
+      author: item.author || { 
+        name: item.userName || item.user_name || '用户',
+        avatar: safeImageUrl(
+          item.author?.avatar || 
+          item.user_avatar || 
+          item.avatar_url ||
+          getPlaceholder('avatar'),
+          'avatar'
+        )
+      }
     })) : []
   } catch (e) {
     console.error('[profile.community] load posts failed', e)

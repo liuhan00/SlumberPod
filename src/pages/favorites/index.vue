@@ -6,6 +6,7 @@
       <view class="tabs">
         <button :class="['tab', {active: tab==='audio'}]" @click="tab='audio'">音频</button>
         <button :class="['tab', {active: tab==='post'}]" @click="tab='post'">帖子</button>
+        <button :class="['tab', {active: tab==='combo'}]" @click="tab='combo'">组合</button>
       </view>
 
       <!-- 音频列表 -->
@@ -24,6 +25,32 @@
         </view>
       </view>
         <view class="empty" v-else>暂无收藏的音频</view>
+      </view>
+
+      <!-- 组合列表 -->
+      <view v-show="tab==='combo'">
+        <view class="list" v-if="comboItems.length">
+          <view class="item" v-for="combo in comboItems" :key="combo.id">
+            <view class="meta">
+              <text class="name">{{ combo.name }}</text>
+              <!-- 显示组合中的音频 -->
+              <view class="combo-audios">
+                <text 
+                  v-for="audioId in combo.audioIds" 
+                  :key="audioId"
+                  :class="['audio-tag', { selected: combo.selectedAudioIds && combo.selectedAudioIds.includes(audioId) }]"
+                >
+                  音频{{ audioId }}
+                </text>
+              </view>
+            </view>
+            <view class="actions">
+              <button class="btn" @click="playCombo(combo)">播放</button>
+              <button class="btn danger" @click="removeCombo(combo.id)">移除</button>
+            </view>
+          </view>
+        </view>
+        <view class="empty" v-else>暂无收藏的组合</view>
       </view>
 
       <!-- 帖子列表 -->
@@ -58,6 +85,7 @@ const fav = useFavoritesStore(); fav.load()
 const store = usePlayerStore()
 const tab = ref('audio')
 const audioItems = computed(()=> fav.items)
+const comboItems = computed(()=> fav.comboItems)
 const posts = ref([])
 function play(t){ store.play(t); try{ uni.navigateTo({ url:`/pages/player/index?id=${t.id}` }) }catch(e){ location.hash = `#/pages/player/index?id=${t.id}` } }
 function remove(id){ fav.remove(id) }
@@ -70,9 +98,25 @@ function handleImageError(e) {
   // 图片加载失败时，safeImageUrl 已经处理了，这里不需要额外操作
 }
 
+// 播放组合
+function playCombo(combo) {
+  // 这里应该实现组合播放逻辑
+  console.log('播放组合:', combo)
+  uni.showToast({ title: '播放组合功能待实现', icon: 'none' })
+}
+
+// 移除组合收藏
+function removeCombo(id) {
+  // 这里应该实现移除组合收藏的逻辑
+  console.log('移除组合收藏:', id)
+  uni.showToast({ title: '移除组合功能待实现', icon: 'none' })
+}
+
 onMounted(async ()=>{
   // 同步音频收藏（若已登录）
   try{ await fav.syncFromServer?.() }catch(e){}
+  // 触发组合收藏列表拉取（GET /api/audios/white-noise/favorites）
+  try{ await fav.syncWhiteNoiseCombos?.() }catch(e){}
   // 拉取帖子点赞
   try{
     const auth = getAuthLocal()
@@ -114,4 +158,23 @@ onMounted(async ()=>{
 .btn{ padding:6px 10px; border-radius:6px; background: var(--input-bg); color: var(--fg) }
 .danger{ background:#ffeded; color:#c62828 }
 .empty{ text-align:center; color: var(--muted); padding:32px 0 }
+
+/* 组合相关样式 */
+.combo-audios { 
+  display: flex; 
+  flex-wrap: wrap; 
+  gap: 4px; 
+  margin-top: 4px; 
+}
+.audio-tag { 
+  font-size: 10px; 
+  padding: 2px 6px; 
+  border-radius: 4px; 
+  background: var(--input-bg); 
+  color: var(--muted);
+}
+.audio-tag.selected { 
+  background: #13303f; 
+  color: #fff; 
+}
 </style>

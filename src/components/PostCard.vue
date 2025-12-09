@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { getPlaceholder } from '@/utils/image'
+import { getPlaceholder, safeImageUrl } from '@/utils/image'
 
 const props = defineProps({
   post: {
@@ -11,13 +11,13 @@ const props = defineProps({
 
 const emit = defineEmits(['like', 'comment', 'share'])
 
-const avatarSrc = ref(props.post.author?.avatar || getPlaceholder('avatar'))
+const avatarSrc = ref(safeImageUrl(props.post.author?.avatar || getPlaceholder('avatar'), 'avatar'))
 
 // 只有在图片URL有效时才设置图片源
 const imageSrc = computed(() => {
   const imgUrl = props.post.image
   // 检查图片URL是否有效（非空且不是默认的占位符URL）
-  if (imgUrl && imgUrl.trim() && !imgUrl.includes('example.com')) {
+  if (imgUrl && imgUrl.trim() && imgUrl !== 'https://example.com/avatar.jpg') {
     return imgUrl
   }
   return null // 返回null表示没有有效图片
@@ -193,7 +193,7 @@ function handleImageError(e) {
     <!-- 统计信息 -->
     <view class="stats">
       <!-- 点赞数 -->
-      <view class="stat-item" @click="handleLike">
+      <view class="stat-item" :class="{ liked: post.user_liked }" @click="handleLike">
         <text class="icon">👍</text>
         <text class="count">{{ post.favorite_count || post.likes || 0 }}</text>
       </view>
@@ -327,6 +327,16 @@ function handleImageError(e) {
 
 .stat-item:hover {
   background: var(--card-bg-hover, rgba(255,255,255,0.1));
+}
+
+.stat-item.liked {
+  background: linear-gradient(135deg, #007aff 0%, #3395ff 100%);
+  color: white;
+}
+
+.stat-item.liked .icon,
+.stat-item.liked .count {
+  color: white;
 }
 
 .icon {

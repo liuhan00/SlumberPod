@@ -1,5 +1,5 @@
 import { getAuthLocal, getAuthToken, validateJwtToken } from '@/store/auth'
-const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.162:3003'
+const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.128:3003'
 
 function buildHeaders(){
   const auth = getAuthLocal()
@@ -139,15 +139,42 @@ export async function uploadAvatar(file) {
 
 export async function getPlayHistory(userId){
   const url = `${BASE}/api/users/${userId}/play-history`
-  const res = await fetch(url, { method: 'GET', headers: buildHeaders() })
   
-  // 处理304状态码 - 表示内容未修改，返回空数组
-  if(res.status === 304) return []
-  if(res.status === 404) return []
+  // 使用 fetch (Web环境)
+  if (typeof fetch === 'function'){
+    const res = await fetch(url, { method: 'GET', headers: buildHeaders() })
+    
+    // 处理304状态码 - 表示内容未修改，返回空数组
+    if(res.status === 304) return []
+    if(res.status === 404) return []
+    
+    const j = await res.json()
+    if(!res.ok) throw new Error(j.message || 'fetch play history failed')
+    return j.data || j || []
+  }
   
-  const j = await res.json()
-  if(!res.ok) throw new Error(j.message || 'fetch play history failed')
-  return j.data || j || []
+  // uni-app fallback (小程序环境)
+  return await new Promise((resolve, reject) => {
+    uni.request({
+      url,
+      method: 'GET',
+      header: buildHeaders(),
+      success(r){
+        const ok = r.statusCode >= 200 && r.statusCode < 300
+        if(r.statusCode === 304 || r.statusCode === 404){
+          resolve([])
+          return
+        }
+        if(!ok){
+          const msg = r.data?.message || r.data?.error || `fetch play history failed: ${r.statusCode}`
+          reject(new Error(msg))
+          return
+        }
+        resolve(r.data?.data || r.data || [])
+      },
+      fail(err){ reject(err) }
+    })
+  })
 }
 
 export async function getFavorites(userId){
@@ -175,4 +202,79 @@ export async function removeFavorite(userId, favoriteId){
   const j = await res.json()
   if(!res.ok) throw new Error(j.message || 'remove favorite failed')
   return j.data || j || null
+}
+
+// 更新用户资料
+export async function updateProfile(profileData) {
+  const url = `${BASE}/api/users/profile`
+  const headers = buildHeaders()
+  
+  // 兼容小程序环境
+  if (typeof uni !== 'undefined' && uni.request) {
+    return new Promise((resolve, reject) => {
+      uni.request({
+        url,
+        method: 'PUT',
+        header: headers,
+        data: profileData,
+        success(res) {
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            resolve(res.data)
+          } else {
+            const errorMsg = res.data?.message || res.data?.error || `更新资料失败: ${res.statusCode}`
+            reject(new Error(errorMsg))
+          }
+        },
+        fail(err) {
+          reject(new Error(`网络请求失败: ${err.errMsg || err.message || JSON.stringify(err)}`))
+        }
+      })
+    })
+  }
+  
+  // Web环境使用fetch
+  const res = await fetch(url, { 
+    method: 'PUT', 
+    headers, 
+    body: JSON.stringify(profileData) 
+  })
+  
+  const j = await res.json()
+  if (!res.ok) throw new Error(j.message || j.error || '更新资料失败')
+  return j
+}
+
+// 获取用户资料
+export async function getProfile() {
+  const url = `${BASE}/api/users/profile`
+  const headers = buildHeaders()
+  
+  // 兼容小程序环境
+  if (typeof uni !== 'undefined' && uni.request) {
+    return new Promise((resolve, reject) => {
+      uni.request({
+        url,
+        method: 'GET',
+        header: headers,
+        success(res) {
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            resolve(res.data)
+          } else {
+            const errorMsg = res.data?.message || res.data?.error || `获取资料失败: ${res.statusCode}`
+            reject(new Error(errorMsg))
+          }
+        },
+        fail(err) {
+          reject(new Error(`网络请求失败: ${err.errMsg || err.message || JSON.stringify(err)}`))
+        }
+      })
+    })
+  }
+  
+  // Web环境使用fetch
+  const res = await fetch(url, { method: 'GET', headers })
+  
+  const j = await res.json()
+  if (!res.ok) throw new Error(j.message || j.error || '获取资料失败')
+  return j
 }

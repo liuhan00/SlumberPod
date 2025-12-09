@@ -28,7 +28,18 @@ import { useHistoryStore } from '@/stores/history'
 const historyStore = useHistoryStore()
 const { items } = storeToRefs(historyStore)
 
-onMounted(()=> historyStore.load())
+onMounted(async ()=> {
+  historyStore.load()
+  // 触发组合播放历史拉取（GET /api/audios/white-noise/history）
+  try{ 
+    // 直接调用新的API获取播放历史
+    const historyData = await getWhiteNoiseHistory({ offset: 0, limit: 100 })
+    // 更新历史存储中的组合播放历史
+    await historyStore.syncWhiteNoiseHistory()
+  }catch(e){
+    console.error('加载播放历史失败:', e)
+  }
+})
 
 const keyword = ref('')
 const selecting = ref(false)

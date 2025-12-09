@@ -95,8 +95,19 @@ function normalizeList(list){
     favorite_count: item.favorite_count ?? item.like_count ?? item.likes ?? 0,
     comment_count: item.comment_count ?? item.commentCount ?? (Array.isArray(item.comments) ? item.comments.length : 0),
     likes: item.likes || item.favorite_count || item.like_count || 0,
+    // 添加用户点赞状态
+    user_liked: item.user_liked || false,
     comments: Array.isArray(item.comments) ? item.comments : [],
-    author: item.author || { name: item.userName || item.user_name || '用户', avatar: safeImageUrl((item.author && item.author.avatar) || item.user_avatar, 'avatar') }
+    author: item.author || { 
+      name: item.userName || item.user_name || '用户', 
+      avatar: safeImageUrl(
+        (item.author && item.author.avatar) || 
+        item.user_avatar || 
+        item.avatar_url ||
+        getPlaceholder('avatar'), 
+        'avatar'
+      ) 
+    }
   }))
 }
 
@@ -219,16 +230,64 @@ async function onLike(id) {
         return
       }
       
+      // 保存当前状态以便回滚
+      const originalLikes = post.likes
+      const originalFavoriteCount = post.favorite_count
+      const originalUserLiked = post.user_liked
+      
       // 调用点赞API
-      await apiCommunity.likePost({ postId: post.backendId || post.id }, auth.token)
+      const result = await apiCommunity.likePost({ postId: post.backendId || post.id }, auth.token)
       
-      // 更新本地数据
-      post.likes++
-      post.favorite_count++
+      // API调用成功后，再更新本地数据
+      // 如果API返回了新的状态，使用API返回的状态更新本地数据
+      if (result && typeof result === 'object') {
+        // 检查是否有明确的点赞状态返回
+        if (result.hasOwnProperty('liked')) {
+          post.user_liked = result.liked
+        }
+        
+        // 检查是否有明确的点赞数返回
+        if (result.hasOwnProperty('like_count')) {
+          post.favorite_count = result.like_count
+          post.likes = result.like_count
+        } else if (result.hasOwnProperty('favorite_count')) {
+          post.favorite_count = result.favorite_count
+          post.likes = result.favorite_count
+        }
+      } else {
+        // 如果API没有返回明确的状态，根据操作类型更新状态
+        if (originalUserLiked) {
+          // 执行取消点赞操作
+          post.likes = Math.max(0, (post.likes || 0) - 1)
+          post.favorite_count = Math.max(0, (post.favorite_count || 0) - 1)
+          post.user_liked = false
+        } else {
+          // 执行点赞操作
+          post.likes = (post.likes || 0) + 1
+          post.favorite_count = (post.favorite_count || 0) + 1
+          post.user_liked = true
+        }
+      }
       
-      uni.showToast({ title: '点赞成功', icon: 'success' })
+      // 根据后端返回的实际状态显示提示信息
+      let message = '操作成功'
+      if (result && typeof result === 'object' && result.hasOwnProperty('liked')) {
+        // 根据后端返回的点赞状态显示提示信息
+        message = result.liked ? '点赞成功' : '已取消点赞'
+      } else {
+        // 如果后端没有返回明确的点赞状态，根据前后状态变化判断
+        if (post.user_liked !== originalUserLiked) {
+          message = post.user_liked ? '点赞成功' : '已取消点赞'
+        }
+      }
+      
+      uni.showToast({ title: message, icon: 'success' })
     } catch (e) {
       console.error('点赞失败:', e)
+      // 回滚到原始状态
+      post.likes = originalLikes
+      post.favorite_count = originalFavoriteCount
+      post.user_liked = originalUserLiked
       uni.showToast({ title: '点赞失败', icon: 'none' })
     }
   }
@@ -268,7 +327,7 @@ async function onComment(id) {
             const newComment = {
               id: result.data?.id || `c${Date.now()}`,
               content: res.content,
-              author: { name: '我', avatar: getPlaceholder('avatar') }
+              author: { name: '我', avatar: safeImageUrl(getPlaceholder('avatar'), 'avatar') }
             }
             
             post.comments.push(newComment)

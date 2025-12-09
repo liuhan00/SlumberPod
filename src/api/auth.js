@@ -1,7 +1,7 @@
 // Unified auth API with platform-specific branches
 import { saveAuthLocal, clearAuthLocal, applySession } from '@/store/auth'
 
-const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.162:3003'
+const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.128:3003'
 
 async function httpFetch(path, opts = {}){
   const url = BASE + path

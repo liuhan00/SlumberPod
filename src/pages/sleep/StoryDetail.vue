@@ -60,8 +60,6 @@
       </view>
     </view>
 
-    <!-- floating circular listen button (above player-section) -->
-    <button class="floating-play" @click="generateAndPlay">听</button>
   </view>
 </template>
 
@@ -112,42 +110,6 @@ const formattedDuration = computed(() => {
   const ss = String(duration.value % 60).padStart(2, '0')
   return `${mm}:${ss}`
 })
-
-async function generateAndPlay() {
-  // 当用户点击"听"时立即显示播放器时间线
-  showPlayerBar.value = true
-  // 重置时间显示
-  currentTime.value = 0
-  duration.value = 0
-
-  try {
-    // 如果已经有音频URL，直接使用
-    if (audioUrl.value) {
-      audioCtx.src = audioUrl.value
-      audioCtx.onCanplay(() => {
-        duration.value = Math.floor(audioCtx.duration || 0)
-        audioCtx.play()
-        isPlaying.value = true
-      })
-      return
-    }
-    
-    // 如果没有音频URL，显示提示
-    uni.showToast({
-      title: '该故事暂无音频',
-      icon: 'none',
-      duration: 2000
-    })
-    
-  } catch (e) {
-    console.error('play audio error:', e)
-    uni.showToast({ 
-      title: '播放失败，请重试', 
-      icon: 'none',
-      duration: 2000 
-    })
-  }
-}
 
 function togglePlayerBar() {
   showPlayerBar.value = !showPlayerBar.value
@@ -321,7 +283,7 @@ onMounted(() => {
 
 .content {
   flex: 1;
-  padding: 12px 16px 80px; /* bottom padding to avoid floating button */
+  padding: 12px 16px 16px; /* adjusted padding */
   box-sizing: border-box;
 }
 
@@ -355,7 +317,7 @@ onMounted(() => {
   position: fixed;
   left: 12px;
   right: 12px;
-  bottom: 90px; /* float above bottom controls */
+  bottom: 18px; /* adjust to be above bottom controls */
   padding: 12px 16px;
   background: rgba(255,255,255,0.85);
   border-radius: 12px;
@@ -368,69 +330,6 @@ onMounted(() => {
   z-index: 20;
   backdrop-filter: blur(6px);
 }
-
-.floating-play {
-  position: fixed;
-  right: 18px;
-  bottom: 110px; /* place above player-section */
-  width: 64px;
-  height: 64px;
-  border-radius: 32px;
-  background: linear-gradient(135deg, #7B61FF, #5A47D1);
-  color: #fff;
-  font-size: 18px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 8px 20px rgba(91, 65, 200, 0.35);
-  border: none;
-  z-index: 40;
-}
-.player-controls {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.control-btn {
-  width: 48px;
-  height: 48px;
-  border-radius: 24px;
-  background: #7B61FF;
-  color: #fff;
-  border: none;
-  font-size: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.progress-info {
-  flex: 1;
-}
-
-.time-text {
-  font-size: 12px;
-  color: var(--muted);
-  font-family: 'Courier New', monospace;
-}
-.floating-play {
-  position: fixed;
-  right: 18px;
-  bottom: 18px;
-  width: 64px;
-  height: 64px;
-  border-radius: 32px;
-  background: linear-gradient(135deg, #7B61FF, #5A47D1);
-  color: #fff;
-  font-size: 18px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 8px 20px rgba(91, 65, 200, 0.35);
-  border: none;
-}
-
 
 /* 音量弹窗样式 */
 .volume-modal-overlay{ position: fixed; left:0; right:0; top:0; bottom:0; background: rgba(0,0,0,0.45); display:flex; align-items:center; justify-content:center; z-index:2000 }
@@ -447,20 +346,3 @@ onMounted(() => {
 .vm-close{ padding:8px 12px; border-radius:8px; background:#111; color:#fff; border:none }
 
 </style>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

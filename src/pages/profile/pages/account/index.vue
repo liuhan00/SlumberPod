@@ -5,7 +5,7 @@ import { useGlobalTheme } from '@/composables/useGlobalTheme'
 import { ref, watch, onMounted } from 'vue'
 import { getPlaceholder } from '@/utils/image'
 // 导入上传头像的API
-import { uploadAvatar } from '@/api/users'
+import { uploadAvatar, updateProfile, getProfile } from '@/api/users'
 import { logout } from '@/api/auth'
 import { setAuthLocal } from '@/store/auth'
 
@@ -48,7 +48,25 @@ const user = ref({
 })
 
 // 初始化用户数据
-onMounted(() => {
+onMounted(async () => {
+  try {
+    // 调用后端接口获取最新的用户资料
+    const profileData = await getProfile()
+    console.log('[Account Page] 获取到的用户资料:', profileData)
+    
+    // 更新用户store中的数据
+    if (profileData && typeof profileData === 'object') {
+      userStore.applyAuth(profileData)
+    }
+  } catch (error) {
+    console.error('[Account Page] 获取用户资料失败:', error)
+    uni.showToast({
+      title: '获取用户资料失败',
+      icon: 'none'
+    })
+  }
+  
+  // 初始化本地用户数据
   user.value.userId = userId.value || ''
   user.value.nickname = nickname.value || '眠友9177'
   user.value.avatar = avatar.value || getPlaceholder('avatar')
@@ -81,10 +99,50 @@ function maskedPhone(phone){
   return s
 }
 
+// 更新用户资料的通用函数
+async function updateUserProfile(field, value) {
+  try {
+    // 构造要更新的数据
+    const profileData = {}
+    profileData[field] = value
+    
+    // 调用API更新资料
+    const result = await updateProfile(profileData)
+    
+    // 更新本地状态
+    user.value[field] = value
+    
+    // 更新store中的状态
+    if (userStore && typeof userStore[`update${field.charAt(0).toUpperCase() + field.slice(1)}`] === 'function') {
+      userStore[`update${field.charAt(0).toUpperCase() + field.slice(1)}`](value)
+    } else {
+      // 如果没有特定的更新函数，使用通用的updateUser方法
+      userStore.updateUser({ [field]: value })
+    }
+    
+    return result
+  } catch (error) {
+    console.error(`[Profile Account] 更新${field}失败:`, error)
+    throw error
+  }
+}
+
 function onBirthdayChange(e){
   const val = e.detail.value
   user.value.birthday = val
-  uni.showToast({ title:'生日已保存' })
+  
+  // 更新生日到服务器
+  updateUserProfile('birthday', val)
+    .then(() => {
+      uni.showToast({ title:'生日已保存' })
+    })
+    .catch((error) => {
+      uni.showToast({ 
+        title: '保存失败: ' + (error.message || '未知错误'), 
+        icon: 'none',
+        duration: 3000
+      })
+    })
 }
 
 function openBirthdayPicker(){
@@ -130,6 +188,9 @@ function changeAvatar(){
             auth.user.avatar = avatarUrl
           } else if (auth.user_metadata) {
             auth.user_metadata.avatar = avatarUrl
+          } else {
+            // 如果没有user或user_metadata字段，直接在auth对象上设置avatar
+            auth.avatar = avatarUrl
           }
           // 保存更新后的认证信息
           setAuthLocal(auth)
@@ -152,21 +213,97 @@ function changeAvatar(){
 }
 
 function editNickname(){
-  uni.showModal({ title:'修改昵称', editable:true, placeholderText:'请输入昵称', success(res){ if(res.confirm) user.value.nickname = res.content } })
+  uni.showModal({ 
+    title:'修改昵称', 
+    editable:true, 
+    placeholderText:'请输入昵称',
+    success: async (res) => { 
+      if(res.confirm && res.content) {
+        try {
+          await updateUserProfile('nickname', res.content)
+          user.value.nickname = res.content
+          uni.showToast({ title:'昵称已保存' })
+        } catch (error) {
+          uni.showToast({ 
+            title: '保存失败: ' + (error.message || '未知错误'), 
+            icon: 'none',
+            duration: 3000
+          })
+        }
+      }
+    } 
+  })
 }
 
 function editBio(){
-  uni.showModal({ title:'修改简介', editable:true, placeholderText:'请输入个人简介（1-50字）', success(res){ if(res.confirm && res.content){ user.value.bio = res.content; uni.showToast({ title:'简介已保存' }) } } })
+  uni.showModal({ 
+    title:'修改简介', 
+    editable:true, 
+    placeholderText:'请输入个人简介（1-50字）',
+    success: async (res) => { 
+      if(res.confirm && res.content){ 
+        try {
+          await updateUserProfile('bio', res.content)
+          user.value.bio = res.content
+          uni.showToast({ title:'简介已保存' })
+        } catch (error) {
+          uni.showToast({ 
+            title: '保存失败: ' + (error.message || '未知错误'), 
+            icon: 'none',
+            duration: 3000
+          })
+        }
+      } 
+    } 
+  })
 }
 
 function editGender(){
   // 去掉"保密"选项，避免重复取消按钮
-  uni.showActionSheet({ itemList:['男','女'], success(res){ if(res.tapIndex < 0) return; const g=['男','女']; user.value.gender = g[res.tapIndex]; uni.showToast({ title:'性别已更新' }) } })
+  uni.showActionSheet({ 
+    itemList:['男','女'], 
+    success: async (res) => { 
+      if(res.tapIndex < 0) return
+      const g=['男','女']
+      const selectedGender = g[res.tapIndex]
+      
+      try {
+        await updateUserProfile('gender', selectedGender)
+        user.value.gender = selectedGender
+        uni.showToast({ title:'性别已更新' })
+      } catch (error) {
+        uni.showToast({ 
+          title: '更新失败: ' + (error.message || '未知错误'), 
+          icon: 'none',
+          duration: 3000
+        })
+      }
+    } 
+  })
 }
 
 function editLocation(){
   const provinces = ['北京市','天津市','河北省','山西省','内蒙古自治区','辽宁省','吉林省','黑龙江省','上海市','江苏省','浙江省','安徽省','福建省','江西省','山东省','河南省','湖北省','湖南省','广东省','广西壮族自治区','海南省','重庆市','四川省','贵州省','云南省','西藏自治区','陕西省','甘肃省','青海省','宁夏回族自治区','新疆维吾尔自治区']
-  uni.showActionSheet({ itemList: provinces, success(res){ const sel = provinces[res.tapIndex]; if(sel){ user.value.location = sel; uni.showToast({ title:'已选择 ' + sel }) } }, fail(){ } })
+  uni.showActionSheet({ 
+    itemList: provinces, 
+    success: async (res) => { 
+      const sel = provinces[res.tapIndex]
+      if(sel){ 
+        try {
+          await updateUserProfile('location', sel)
+          user.value.location = sel
+          uni.showToast({ title:'已选择 ' + sel })
+        } catch (error) {
+          uni.showToast({ 
+            title: '更新失败: ' + (error.message || '未知错误'), 
+            icon: 'none',
+            duration: 3000
+          })
+        }
+      }
+    }, 
+    fail(){ } 
+  })
 }
 
 function editBackground(){
@@ -174,7 +311,26 @@ function editBackground(){
 }
 
 function editPhone(){
-  uni.showModal({ title:'修改手机号', editable:true, placeholderText:'请输入手机号', success(res){ if(res.confirm && res.content){ user.value.phone = res.content; uni.showToast({ title:'手机号已更新' }) } } })
+  uni.showModal({ 
+    title:'修改手机号', 
+    editable:true, 
+    placeholderText:'请输入手机号',
+    success: async (res) => { 
+      if(res.confirm && res.content){ 
+        try {
+          await updateUserProfile('phone', res.content)
+          user.value.phone = res.content
+          uni.showToast({ title:'手机号已更新' })
+        } catch (error) {
+          uni.showToast({ 
+            title: '更新失败: ' + (error.message || '未知错误'), 
+            icon: 'none',
+            duration: 3000
+          })
+        }
+      } 
+    } 
+  })
 }
 
 function openThirdParty(){

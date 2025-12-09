@@ -1,5 +1,5 @@
 import { getAuthLocal } from '@/store/auth'
-const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.162:3003'
+const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.128:3003'
 
 function buildHeaders(token){
   const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' }
@@ -168,11 +168,16 @@ export async function getComments({ postId, page = 1, limit = 20 } = {}){
 }
 
 // 创建评论：/api/community/:postId/comments
-export async function createComment({ postId, content }, token){
+export async function createComment({ postId, content, parent_id }, token){
   if(!postId && postId !== 0) throw new Error('missing postId')
   if(!content) throw new Error('missing content')
   const url = BASE + '/api/community/' + encodeURIComponent(postId) + '/comments'
-  const body = JSON.stringify({ content })
+  // 构造请求体，包含content和可选的parent_id
+  const payload = { content }
+  if (parent_id) {
+    payload.parent_id = parent_id
+  }
+  const body = JSON.stringify(payload)
   try{
     if (typeof fetch === 'function'){
       const res = await fetch(url, { method:'POST', headers: buildHeaders(token), body })
@@ -209,6 +214,28 @@ export async function deleteComment({ commentId }, token){
       }catch(e){ reject(e) }
     })
   }catch(e){ throw e }
+}
+
+// 获取评论回复列表：/api/community/comments/:commentId/replies
+export async function getCommentReplies({ commentId, page = 1, limit = 20 } = {}){
+  if(!commentId && commentId !== 0) throw new Error('missing commentId')
+  const url = BASE + '/api/community/comments/' + encodeURIComponent(commentId) + '/replies?page=' + encodeURIComponent(page) + '&limit=' + encodeURIComponent(limit)
+  try{
+    if (typeof fetch === 'function'){
+      const res = await fetch(url, { method:'GET', headers: buildHeaders() })
+      let j = null
+      try{ j = await res.json() }catch(e){ j = res }
+      if(!res.ok) throw new Error(j?.message || j?.error || 'fetch comment replies failed')
+      return j?.data || j || []
+    }
+    return await new Promise((resolve, reject)=>{
+      try{
+        uni.request({ url, method:'GET', header: buildHeaders(), success(r){ resolve(r.data?.data || r.data || []) }, fail(err){ reject(err) } })
+      }catch(e){ reject(e) }
+    })
+  }catch(e){ 
+    throw e 
+  }
 }
 
 // 点赞/取消点赞评论：/api/community/comments/:commentId/like
@@ -268,7 +295,37 @@ export async function likePost({ postId }, token){
     }
     return await new Promise((resolve, reject)=>{
       try{
-        uni.request({ url, method:'POST', header: buildHeaders(token), success(r){ resolve(r.data) }, fail(err){ reject(err) } })
+        uni.request({ 
+          url, 
+          method:'POST', 
+          header: buildHeaders(token), 
+          success(r){ 
+            // 检查HTTP状态码
+            if(r.statusCode >= 200 && r.statusCode < 300){
+              // 尝试解析响应数据
+              let data = r.data
+              try {
+                if (typeof data === 'string') {
+                  data = JSON.parse(data)
+                }
+              } catch(e) {
+                // 如果解析失败，保持原始数据
+              }
+              resolve(data)
+            } else {
+              // 解析错误信息
+              let errorMsg = 'like post failed'
+              try {
+                const errorData = typeof r.data === 'string' ? JSON.parse(r.data) : r.data
+                errorMsg = errorData?.message || errorData?.error || `like post failed with status ${r.statusCode}`
+              } catch(e) {
+                errorMsg = r.data?.message || r.data?.error || `like post failed with status ${r.statusCode}`
+              }
+              reject(new Error(errorMsg))
+            }
+          }, 
+          fail(err){ reject(err) } 
+        })
       }catch(e){ reject(e) }
     })
   }catch(e){ 

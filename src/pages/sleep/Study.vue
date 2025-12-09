@@ -12,6 +12,7 @@
     <view class="content-wrapper">
       <!-- 顶部状态栏（可选，显示时间等） -->
       <view class="top-status">
+        <button class="back-btn" @click="handleBackClick">←</button>
         <text class="status-time">{{ currentTime }}</text>
       </view>
 
@@ -62,18 +63,24 @@
     <!-- 计时器设置弹窗：选择退出后是否继续计时 -->
     <view v-if="showTimerSettings" class="timer-settings-overlay" @click="closeTimerSettings">
       <view class="timer-settings" @click.stop>
-        <text class="ts-title">退出后下一次计时</text>
-        <view class="ts-option" @click="setResumePolicy(true)">
-          <text class="ts-label">继续计时（下次打开接着本次时间）</text>
-          <text class="ts-check">{{ resumePolicy ? '●' : '○' }}</text>
+        <text class="ts-title">退出学习</text>
+        <text class="ts-subtitle">请选择退出方式</text>
+        <view class="ts-option" @click="handleContinueAndReturn">
+          <view class="ts-option-content">
+            <text class="ts-label">继续计时</text>
+            <text class="ts-desc">暂停当前计时，下次进入接着计时</text>
+          </view>
+          <text class="ts-icon">→</text>
         </view>
-        <view class="ts-option" @click="setResumePolicy(false)">
-          <text class="ts-label">重新计时（下次打开从 00:00 开始）</text>
-          <text class="ts-check">{{ !resumePolicy ? '●' : '○' }}</text>
+        <view class="ts-option" @click="handleResetAndReturn">
+          <view class="ts-option-content">
+            <text class="ts-label">重新计时</text>
+            <text class="ts-desc">结束本次学习，下次从 00:00 开始</text>
+          </view>
+          <text class="ts-icon">→</text>
         </view>
         <view class="ts-actions">
           <button class="ts-cancel" @click="closeTimerSettings">取消</button>
-          <button class="ts-save" @click="saveTimerSettings">保存</button>
         </view>
       </view>
     </view>
@@ -326,27 +333,6 @@ function closeTimerSettings(){
   showTimerSettings.value = false 
 }
 
-function setResumePolicy(val){ 
-  console.log('[Study] 设置恢复策略:', val)
-  resumePolicy.value = !!val 
-}
-
-function saveTimerSettings(){
-  console.log('[Study] 保存计时器设置，策略:', resumePolicy.value)
-  // 保存设置到本地
-  uni.setStorageSync('studyTimerResumePolicy', { resume: resumePolicy.value })
-  showTimerSettings.value = false
-  
-  // 根据用户选择执行相应操作
-  if (resumePolicy.value) {
-    // 用户选择继续计时，调用暂停接口
-    handleExitWithPause()
-  } else {
-    // 用户选择重新计时，调用结束接口
-    handleExitWithEnd()
-  }
-}
-
 function toggleScreen() {
   // 屏幕设置已删除，功能不再需要
 }
@@ -450,7 +436,125 @@ const closeExitConfirm = function() {
   showExitConfirm.value = false
 }
 
+// 处理返回按钮点击
+function handleBackClick() {
+  console.log('[Study] 用户点击返回按钮')
+  // 如果计时器正在运行或存在会话ID,显示计时器设置弹窗
+  if (isTimerRunning.value || sessionId.value) {
+    showTimerSettings.value = true
+    console.log('[Study] 显示计时器设置弹窗')
+  } else {
+    // 直接返回
+    uni.navigateBack()
+  }
+}
 
+// 继续计时并返回
+async function handleContinueAndReturn() {
+  console.log('[Study] 用户选择继续计时')
+  // 保存设置：下次继续计时
+  uni.setStorageSync('studyTimerResumePolicy', { resume: true })
+  resumePolicy.value = true
+  
+  // 调用暂停接口
+  if (sessionId.value) {
+    try {
+      console.log('[Study] 调用 pauseStudySession API')
+      const response = await studyApi.pauseStudySession(sessionId.value)
+      console.log('[Study] pauseStudySession 响应:', response)
+      uni.showToast({ title: '已暂停计时', icon: 'success', duration: 1000 })
+    } catch (error) {
+      console.error('[Study] 暂停计时失败:', error)
+      uni.showToast({ title: '暂停失败', icon: 'none', duration: 1500 })
+    }
+  }
+  
+  // 关闭弹窗并返回
+  closeTimerSettings()
+  setTimeout(() => {
+    uni.navigateBack()
+  }, 300)
+}
+
+// 重新计时并返回
+async function handleResetAndReturn() {
+  console.log('[Study] 用户选择重新计时')
+  // 保存设置：下次重新计时
+  uni.setStorageSync('studyTimerResumePolicy', { resume: false })
+  resumePolicy.value = false
+  
+  // 调用结束接口
+  if (sessionId.value) {
+    try {
+      console.log('[Study] 调用 endStudySession API')
+      const response = await studyApi.endStudySession(sessionId.value)
+      console.log('[Study] endStudySession 响应:', response)
+      
+      // 获取学习时长
+      const duration = response.duration || response.seconds || response.time || elapsedSeconds.value
+      const minutes = Math.floor(duration / 60)
+      const seconds = duration % 60
+      
+      // 获取累计学习统计
+      let statsMessage = `本次学习 ${minutes} 分钟 ${seconds} 秒`
+      try {
+        const stats = await studyApi.getStudyStats()
+        if (stats && typeof stats === 'object' && 'totalMinutes' in stats) {
+          const totalHours = Math.floor(stats.totalMinutes / 60)
+          const remainingMinutes = stats.totalMinutes % 60
+          statsMessage += `\n累计学习 ${totalHours} 小时 ${remainingMinutes} 分钟`
+        }
+      } catch (statsError) {
+        console.warn('[Study] 获取学习统计失败:', statsError)
+      }
+      
+      // 显示鼓励弹窗
+      uni.showModal({
+        title: '学习完成 🎉',
+        content: `${statsMessage}\n\n继续保持，你很棒！`,
+        showCancel: false,
+        confirmText: '好的',
+        success: () => {
+          closeTimerSettings()
+          setTimeout(() => {
+            uni.navigateBack()
+          }, 200)
+        }
+      })
+    } catch (error) {
+      console.error('[Study] 结束计时失败:', error)
+      uni.showToast({ title: '结束失败', icon: 'none', duration: 1500 })
+      // 即使失败也允许返回
+      closeTimerSettings()
+      setTimeout(() => {
+        uni.navigateBack()
+      }, 300)
+    }
+  } else {
+    // 没有会话ID，直接返回
+    closeTimerSettings()
+    uni.navigateBack()
+  }
+}
+
+
+
+// uni-app 特有的页面返回处理函数
+// 必须在所有其他代码之前定义,以便正确注册
+function onBackPress() {
+  console.log('[Study] 页面返回事件触发')
+  // 如果计时器正在运行或存在会话ID，显示计时器设置弹窗
+  if (isTimerRunning.value || sessionId.value) {
+    // 显示计时器设置弹窗，让用户选择继续计时还是重新计时
+    showTimerSettings.value = true
+    console.log('[Study] 显示计时器设置弹窗')
+    // 阻止默认的返回行为
+    return true
+  }
+  // 允许默认的返回行为
+  console.log('[Study] 允许默认返回行为')
+  return false
+}
 
 // 在onMounted中注册onBackPress事件处理器
 onMounted(() => {
@@ -496,94 +600,17 @@ onMounted(() => {
   } catch (e) {
     console.warn('[Study] 注册onBackPress失败:', e)
   }
-  
-  // 另一种注册方式：尝试直接在全局对象上设置
-  try {
-    const globalObject = typeof window !== 'undefined' ? window : global
-    if (globalObject) {
-      globalObject.currentOnBackPress = onBackPress
-      console.log('[Study] onBackPress 已注册到全局对象')
-    }
-  } catch (e) {
-    console.warn('[Study] 注册onBackPress到全局对象失败:', e)
-  }
-  
-  // 尝试使用uni-app提供的事件监听机制
-  // 在某些平台上，可以使用uni.$on来监听特定事件
-  try {
-    if (uni && typeof uni.$on === 'function') {
-      uni.$on('onBackPress', onBackPress)
-      console.log('[Study] onBackPress 已通过uni.$on注册')
-    }
-  } catch (e) {
-    console.warn('[Study] 通过uni.$on注册onBackPress失败:', e)
-  }
-  
-  // 特殊处理：在某些平台可能需要直接赋值
-  try {
-    // 尝试在不同对象上设置onBackPress
-    if (typeof global !== 'undefined' && global) {
-      global.onBackPress = onBackPress
-    }
-    
-    // 在H5平台的特殊处理
-    if (typeof window !== 'undefined' && window) {
-      window.onBackPress = onBackPress
-    }
-    
-    console.log('[Study] onBackPress 已注册到多个全局对象')
-  } catch (e) {
-    console.warn('[Study] 注册onBackPress到多个全局对象失败:', e)
-  }
 })
 
 // 页面返回事件处理（uni-app推荐方式）
-// 这个函数会在页面返回时被调用
 onBeforeUnmount(() => {
   console.log('[Study] 页面即将卸载')
-  // 注意：这里不能阻止返回，只能做一些清理工作
 })
 
-// uni-app 特有的页面返回处理函数
-// 这个函数在某些平台上会被自动调用
-function onBackPress() {
-  console.log('[Study] 页面返回事件触发')
-  // 如果计时器正在运行或存在会话ID，显示计时器设置弹窗
-  if (isTimerRunning.value || sessionId.value) {
-    // 显示计时器设置弹窗，让用户选择继续计时还是重新计时
-    showTimerSettings.value = true
-    console.log('[Study] 显示计时器设置弹窗')
-    // 阻止默认的返回行为
-    return true
-  }
-  // 允许默认的返回行为
-  console.log('[Study] 允许默认返回行为')
-  return false
-}
-
 // 在某些平台上，我们需要显式地将onBackPress函数暴露给页面实例
-// 这是为了确保在页面级别能够正确调用该函数
 defineExpose({
   onBackPress
 })
-
-// 为了确保onBackPress能被调用，我们再添加一个全局函数
-// 这种方式在某些小程序平台上可能更有效
-try {
-  const globalObject = typeof window !== 'undefined' ? window : global
-  if (globalObject) {
-    globalObject.handleStudyBackPress = onBackPress
-  }
-} catch (e) {
-  console.warn('[Study] 注册全局返回处理函数失败:', e)
-}
-
-// 同时，我们也提供一个手动触发的方法，以防自动监听失败
-// 可以通过页面上的按钮来手动触发
-function manualBackPress() {
-  console.log('[Study] 手动触发返回按键处理')
-  return onBackPress()
-}
 
 onUnmounted(() => {
   console.log('[Study] 页面卸载，清理定时器')
@@ -657,6 +684,22 @@ onUnmounted(() => {
   justify-content: space-between;
   align-items: center;
   z-index: 10;
+}
+
+.back-btn {
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
+  border: none;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 20px;
+  color: var(--fg);
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.back-btn:active {
+  background: rgba(255, 255, 255, 0.3);
 }
 
 .status-time {
@@ -795,17 +838,50 @@ onUnmounted(() => {
   width: calc(100vw - 48px);
   max-width: 420px;
   background: rgba(255,255,255,0.98);
-  border-radius: 12px;
-  padding: 16px;
+  border-radius: 16px;
+  padding: 20px;
   box-shadow: 0 12px 40px rgba(0,0,0,0.28);
 }
-.timer-settings .ts-title{ font-size:16px; font-weight:700; margin-bottom:12px; color:#111 }
-.timer-settings .ts-option{ display:flex; justify-content:space-between; align-items:center; padding:12px; border-radius:8px; cursor:pointer }
-.timer-settings .ts-option:hover{ background: rgba(0,0,0,0.03) }
-.timer-settings .ts-label{ color:#222 }
+.timer-settings .ts-title{ font-size:18px; font-weight:700; margin-bottom:4px; color:#111; text-align:center }
+.timer-settings .ts-subtitle{ font-size:14px; color:#666; margin-bottom:16px; display:block; text-align:center }
+.timer-settings .ts-option{ 
+  display:flex; 
+  justify-content:space-between; 
+  align-items:center; 
+  padding:16px; 
+  border-radius:12px; 
+  cursor:pointer; 
+  background:#f8f8f8;
+  margin-bottom:12px;
+  transition: all 0.2s;
+}
+.timer-settings .ts-option:active{ 
+  background: rgba(123,97,255,0.1);
+  transform: scale(0.98);
+}
+.timer-settings .ts-option-content{
+  flex: 1;
+}
+.timer-settings .ts-label{ 
+  color:#111; 
+  font-size:15px; 
+  font-weight:600; 
+  display:block; 
+  margin-bottom:4px;
+}
+.timer-settings .ts-desc{
+  color:#666;
+  font-size:12px;
+  display:block;
+}
+.timer-settings .ts-icon{ 
+  color:#7B61FF; 
+  font-size:20px;
+  margin-left:12px;
+}
 .timer-settings .ts-check{ color:#7B61FF; font-size:18px }
-.timer-settings .ts-actions{ display:flex; gap:10px; justify-content:flex-end; margin-top:12px }
-.timer-settings .ts-cancel{ background:transparent; border:1px solid rgba(0,0,0,0.06); padding:8px 12px; border-radius:8px }
+.timer-settings .ts-actions{ display:flex; gap:10px; justify-content:center; margin-top:8px }
+.timer-settings .ts-cancel{ background:transparent; border:1px solid rgba(0,0,0,0.1); padding:10px 24px; border-radius:8px; color:#666 }
 .timer-settings .ts-save{ background:#111; color:#fff; border:none; padding:8px 12px; border-radius:8px }
 
 /* 退出确认弹窗样式 */

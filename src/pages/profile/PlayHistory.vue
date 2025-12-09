@@ -17,8 +17,8 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useGlobalTheme } from '@/composables/useGlobalTheme'
-import { getPlayHistory } from '@/api/users'
 import { getAuthLocal } from '@/store/auth'
+import { getWhiteNoiseHistory } from '@/api/whiteNoise'
 
 const { bgStyle } = useGlobalTheme()
 const pageStyle = bgStyle
@@ -33,17 +33,17 @@ function formatDate(v){ if(!v) return ''
 async function load(){
   loading.value = true
   try{
-    const auth = getAuthLocal()
-    let userId = auth?.user?.id || auth?.id || auth?.userId || auth?.uuid
-    if(!userId){
-      // try fetch /api/auth/me
-      const base = import.meta.env.VITE_API_BASE || 'http://192.168.1.162:3003'
-      const resp = await fetch(base + '/api/auth/me', { headers: { Authorization: `Bearer ${auth?.token}` } })
-      if(resp.ok){ const j = await resp.json(); userId = j?.user?.id }
-    }
-    if(!userId) throw new Error('无法获取用户 ID，请先登录')
-    const data = await getPlayHistory(userId)
+    // 使用新的白噪音组合播放历史接口
+    console.log('[PlayHistory] 加载白噪音组合播放历史')
+    const data = await getWhiteNoiseHistory({ offset: 0, limit: 100 })
     list.value = Array.isArray(data) ? data : (data.items || data.data || [])
+    
+    // 触发组合播放历史拉取（GET /api/audios/white-noise/history）
+    try{
+      const { useHistoryStore } = await import('@/stores/history')
+      const historyStore = useHistoryStore()
+      await historyStore.syncWhiteNoiseHistory?.()
+    }catch(e){ console.warn('sync combo history failed', e) }
   }catch(e){ error.value = e.message || String(e); console.error(e) }
   finally{ loading.value = false }
 }

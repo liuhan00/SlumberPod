@@ -1,4 +1,4 @@
-const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.162:3003'
+const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.128:3003'
 
 // 统一的请求函数（基于项目中的 httpFetch 实现）
 async function httpFetch(path, opts = {}) {

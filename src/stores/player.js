@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import * as apiHistory from '@/api/history'
 import * as apiAudios from '@/api/audios'
+import * as apiWhiteNoise from '@/api/whiteNoise'
 import { getAuthLocal } from '@/store/auth'
 
 export const usePlayerStore = defineStore('player', {
@@ -75,10 +76,18 @@ export const usePlayerStore = defineStore('player', {
         
         if (hasToken && hasValidId){
           console.log('[player] Recording play with audio ID:', rawId)
-          // 记录播放历史
+          // 单曲播放计数 & 历史（保留）
           apiHistory.addPlayHistory({ audio_id: rawId, play_duration: 0 }).catch(()=>{})
-          // 记录播放行为（调用 POST /api/audios/{audioId}/play 接口）
           apiAudios.incrementPlay(rawId).catch(()=>{})
+
+          // 组合播放记录：当播放列表存在三轨时，将当前三轨作为组合进行记录
+          try{
+            const trio = Array.isArray(this.playlist) ? this.playlist.slice(0,3) : []
+            const comboIds = trio.map(t=> t.metaId).filter(x=> x!=null && /^\d+$/.test(String(x))).map(Number)
+            if(comboIds.length){
+              apiWhiteNoise.recordWhiteNoisePlay({ audio_ids: comboIds, mode: 'single', played_id: Number(this.currentTrack?.metaId) || null }).catch(()=>{})
+            }
+          }catch(err){ console.warn('[player] recordWhiteNoisePlay failed', err) }
         } else {
           console.log('[player] Skipping play record due to missing token or invalid ID')
         }

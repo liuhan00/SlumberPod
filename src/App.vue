@@ -7,7 +7,8 @@
 <script>
 import MiniPlayer from '@/components/MiniPlayer.vue'
 import { usePlayerStore } from '@/stores/player'
-import { getAuthStatus } from '@/store/auth'
+import { useUserStore } from '@/stores/user'
+import { getAuthStatus, getAuthLocal } from '@/store/auth'
 import { getHour, getThemeByHour, baseColors, textColors, gradients } from '@/utils/timeTheme'
 const AUTH_WHITELIST = new Set(['pages/auth/Login', 'pages/auth/Register'])
 let navigationGuardInstalled = false
@@ -76,6 +77,48 @@ function installNavigationGuards(){
 export default {
   components: { MiniPlayer },
   onLaunch() {
+    try {
+      // 初始化用户存储
+      const userStore = useUserStore()
+      const authInfo = getAuthLocal()
+      if (authInfo && typeof authInfo === 'object') {
+        // 如果认证信息中包含用户元数据，则应用到用户存储
+        if (authInfo.user_metadata) {
+          userStore.applyAuth({
+            id: authInfo.id || authInfo.userId,
+            name: authInfo.user_metadata.name,
+            avatar: authInfo.user_metadata.avatar
+          })
+        } 
+        // 如果认证信息本身就是用户对象
+        else if (authInfo.user) {
+          userStore.applyAuth(authInfo.user)
+        }
+        // 如果认证信息包含用户字段
+        else if (authInfo.name || authInfo.avatar) {
+          userStore.applyAuth(authInfo)
+        }
+        // 如果只有token，尝试从服务器获取用户信息
+        else if (authInfo.token) {
+          // 这里我们可以稍后从服务器获取用户信息
+          // 现在至少确保用户存储有一个默认状态
+          userStore.applyAuth(null)
+        }
+      } else {
+        // 如果没有认证信息，确保用户存储有一个默认状态
+        userStore.applyAuth(null)
+      }
+    } catch (e) {
+      console.error('[App] 初始化用户存储失败:', e)
+      // 确保用户存储有一个默认状态
+      try {
+        const userStore = useUserStore()
+        userStore.applyAuth(null)
+      } catch (e2) {
+        console.error('[App] 初始化用户存储失败2:', e2)
+      }
+    }
+
     const store = usePlayerStore()
     const s = uni.getStorageSync('playerState')
     if (s && typeof s === 'object') {

@@ -63,15 +63,16 @@
           <view class="input-group">
             <text class="input-label">作品图标</text>
             <view class="cover-upload-section">
-              <view class="cover-preview" v-if="creationData.cover_url">
-                <image class="cover-image" :src="creationData.cover_url" mode="aspectFill" />
+              <view class="cover-preview" v-if="creationData.cover_image">
+                <image class="cover-image" :src="creationData.cover_image" mode="aspectFill" />
                 <view class="cover-overlay">
                   <text class="cover-change-btn" @click="uploadCoverImage">更换</text>
                 </view>
               </view>
-              <view class="cover-placeholder" v-else @click="uploadCoverImage">
-                <text class="cover-placeholder-icon">📷</text>
-                <text class="cover-placeholder-text">上传图标</text>
+              <view class="cover-upload-placeholder" v-else @click="uploadCoverImage">
+                <text class="upload-icon">📁</text>
+                <text class="upload-text">上传图标</text>
+                <text class="upload-hint">支持 JPG/PNG 格式</text>
               </view>
             </view>
           </view>
@@ -203,7 +204,7 @@ const creationData = ref({
   shareToCommunity: true,
   isPublic: true,
   allowDownload: true,
-  cover_url: '' // 添加封面图片URL字段
+  cover_image: null // 存储选择的图标文件
 })
 
 // 分类选项
@@ -293,66 +294,52 @@ const isValid = computed(() => {
 const canCreate = computed(() => {
   return creationData.value.name.trim() && 
          creationData.value.category && 
-         creationData.value.cover_url &&
+         creationData.value.cover_image &&
          (selectedFile.value || isRecording.value)
 })
 
 // 新的创作函数，同时上传图标和音频文件
 async function createNoise() {
-  if (!canCreate.value) {
-    if (!creationData.value.name.trim()) {
-      return uni.showToast({ title: '请输入作品名称', icon: 'none' })
-    }
-    if (!creationData.value.category) {
-      return uni.showToast({ title: '请选择作品分类', icon: 'none' })
-    }
-    if (!creationData.value.cover_url) {
-      return uni.showToast({ title: '请上传作品图标', icon: 'none' })
-    }
-    if (!selectedFile.value && !isRecording.value) {
-      return uni.showToast({ title: '请选择或录制音频文件', icon: 'none' })
-    }
-    return
+  // 验证输入
+  if (!creationData.value.name?.trim()) {
+    return uni.showToast({ title: '请输入作品名称', icon: 'none' })
+  }
+  if (!creationData.value.category) {
+    return uni.showToast({ title: '请选择分类', icon: 'none' })
+  }
+  if (!creationData.value.cover_image) {
+    return uni.showToast({ title: '请上传作品图标', icon: 'none' })
+  }
+  if (!selectedFile.value && !isRecording.value) {
+    return uni.showToast({ title: '请选择音频文件或开始录制', icon: 'none' })
   }
   
+  // 显示加载提示
   uni.showLoading({ title: '创作中...' })
-  
+
   try {
-    // 检查必填字段
-    if (!creationData.value.name.trim()) {
-      throw new Error('请输入作品名称')
-    }
-    
-    if (!creationData.value.category) {
-      throw new Error('请选择作品分类')
-    }
-    
-    // 检查文件大小限制（50MB）
-    if (selectedFile.value && selectedFile.value.size > 50 * 1024 * 1024) {
-      throw new Error('文件大小不能超过50MB')
-    }
-    
-    // 检查文件类型
+    // 验证文件扩展名
     if (selectedFile.value) {
-      const fileName = selectedFile.value.name.toLowerCase()
-      const allowedExtensions = ['.mp3', '.wav', '.m4a', '.aac', '.ogg', '.flac']
-      const hasValidExtension = allowedExtensions.some(ext => fileName.endsWith(ext))
+      const fileName = selectedFile.value.name || selectedFile.value.path || selectedFile.value.tempFilePath || ''
+      const fileExt = fileName.split('.').pop()?.toLowerCase() || ''
+      const allowedExts = ['mp3', 'wav', 'm4a', 'aac', 'ogg', 'flac']
+      const hasValidExtension = allowedExts.includes(fileExt)
       
       if (!hasValidExtension) {
         throw new Error('请上传音频文件（支持MP3、WAV、M4A、AAC、OGG、FLAC格式）')
       }
     }
     
-    // 使用新的两步上传流程：先上传到 /api/audio/upload，然后创建记录
+    // 准备上传数据
     // 将 category_id 转换为 categoryIds 数组格式
     const categoryIds = creationData.value.category ? [creationData.value.category] : []
     
-    // 准备上传数据
+    // 使用 uploadAudioToStorage 函数替代不存在的 uploadAudioAndCover 函数
     const uploadData = {
       file: selectedFile.value,
       title: creationData.value.name,
       description: creationData.value.description || '',
-      coverUrl: creationData.value.cover_url || '',
+      coverUrl: creationData.value.cover_image || '',
       durationSeconds: duration.value || 0,
       categoryIds: categoryIds,
       isPublic: creationData.value.isPublic ? 1 : 0,
@@ -372,6 +359,7 @@ async function createNoise() {
     }
     
     console.log('[creation] 开始上传音频文件和图标')
+    // 使用 uploadAudioToStorage 替代 uploadAudioAndCover
     const uploadPromise = apiAudios.uploadAudioToStorage(uploadData)
     
     // 显示上传进度
@@ -389,58 +377,41 @@ async function createNoise() {
     console.log('[creation] 上传响应:', resp)
     
     // 优先获取音频ID；兼容不同返回结构
-    const audioIdCandidate = resp?.data?.audioId ?? resp?.data?.id ?? resp?.audioId ?? resp?.id
+    const audioIdCandidate = resp?.data?.audio_id || resp?.data?.id || resp?.audio_id || resp?.id
     if (audioIdCandidate != null) {
       creationData.value.audio_id = String(audioIdCandidate)
       uni.hideLoading()
       uni.showToast({ 
         title: '创作成功', 
         icon: 'success',
-        duration: 2000
+        duration: 2000 
       })
       
-      // 清空已选文件
-      selectedFile.value = null
+      // 重置表单
+      resetForm()
       
-      // 如果设置了分享到社区，则跳转到分享页面
-      if (creationData.value.shareToCommunity) {
-        setTimeout(() => {
-          uni.navigateTo({ 
-            url: '/pages/creation/share?id=' + (resp.data?.id || resp.id || Date.now()) 
-          })
-        }, 800)
-      } else {
-        // 否则返回上一页
-        setTimeout(() => goBack(), 800)
-      }
+      // 跳转到创作列表页面
+      setTimeout(() => {
+        uni.navigateTo({
+          url: '/pages/profile/pages/creations/index'
+        })
+      }, 1500)
+      
+      return
     } else {
-      throw new Error('上传成功但未获取到音频ID，响应：' + JSON.stringify(resp))
+      throw new Error('上传成功但无法获取音频ID，请检查后端返回格式')
     }
-  } catch (e) {
-    console.error('[creation] 创作失败详情:', e)
+  } catch (error) {
+    console.error('[creation] 创作失败详情:', error)
     uni.hideLoading()
-    
-    // 更详细的错误信息
-    let errorMessage = '创作失败'
-    if (e.message && e.message.includes('Network')) {
-      errorMessage = '网络连接失败，请检查网络设置'
-    } else if (e.message && e.message.includes('Failed to fetch')) {
-      errorMessage = '服务器连接失败，请稍后重试'
-    } else if (e.message && e.message.includes('uploadService.uploadAudioToSupabase is not a function')) {
-      errorMessage = '服务器内部错误：上传服务暂时不可用，请联系管理员或稍后重试。'
-    } else if (e.message) {
-      errorMessage = e.message
-    }
-    
     uni.showToast({ 
-      title: errorMessage, 
+      title: error.message || '创作失败，请重试', 
       icon: 'none',
-      duration: 3000
+      duration: 3000 
     })
-  } finally {
-    setTimeout(() => { uploadProgress.value = 0 }, 2000)
   }
 }
+
 // 返回上一页
 function goBack() {
   try {
@@ -568,7 +539,7 @@ function showSoundLibrary() {
 async function uploadAudioCover(audioId, file) {
   if (!audioId) throw new Error('audioId is required')
   
-  const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.135:3003'
+  const BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.128:3003'
   const url = BASE + `/api/audios/${audioId}/cover/upload`
   
   // 获取认证信息
@@ -804,47 +775,20 @@ async function uploadCoverImage() {
     count: 1,
     sizeType: ['compressed'],
     sourceType: ['album', 'camera'],
-    success: async (res) => {
+    success: (res) => {
       const tempFilePath = res.tempFilePaths[0]
       
-      uni.showLoading({
-        title: '上传中...'
-      })
+      // 直接将选择的图片文件存储到创作数据中
+      creationData.value.cover_image = tempFilePath
       
-      try {
-        // 使用新的图标上传接口
-        const uploadResult = await apiAudios.uploadIcon(tempFilePath)
-        
-        // 获取上传后的URL
-        const coverUrl = uploadResult?.url || uploadResult?.data?.url || ''
-        
-        if (!coverUrl) {
-          throw new Error('上传成功但未返回图片URL')
-        }
-        
-        uni.hideLoading()
-        uni.showToast({
-          title: '图标上传成功',
-          icon: 'success',
-          duration: 2000
-        })
-        
-        // 更新创作数据中的封面URL
-        creationData.value.cover_url = coverUrl
-        
-      } catch (error) {
-        uni.hideLoading()
-        console.error('上传图标失败:', error)
-        uni.showToast({
-          title: '上传失败: ' + (error.message || String(error)),
-          icon: 'none',
-          duration: 3000
-        })
-      }
+      uni.showToast({
+        title: '图标选择成功',
+        icon: 'success',
+        duration: 2000
+      })
     },
     fail: () => {
       // 用户取消选择图片，不显示错误提示
-      uni.hideLoading()
     }
   })
 }
@@ -1097,7 +1041,7 @@ onMounted(() => {
   font-weight: 500;
 }
 
-.cover-placeholder {
+.cover-upload-placeholder {
   width: 120px;
   height: 120px;
   border: 2px dashed var(--border, #f0f0f0);
@@ -1110,19 +1054,24 @@ onMounted(() => {
   transition: all 0.2s;
 }
 
-.cover-placeholder:active {
+.cover-upload-placeholder:active {
   border-color: var(--uni-color-primary, #007aff);
   background: var(--input-bg, #f8f9fa);
 }
 
-.cover-placeholder-icon {
+.upload-icon {
   font-size: 32px;
   margin-bottom: 8px;
 }
 
-.cover-placeholder-text {
+.upload-text {
   font-size: 14px;
   color: var(--muted, #666);
+}
+
+.upload-hint {
+  font-size: 12px;
+  color: var(--muted, #999);
 }
 
 /* 录制控制 */

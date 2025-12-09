@@ -2,9 +2,10 @@ import { defineStore } from 'pinia'
 import { listFavorites, addFavorite, removeFavorite, removeFavoriteByRecordId } from '@/api/favorites'
 import { getAudioById } from '@/api/audios'
 import { getAuthLocal } from '@/store/auth'
+import { listWhiteNoiseFavorites } from '@/api/whiteNoise'
 
 export const useFavoritesStore = defineStore('favorites', {
-  state: () => ({ items: [] }),
+  state: () => ({ items: [], comboItems: [] }),
   actions: {
     load(){
       try { const arr = uni.getStorageSync('favoriteItems'); if(Array.isArray(arr)) this.items = arr } catch(e){}
@@ -204,6 +205,34 @@ export const useFavoritesStore = defineStore('favorites', {
       if (numericMeta === null) throw new Error('该音频暂不支持收藏')
       const exists = this.items.some(x=>x.id===numericMeta)
       if(exists) await this.remove(numericMeta); else await this.add(item)
+    },
+    // 同步白噪音组合收藏列表
+    async syncWhiteNoiseCombos(){
+      try {
+        const auth = getAuthLocal()
+        const loggedIn = Boolean(auth?.id || auth?.user?.id || auth?.token || auth?.access_token)
+        if(!loggedIn) return
+        
+        // 使用新的API获取白噪音组合收藏列表
+        const combos = await listWhiteNoiseFavorites({ offset: 0, limit: 100 })
+        // 规范化组合收藏数据
+        const normalized = (Array.isArray(combos) ? combos : []).map((c, idx) => {
+          const ids = c?.audio_ids ?? c?.audios ?? c?.ids ?? []
+          const selectedIds = c?.selected_audio_ids ?? c?.selectedAudios ?? c?.selectedIds ?? []
+          return {
+            id: c?.id ?? c?.combo_id ?? `combo-${idx}`,
+            audioIds: (Array.isArray(ids) ? ids : []).map(n=> Number(n)).filter(n=> !Number.isNaN(n)),
+            selectedAudioIds: (Array.isArray(selectedIds) ? selectedIds : []).map(n=> Number(n)).filter(n=> !Number.isNaN(n)),
+            name: c?.name || c?.title || c?.custom_name || '白噪音组合',
+            ts: c?.created_at ?? c?.favorite_time ?? c?.ts ?? Date.now()
+          }
+        })
+        this.comboItems = normalized
+        // 可选：写入本地缓存
+        try{ uni.setStorageSync('comboFavoriteItems', this.comboItems) }catch(e){}
+      } catch(e){ 
+        console.warn('sync white-noise combos failed', e) 
+      }
     }
   }
 })
